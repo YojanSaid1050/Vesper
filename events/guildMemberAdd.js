@@ -12,7 +12,73 @@ module.exports = {
 
   async execute(member) {
 
-    // WELCOME
+    // =========================
+    // SI ES BOT
+    // =========================
+
+    if (member.user.bot) {
+
+      // AÑADIR ROL BOT
+
+      const role = member.guild.roles.cache.get(
+        config.botRole
+      );
+
+      if (role) {
+
+        await member.roles.add(role)
+          .catch(console.error);
+
+      }
+
+      // ENVIAR LOG BOT
+
+      const botChannel = member.guild.channels.cache.get(
+        config.botLogChannel
+      );
+
+      if (botChannel) {
+
+        const embed = new EmbedBuilder()
+
+          .setTitle('🤖 Bot Added')
+          .setColor('#5865F2')
+
+          .addFields(
+            {
+              name: '🤖 Bot',
+              value: `${member.user.tag}`
+            },
+
+            {
+              name: '🆔 ID',
+              value: `${member.id}`
+            },
+
+            {
+              name: '🎭 Rol añadido',
+              value: `<@&${config.botRole}>`
+            }
+          )
+
+          .setThumbnail(
+            member.user.displayAvatarURL()
+          )
+
+          .setTimestamp();
+
+        botChannel.send({
+          embeds: [embed]
+        });
+
+      }
+
+      return;
+    }
+
+    // =========================
+    // WELCOME NORMAL
+    // =========================
 
     const welcomeChannel = member.guild.channels.cache.get(
       config.welcomeChannel
@@ -20,7 +86,9 @@ module.exports = {
 
     enviarWelcome(member, welcomeChannel);
 
-    // LOG
+    // =========================
+    // LOG NORMAL
+    // =========================
 
     const logChannel = member.guild.channels.cache.get(
       config.logChannel
