@@ -6,14 +6,24 @@ const {
 
 const config = require('../config/config.json');
 
+const {
+  createLog
+} = require('../utils/logCache');
+
 module.exports = {
   name: Events.GuildRoleDelete,
 
   async execute(role) {
 
-    const canal = role.guild.channels.cache.get(
-      config.logChannel
-    );
+    const logKey =
+      `role-delete-${role.id}`;
+
+    if (!createLog(logKey)) return;
+
+    const canal =
+      role.guild.channels.cache.get(
+        config.logChannel
+      );
 
     if (!canal) return;
 
@@ -27,11 +37,13 @@ module.exports = {
           type: AuditLogEvent.RoleDelete
         });
 
-      const deleteLog = fetchedLogs.entries.first();
+      const deleteLog =
+        fetchedLogs.entries.first();
 
       if (deleteLog) {
 
-        executor = deleteLog.executor.tag;
+        executor =
+          deleteLog.executor.tag;
 
       }
 
@@ -44,6 +56,7 @@ module.exports = {
     const embed = new EmbedBuilder()
 
       .setTitle('❌ Role Deleted')
+
       .setColor('#ff4d4d')
 
       .addFields(

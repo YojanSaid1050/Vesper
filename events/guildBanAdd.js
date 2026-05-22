@@ -6,18 +6,26 @@ const {
 
 const config = require('../config/config.json');
 
+const {
+  createLog
+} = require('../utils/logCache');
+
 module.exports = {
   name: Events.GuildBanAdd,
 
   async execute(ban) {
 
-    const canal = ban.guild.channels.cache.get(
-      config.logChannel
-    );
+    const logKey =
+      `ban-${ban.user.id}`;
+
+    if (!createLog(logKey)) return;
+
+    const canal =
+      ban.guild.channels.cache.get(
+        config.logChannel
+      );
 
     if (!canal) return;
-
-    // AUDIT LOG
 
     let executor = 'Desconocido';
 
@@ -29,11 +37,13 @@ module.exports = {
           type: AuditLogEvent.MemberBanAdd
         });
 
-      const banLog = fetchedLogs.entries.first();
+      const banLog =
+        fetchedLogs.entries.first();
 
       if (banLog) {
 
-        executor = banLog.executor.tag;
+        executor =
+          banLog.executor.tag;
 
       }
 
@@ -43,11 +53,10 @@ module.exports = {
 
     }
 
-    // EMBED
-
     const embed = new EmbedBuilder()
 
       .setTitle('🔨 User Banned')
+
       .setColor('#ff0000')
 
       .addFields(

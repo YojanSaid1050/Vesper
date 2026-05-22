@@ -5,6 +5,10 @@ const {
 
 const config = require('../config/config.json');
 
+const {
+  createLog
+} = require('../utils/logCache');
+
 module.exports = {
   name: Events.MessageUpdate,
 
@@ -14,37 +18,48 @@ module.exports = {
 
     if (oldMessage.author?.bot) return;
 
-    if (oldMessage.content === newMessage.content) return;
+    if (oldMessage.content === newMessage.content)
+      return;
 
-    const canal = oldMessage.guild.channels.cache.get(config.logChannel);
+    const logKey =
+      `edit-${newMessage.id}`;
+
+    if (!createLog(logKey)) return;
+
+    const canal =
+      oldMessage.guild.channels.cache.get(
+        config.logChannel
+      );
 
     if (!canal) return;
 
     const embed = new EmbedBuilder()
+
       .setTitle('✏️ Message Edited')
+
       .setColor('#ffaa00')
 
       .addFields(
         {
           name: '👤 Usuario',
-          value: `${oldMessage.author}`,
-          inline: true
+          value: `${oldMessage.author.tag}`
         },
 
         {
           name: '📍 Canal',
-          value: `${oldMessage.channel}`,
-          inline: true
+          value: `${oldMessage.channel}`
         },
 
         {
-          name: '📝 Antes',
-          value: oldMessage.content || '*Vacío*'
+          name: '📌 Antes',
+          value:
+            oldMessage.content || '*Sin texto*'
         },
 
         {
-          name: '📝 Después',
-          value: newMessage.content || '*Vacío*'
+          name: '📌 Después',
+          value:
+            newMessage.content || '*Sin texto*'
         }
       )
 

@@ -6,6 +6,10 @@ const {
 
 const config = require('../config/config.json');
 
+const {
+  createLog
+} = require('../utils/logCache');
+
 module.exports = {
   name: Events.MessageDelete,
 
@@ -15,15 +19,16 @@ module.exports = {
 
     if (message.author?.bot) return;
 
+    const logKey =
+      `delete-${message.id}`;
+
+    if (!createLog(logKey)) return;
+
     const canal = message.guild.channels.cache.get(
       config.logChannel
     );
 
     if (!canal) return;
-
-    // =========================
-    // AUDIT LOG
-    // =========================
 
     let deleter = 'Desconocido';
 
@@ -35,11 +40,13 @@ module.exports = {
           type: AuditLogEvent.MessageDelete
         });
 
-      const deletionLog = fetchedLogs.entries.first();
+      const deletionLog =
+        fetchedLogs.entries.first();
 
       if (deletionLog) {
 
-        deleter = deletionLog.executor.tag;
+        deleter =
+          deletionLog.executor.tag;
 
       }
 
@@ -49,13 +56,10 @@ module.exports = {
 
     }
 
-    // =========================
-    // EMBED
-    // =========================
-
     const embed = new EmbedBuilder()
 
       .setTitle('🗑️ Message Deleted')
+
       .setColor('#ff4d4d')
 
       .addFields(
@@ -78,7 +82,8 @@ module.exports = {
 
         {
           name: '💬 Contenido',
-          value: message.content || '*Sin texto*'
+          value:
+            message.content || '*Sin texto*'
         }
       )
 

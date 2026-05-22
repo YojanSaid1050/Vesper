@@ -6,20 +6,26 @@ const {
 
 const config = require('../config/config.json');
 
+const {
+  createLog
+} = require('../utils/logCache');
+
 module.exports = {
   name: Events.GuildBanRemove,
 
   async execute(ban) {
 
-    const canal = ban.guild.channels.cache.get(
-      config.logChannel
-    );
+    const logKey =
+      `unban-${ban.user.id}`;
+
+    if (!createLog(logKey)) return;
+
+    const canal =
+      ban.guild.channels.cache.get(
+        config.logChannel
+      );
 
     if (!canal) return;
-
-    // =========================
-    // AUDIT LOG
-    // =========================
 
     let executor = 'Desconocido';
 
@@ -31,11 +37,13 @@ module.exports = {
           type: AuditLogEvent.MemberBanRemove
         });
 
-      const unbanLog = fetchedLogs.entries.first();
+      const unbanLog =
+        fetchedLogs.entries.first();
 
       if (unbanLog) {
 
-        executor = unbanLog.executor.tag;
+        executor =
+          unbanLog.executor.tag;
 
       }
 
@@ -45,13 +53,10 @@ module.exports = {
 
     }
 
-    // =========================
-    // EMBED
-    // =========================
-
     const embed = new EmbedBuilder()
 
       .setTitle('🔓 User Unbanned')
+
       .setColor('#57F287')
 
       .addFields(
