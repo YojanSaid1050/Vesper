@@ -1,6 +1,7 @@
 const {
   Events,
-  EmbedBuilder
+  EmbedBuilder,
+  AuditLogEvent
 } = require('discord.js');
 
 const config = require('../config/config.json');
@@ -16,9 +17,9 @@ module.exports = {
 
     if (!canal) return;
 
-    // =========================
-    // NICKNAME
-    // =========================
+    // ==================================================
+    // NICKNAME UPDATE
+    // ==================================================
 
     if (oldMember.nickname !== newMember.nickname) {
 
@@ -58,53 +59,137 @@ module.exports = {
 
     }
 
-    // =========================
-    // TIMEOUT
-    // =========================
+    // ==================================================
+    // TIMEOUT / UNTIMEOUT
+    // ==================================================
 
     if (
       oldMember.communicationDisabledUntilTimestamp !==
       newMember.communicationDisabledUntilTimestamp
     ) {
 
-      const timeout =
-        newMember.communicationDisabledUntilTimestamp;
+      let executor = 'Desconocido';
+      let reason = 'Sin razón';
 
-      const embed = new EmbedBuilder()
+      try {
 
-        .setTitle(
-          timeout
-            ? '🔇 User Timed Out'
-            : '🔊 Timeout Removed'
-        )
+        const fetchedLogs =
+          await newMember.guild.fetchAuditLogs({
+            limit: 1,
+            type: AuditLogEvent.MemberUpdate
+          });
 
-        .setColor(
-          timeout
-            ? '#ff0000'
-            : '#57F287'
-        )
+        const timeoutLog =
+          fetchedLogs.entries.first();
 
-        .addFields({
-          name: '👤 Usuario',
-          value: `${newMember.user.tag}`
-        })
+        if (timeoutLog) {
 
-        .setTimestamp();
+          executor = timeoutLog.executor.tag;
+          reason = timeoutLog.reason || 'Sin razón';
 
-      canal.send({
-        embeds: [embed]
-      });
+        }
+
+      } catch (error) {
+
+        console.error(error);
+
+      }
+
+      // =========================
+      // TIMEOUT
+      // =========================
+
+      if (
+        newMember.communicationDisabledUntilTimestamp
+      ) {
+
+        const timeoutDate =
+          new Date(
+            newMember.communicationDisabledUntilTimestamp
+          );
+
+        const embed = new EmbedBuilder()
+
+          .setTitle('🔇 User Timed Out')
+          .setColor('#ff0000')
+
+          .addFields(
+            {
+              name: '👤 Usuario',
+              value: `${newMember.user.tag}`
+            },
+
+            {
+              name: '🛠️ Timeout por',
+              value: `${executor}`
+            },
+
+            {
+              name: '📅 Hasta',
+              value: `<t:${Math.floor(timeoutDate.getTime() / 1000)}:F>`
+            },
+
+            {
+              name: '📝 Razón',
+              value: reason
+            }
+          )
+
+          .setThumbnail(
+            newMember.user.displayAvatarURL()
+          )
+
+          .setTimestamp();
+
+        canal.send({
+          embeds: [embed]
+        });
+
+      }
+
+      // =========================
+      // UNTIMEOUT
+      // =========================
+
+      else {
+
+        const embed = new EmbedBuilder()
+
+          .setTitle('🔊 Timeout Removed')
+          .setColor('#57F287')
+
+          .addFields(
+            {
+              name: '👤 Usuario',
+              value: `${newMember.user.tag}`
+            },
+
+            {
+              name: '🛠️ Removido por',
+              value: `${executor}`
+            }
+          )
+
+          .setThumbnail(
+            newMember.user.displayAvatarURL()
+          )
+
+          .setTimestamp();
+
+        canal.send({
+          embeds: [embed]
+        });
+
+      }
 
     }
 
-    // =========================
-    // ROLES
-    // =========================
+    // ==================================================
+    // ROLE ADDED
+    // ==================================================
 
     const oldRoles = oldMember.roles.cache;
     const newRoles = newMember.roles.cache;
-
-    // Rol añadido
 
     const addedRole = newRoles.find(
       role => !oldRoles.has(role.id)
@@ -137,7 +222,9 @@ module.exports = {
 
     }
 
-    // Rol removido
+    // ==================================================
+    // ROLE REMOVED
+    // ==================================================
 
     const removedRole = oldRoles.find(
       role => !newRoles.has(role.id)
