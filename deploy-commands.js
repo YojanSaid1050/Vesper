@@ -53,7 +53,7 @@ const rest = new REST({
   try {
 
     console.log(
-      '🔄 Registrando comandos...'
+      '🔄 Registrando comandos globales...'
     );
 
     await rest.put(
@@ -69,7 +69,7 @@ const rest = new REST({
     );
 
     console.log(
-      '✅ Slash commands registrados.'
+      '✅ Comandos globales registrados.'
     );
 
   } catch (error) {
