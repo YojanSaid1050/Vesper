@@ -1,6 +1,7 @@
 const {
   Events,
-  EmbedBuilder
+  EmbedBuilder,
+  AuditLogEvent
 } = require('discord.js');
 
 const config = require('../config/config.json');
@@ -16,6 +17,30 @@ module.exports = {
 
     if (!canal) return;
 
+    let creator = 'Desconocido';
+
+    try {
+
+      const fetchedLogs =
+        await channel.guild.fetchAuditLogs({
+          limit: 1,
+          type: AuditLogEvent.ChannelCreate
+        });
+
+      const createLog = fetchedLogs.entries.first();
+
+      if (createLog) {
+
+        creator = createLog.executor.tag;
+
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
+
     const embed = new EmbedBuilder()
 
       .setTitle('📁 Channel Created')
@@ -28,8 +53,8 @@ module.exports = {
         },
 
         {
-          name: '🆔 ID',
-          value: `${channel.id}`
+          name: '🛠️ Creado por',
+          value: `${creator}`
         }
       )
 

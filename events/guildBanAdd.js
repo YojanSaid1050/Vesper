@@ -1,6 +1,7 @@
 const {
   Events,
-  EmbedBuilder
+  EmbedBuilder,
+  AuditLogEvent
 } = require('discord.js');
 
 const config = require('../config/config.json');
@@ -16,6 +17,34 @@ module.exports = {
 
     if (!canal) return;
 
+    // AUDIT LOG
+
+    let executor = 'Desconocido';
+
+    try {
+
+      const fetchedLogs =
+        await ban.guild.fetchAuditLogs({
+          limit: 1,
+          type: AuditLogEvent.MemberBanAdd
+        });
+
+      const banLog = fetchedLogs.entries.first();
+
+      if (banLog) {
+
+        executor = banLog.executor.tag;
+
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
+
+    // EMBED
+
     const embed = new EmbedBuilder()
 
       .setTitle('🔨 User Banned')
@@ -28,8 +57,8 @@ module.exports = {
         },
 
         {
-          name: '🆔 ID',
-          value: `${ban.user.id}`
+          name: '🛠️ Baneado por',
+          value: `${executor}`
         }
       )
 

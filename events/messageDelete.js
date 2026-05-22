@@ -1,6 +1,7 @@
 const {
   Events,
-  EmbedBuilder
+  EmbedBuilder,
+  AuditLogEvent
 } = require('discord.js');
 
 const config = require('../config/config.json');
@@ -14,25 +15,65 @@ module.exports = {
 
     if (message.author?.bot) return;
 
-    const canal = message.guild.channels.cache.get(config.logChannel);
+    const canal = message.guild.channels.cache.get(
+      config.logChannel
+    );
 
     if (!canal) return;
 
+    // =========================
+    // AUDIT LOG
+    // =========================
+
+    let deleter = 'Desconocido';
+
+    try {
+
+      const fetchedLogs =
+        await message.guild.fetchAuditLogs({
+          limit: 1,
+          type: AuditLogEvent.MessageDelete
+        });
+
+      const deletionLog = fetchedLogs.entries.first();
+
+      if (deletionLog) {
+
+        deleter = deletionLog.executor.tag;
+
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+    }
+
+    // =========================
+    // EMBED
+    // =========================
+
     const embed = new EmbedBuilder()
+
       .setTitle('🗑️ Message Deleted')
       .setColor('#ff4d4d')
 
       .addFields(
         {
           name: '👤 Usuario',
-          value: `${message.author}`,
+          value: `${message.author.tag}`,
+          inline: true
+        },
+
+        {
+          name: '🛠️ Eliminado por',
+          value: `${deleter}`,
           inline: true
         },
 
         {
           name: '📍 Canal',
-          value: `${message.channel}`,
-          inline: true
+          value: `${message.channel}`
         },
 
         {
