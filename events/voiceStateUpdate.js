@@ -3,152 +3,238 @@ const {
   EmbedBuilder
 } = require('discord.js');
 
-const config = require('../config/config.json');
+const config =
+  require('../config/config.json');
 
-const {
-  createLog
-} = require('../utils/logCache');
+// ==================================================
+// CACHE ANTI DUPLICADOS
+// ==================================================
+
+const recentLogs =
+  new Set();
+
+function createVoiceLog(key) {
+
+  if (recentLogs.has(key)) {
+    return false;
+  }
+
+  recentLogs.add(key);
+
+  setTimeout(() => {
+    recentLogs.delete(key);
+  }, 3000);
+
+  return true;
+
+}
 
 module.exports = {
+
   name: Events.VoiceStateUpdate,
 
   async execute(oldState, newState) {
 
-    const canalLogs =
-      newState.guild.channels.cache.get(
-        config.logChannel
+    try {
+
+      // ==================================================
+      // IGNORAR SI NO CAMBIO EL CANAL
+      // ==================================================
+
+      if (
+        oldState.channelId ===
+        newState.channelId
+      ) return;
+
+      // ==================================================
+      // CANAL LOGS
+      // ==================================================
+
+      const canalLogs =
+        newState.guild.channels.cache.get(
+          config.logChannel
+        );
+
+      if (!canalLogs) return;
+
+      // ==================================================
+      // MEMBER
+      // ==================================================
+
+      const member =
+        newState.member;
+
+      if (!member) return;
+
+      // IGNORAR BOTS
+
+      if (member.user.bot) return;
+
+      // ==================================================
+      // JOIN VOICE
+      // ==================================================
+
+      if (
+        !oldState.channelId &&
+        newState.channelId
+      ) {
+
+        const logKey =
+          `join-${member.id}-${newState.channelId}`;
+
+        if (!createVoiceLog(logKey))
+          return;
+
+        const embed =
+          new EmbedBuilder()
+
+            .setColor('#57F287')
+
+            .setTitle(
+              '🔊 Voice Joined'
+            )
+
+            .addFields(
+
+              {
+                name: '👤 Usuario',
+                value: member.user.tag,
+                inline: true
+              },
+
+              {
+                name: '🎤 Canal',
+                value: `${newState.channel}`,
+                inline: true
+              }
+
+            )
+
+            .setTimestamp();
+
+        await canalLogs.send({
+          embeds: [embed]
+        });
+
+        return;
+
+      }
+
+      // ==================================================
+      // LEAVE VOICE
+      // ==================================================
+
+      if (
+        oldState.channelId &&
+        !newState.channelId
+      ) {
+
+        const logKey =
+          `leave-${member.id}-${oldState.channelId}`;
+
+        if (!createVoiceLog(logKey))
+          return;
+
+        const embed =
+          new EmbedBuilder()
+
+            .setColor('#ED4245')
+
+            .setTitle(
+              '📴 Voice Left'
+            )
+
+            .addFields(
+
+              {
+                name: '👤 Usuario',
+                value: member.user.tag,
+                inline: true
+              },
+
+              {
+                name: '🎤 Canal',
+                value: `${oldState.channel}`,
+                inline: true
+              }
+
+            )
+
+            .setTimestamp();
+
+        await canalLogs.send({
+          embeds: [embed]
+        });
+
+        return;
+
+      }
+
+      // ==================================================
+      // MOVE VOICE
+      // ==================================================
+
+      if (
+        oldState.channelId &&
+        newState.channelId &&
+        oldState.channelId !==
+        newState.channelId
+      ) {
+
+        const logKey =
+          `move-${member.id}-${oldState.channelId}-${newState.channelId}`;
+
+        if (!createVoiceLog(logKey))
+          return;
+
+        const embed =
+          new EmbedBuilder()
+
+            .setColor('#5865F2')
+
+            .setTitle(
+              '🔄 Voice Moved'
+            )
+
+            .addFields(
+
+              {
+                name: '👤 Usuario',
+                value: member.user.tag
+              },
+
+              {
+                name: '⬅️ De',
+                value: `${oldState.channel}`,
+                inline: true
+              },
+
+              {
+                name: '➡️ A',
+                value: `${newState.channel}`,
+                inline: true
+              }
+
+            )
+
+            .setTimestamp();
+
+        await canalLogs.send({
+          embeds: [embed]
+        });
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        '❌ Error en VoiceStateUpdate:'
       );
 
-    if (!canalLogs) return;
-
-    const member =
-      newState.member;
-
-    // =========================
-    // JOIN VOICE
-    // =========================
-
-    if (!oldState.channel && newState.channel) {
-
-      const logKey =
-        `voice-join-${member.id}-${newState.channel.id}`;
-
-      if (!createLog(logKey)) return;
-
-      const embed = new EmbedBuilder()
-
-        .setTitle('🔊 Voice Joined')
-
-        .setColor('#57F287')
-
-        .addFields(
-          {
-            name: '👤 Usuario',
-            value: `${member.user.tag}`,
-            inline: true
-          },
-
-          {
-            name: '🎤 Canal',
-            value: `${newState.channel}`,
-            inline: true
-          }
-        )
-
-        .setTimestamp();
-
-      return canalLogs.send({
-        embeds: [embed]
-      });
-
-    }
-
-    // =========================
-    // LEAVE VOICE
-    // =========================
-
-    if (oldState.channel && !newState.channel) {
-
-      const logKey =
-        `voice-leave-${member.id}-${oldState.channel.id}`;
-
-      if (!createLog(logKey)) return;
-
-      const embed = new EmbedBuilder()
-
-        .setTitle('📴 Voice Left')
-
-        .setColor('#ff4d4d')
-
-        .addFields(
-          {
-            name: '👤 Usuario',
-            value: `${member.user.tag}`,
-            inline: true
-          },
-
-          {
-            name: '🎤 Canal',
-            value: `${oldState.channel}`,
-            inline: true
-          }
-        )
-
-        .setTimestamp();
-
-      return canalLogs.send({
-        embeds: [embed]
-      });
-
-    }
-
-    // =========================
-    // MOVE VOICE
-    // =========================
-
-    if (
-      oldState.channel &&
-      newState.channel &&
-      oldState.channel.id !== newState.channel.id
-    ) {
-
-      const logKey =
-        `voice-move-${member.id}-${oldState.channel.id}-${newState.channel.id}`;
-
-      if (!createLog(logKey)) return;
-
-      const embed = new EmbedBuilder()
-
-        .setTitle('🔄 Voice Moved')
-
-        .setColor('#5865F2')
-
-        .addFields(
-          {
-            name: '👤 Usuario',
-            value: `${member.user.tag}`
-          },
-
-          {
-            name: '⬅️ De',
-            value: `${oldState.channel}`,
-            inline: true
-          },
-
-          {
-            name: '➡️ A',
-            value: `${newState.channel}`,
-            inline: true
-          }
-        )
-
-        .setTimestamp();
-
-      return canalLogs.send({
-        embeds: [embed]
-      });
+      console.error(error);
 
     }
 
   }
+
 };

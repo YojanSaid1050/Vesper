@@ -2,50 +2,92 @@ require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
+const express = require('express');
 
 const {
   Client,
   GatewayIntentBits,
-  Collection
+  Collection,
+  Events
 } = require('discord.js');
 
+// ==================================================
+// VALIDAR .ENV
+// ==================================================
+
+if (!process.env.TOKEN) {
+
+  console.error(
+    '❌ TOKEN no encontrado en el archivo .env'
+  );
+
+  process.exit(1);
+
+}
+
+if (!process.env.CLIENT_ID) {
+
+  console.error(
+    '❌ CLIENT_ID no encontrado en el archivo .env'
+  );
+
+  process.exit(1);
+
+}
+
+// ==================================================
+// CLIENTE
+// ==================================================
+
 const client = new Client({
+
   intents: [
+
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildVoiceStates
+
   ]
+
 });
 
-// =========================
-// COLLECTION DE COMANDOS
-// =========================
+// ==================================================
+// COMANDOS
+// ==================================================
 
-client.commands = new Collection();
+client.commands =
+  new Collection();
 
-// =========================
-// EXPRESS PARA RENDER
-// =========================
-
-const express = require('express');
+// ==================================================
+// EXPRESS
+// ==================================================
 
 const app = express();
 
 app.get('/', (req, res) => {
-  res.send('Embers Void Bot Online');
+
+  res.send(
+    'Embers Void Bot Online'
+  );
+
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT =
+  process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`🌐 Web activa en puerto ${PORT}`);
+
+  console.log(
+    `🌐 Web activa en puerto ${PORT}`
+  );
+
 });
 
-// =========================
+// ==================================================
 // CARGAR COMANDOS
-// =========================
+// ==================================================
 
 const commandsPath =
   path.join(__dirname, 'commands');
@@ -54,18 +96,34 @@ if (fs.existsSync(commandsPath)) {
 
   const commandFiles =
     fs.readdirSync(commandsPath)
-      .filter(file => file.endsWith('.js'));
+      .filter(file =>
+        file.endsWith('.js')
+      );
 
   for (const file of commandFiles) {
 
-    const filePath =
-      path.join(commandsPath, file);
+    try {
 
-    const command =
-      require(filePath);
+      const filePath =
+        path.join(commandsPath, file);
 
-    if ('data' in command &&
-        'execute' in command) {
+      const command =
+        require(filePath);
+
+      // VALIDAR
+
+      if (
+        !command.data ||
+        !command.execute
+      ) {
+
+        console.log(
+          `⚠️ ${file} no tiene data o execute`
+        );
+
+        continue;
+
+      }
 
       client.commands.set(
         command.data.name,
@@ -76,61 +134,137 @@ if (fs.existsSync(commandsPath)) {
         `✅ Comando cargado: ${command.data.name}`
       );
 
+    } catch (error) {
+
+      console.error(
+        `❌ Error cargando comando: ${file}`
+      );
+
+      console.error(error);
+
     }
 
   }
 
+} else {
+
+  console.log(
+    '⚠️ La carpeta commands no existe.'
+  );
+
 }
 
-// =========================
-// CARGAR EVENTS
-// =========================
+// ==================================================
+// CARGAR EVENTOS
+// ==================================================
 
 const eventsPath =
   path.join(__dirname, 'events');
 
-const eventFiles =
-  fs.readdirSync(eventsPath)
-    .filter(file => file.endsWith('.js'));
+if (fs.existsSync(eventsPath)) {
 
-for (const file of eventFiles) {
+  const eventFiles =
+    fs.readdirSync(eventsPath)
+      .filter(file =>
+        file.endsWith('.js')
+      );
 
-  const filePath =
-    path.join(eventsPath, file);
+  for (const file of eventFiles) {
 
-  const event =
-    require(filePath);
+    try {
 
-  if (event.once) {
+      const filePath =
+        path.join(eventsPath, file);
 
-    client.once(
-      event.name,
-      (...args) =>
-        event.execute(...args, client)
-    );
+      const event =
+        require(filePath);
 
-  } else {
+      // VALIDAR
 
-    client.on(
-      event.name,
-      (...args) =>
-        event.execute(...args, client)
-    );
+      if (
+        !event.name ||
+        !event.execute
+      ) {
+
+        console.log(
+          `⚠️ ${file} no tiene name o execute`
+        );
+
+        continue;
+
+      }
+
+      // EVENTOS
+
+      if (event.once) {
+
+        client.once(
+
+          event.name,
+
+          (...args) =>
+            event.execute(
+              ...args,
+              client
+            )
+
+        );
+
+      } else {
+
+        client.on(
+
+          event.name,
+
+          (...args) =>
+            event.execute(
+              ...args,
+              client
+            )
+
+        );
+
+      }
+
+      console.log(
+        `✅ Evento cargado: ${event.name}`
+      );
+
+    } catch (error) {
+
+      console.error(
+        `❌ Error cargando evento: ${file}`
+      );
+
+      console.error(error);
+
+    }
 
   }
 
+} else {
+
+  console.log(
+    '⚠️ La carpeta events no existe.'
+  );
+
 }
 
-// =========================
+// ==================================================
 // SLASH COMMANDS
-// =========================
+// ==================================================
 
 client.on(
-  'interactionCreate',
+
+  Events.InteractionCreate,
+
   async interaction => {
 
-    if (!interaction.isChatInputCommand())
-      return;
+    // SOLO SLASH COMMANDS
+
+    if (
+      !interaction.isChatInputCommand()
+    ) return;
 
     const command =
       client.commands.get(
@@ -141,6 +275,8 @@ client.on(
 
     try {
 
+      // EJECUTAR COMANDO
+
       await command.execute(
         interaction,
         client
@@ -150,34 +286,111 @@ client.on(
 
       console.error(error);
 
-      if (
-        interaction.replied ||
-        interaction.deferred
-      ) {
+      try {
 
-        await interaction.followUp({
-          content:
-            '❌ Error ejecutando comando.',
-          ephemeral: true
-        });
+        // SI YA RESPONDIO
 
-      } else {
+        if (
+          interaction.replied ||
+          interaction.deferred
+        ) {
 
-        await interaction.reply({
-          content:
-            '❌ Error ejecutando comando.',
-          ephemeral: true
-        });
+          await interaction.followUp({
+
+            content:
+              '❌ Ocurrió un error ejecutando el comando.',
+
+            flags: 64
+
+          });
+
+        } else {
+
+          // SI NO RESPONDIO
+
+          await interaction.reply({
+
+            content:
+              '❌ Ocurrió un error ejecutando el comando.',
+
+            flags: 64
+
+          });
+
+        }
+
+      } catch (err) {
+
+        console.error(
+          '❌ Error enviando mensaje de error.'
+        );
 
       }
 
     }
 
   }
+
 );
 
-// =========================
-// LOGIN
-// =========================
+// ==================================================
+// READY
+// ==================================================
 
-client.login(process.env.TOKEN);
+client.once(
+
+  Events.ClientReady,
+
+  readyClient => {
+
+    console.log(
+      `🤖 Bot conectado como ${readyClient.user.tag}`
+    );
+
+  }
+
+);
+
+// ==================================================
+// ERRORES GLOBALES
+// ==================================================
+
+process.on(
+
+  'unhandledRejection',
+
+  error => {
+
+    console.error(
+      '❌ Unhandled Rejection:'
+    );
+
+    console.error(error);
+
+  }
+
+);
+
+process.on(
+
+  'uncaughtException',
+
+  error => {
+
+    console.error(
+      '❌ Uncaught Exception:'
+    );
+
+    console.error(error);
+
+  }
+
+);
+
+// ==================================================
+// LOGIN
+// ==================================================
+
+client.login(
+  process.env.TOKEN
+);

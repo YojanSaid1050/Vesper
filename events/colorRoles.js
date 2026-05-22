@@ -8,18 +8,39 @@ module.exports = {
 
   async execute(interaction) {
 
-    // =========================
-    // SOLO BOTONES Y SELECTS
-    // =========================
+    // ==================================================
+    // SOLO BOTONES Y MENUS
+    // ==================================================
 
     if (
       !interaction.isButton() &&
       !interaction.isStringSelectMenu()
     ) return;
 
-    // =========================
+    // ==================================================
+    // EVITAR ERRORES DE INTERACTION
+    // ==================================================
+
+    try {
+
+      if (
+        !interaction.deferred &&
+        !interaction.replied
+      ) {
+
+        await interaction.deferUpdate();
+
+      }
+
+    } catch (err) {
+
+      return;
+
+    }
+
+    // ==================================================
     // ROLES COLORES
-    // =========================
+    // ==================================================
 
     const colorRoles = {
 
@@ -55,9 +76,9 @@ module.exports = {
 
     };
 
-    // =========================
+    // ==================================================
     // ROLES PAISES
-    // =========================
+    // ==================================================
 
     const countryRoles = {
 
@@ -93,9 +114,9 @@ module.exports = {
 
     };
 
-    // =========================
+    // ==================================================
     // ROLES JUEGOS
-    // =========================
+    // ==================================================
 
     const gameRoles = {
 
@@ -128,9 +149,9 @@ module.exports = {
 
     };
 
-    // =========================
+    // ==================================================
     // ROLES PLATAFORMAS
-    // =========================
+    // ==================================================
 
     const platformRoles = {
 
@@ -151,197 +172,197 @@ module.exports = {
 
     };
 
-    // =========================
-    // SELECT MENU COLORES
-    // =========================
+    // ==================================================
+    // SELECT MENU - COLORES
+    // ==================================================
 
     if (
       interaction.isStringSelectMenu() &&
-      interaction.customId ===
-      'select_color'
+      interaction.customId === 'select_color'
     ) {
 
-      const selected =
-        interaction.values[0];
+      try {
 
-      // RESET COLOR
+        const selected =
+          interaction.values[0];
 
-      if (
-        selected ===
-        'color_remove'
-      ) {
+        // REMOVER TODOS LOS COLORES
 
         await interaction.member.roles.remove(
           Object.values(colorRoles)
         );
 
-        return interaction.reply({
+        // RESET
 
-          content:
-            '❌ Color eliminado.',
+        if (
+          selected === 'color_remove'
+        ) return;
 
-          flags: 64
+        // AGREGAR NUEVO COLOR
 
-        });
+        const roleId =
+          colorRoles[selected];
+
+        if (!roleId) return;
+
+        await interaction.member.roles.add(
+          roleId
+        );
+
+      } catch (err) {
+
+        console.error(
+          'Error en colores:',
+          err
+        );
 
       }
 
-      // REMOVER COLORES ANTERIORES
-
-      await interaction.member.roles.remove(
-        Object.values(colorRoles)
-      );
-
-      // AGREGAR NUEVO COLOR
-
-      await interaction.member.roles.add(
-        colorRoles[selected]
-      );
-
-      return interaction.reply({
-
-        content:
-          '✅ Color actualizado.',
-
-        flags: 64
-
-      });
+      return;
 
     }
 
-    // =========================
-    // SELECT MENU PAISES
-    // =========================
+    // ==================================================
+    // SELECT MENU - PAISES
+    // ==================================================
 
     if (
       interaction.isStringSelectMenu() &&
-      interaction.customId ===
-      'select_country'
+      interaction.customId === 'select_country'
     ) {
 
-      const selected =
-        interaction.values[0];
+      try {
 
-      // SOLO 1 PAIS
+        const selected =
+          interaction.values[0];
 
-      await interaction.member.roles.remove(
-        Object.values(countryRoles)
-      );
+        // REMOVER TODOS LOS PAISES
 
-      // AGREGAR NUEVO PAIS
+        await interaction.member.roles.remove(
+          Object.values(countryRoles)
+        );
 
-      await interaction.member.roles.add(
-        countryRoles[selected]
-      );
+        // AGREGAR NUEVO PAIS
 
-      return interaction.reply({
+        const roleId =
+          countryRoles[selected];
 
-        content:
-          '🌍 País actualizado.',
+        if (!roleId) return;
 
-        flags: 64
+        await interaction.member.roles.add(
+          roleId
+        );
 
-      });
+      } catch (err) {
+
+        console.error(
+          'Error en países:',
+          err
+        );
+
+      }
+
+      return;
 
     }
 
-    // =========================
-    // BOTONES JUEGOS
-    // =========================
+    // ==================================================
+    // BOTONES - JUEGOS
+    // ==================================================
 
     if (
       interaction.isButton() &&
       gameRoles[interaction.customId]
     ) {
 
-      const roleId =
-        gameRoles[interaction.customId];
+      try {
 
-      // TOGGLE
+        const roleId =
+          gameRoles[
+            interaction.customId
+          ];
 
-      if (
-        interaction.member.roles.cache.has(roleId)
-      ) {
+        // TOGGLE ROL
 
-        await interaction.member.roles.remove(
-          roleId
+        if (
+          interaction.member.roles.cache.has(
+            roleId
+          )
+        ) {
+
+          await interaction.member.roles.remove(
+            roleId
+          );
+
+        } else {
+
+          await interaction.member.roles.add(
+            roleId
+          );
+
+        }
+
+      } catch (err) {
+
+        console.error(
+          'Error en juegos:',
+          err
         );
-
-        return interaction.reply({
-
-          content:
-            '❌ Juego removido.',
-
-          flags: 64
-
-        });
 
       }
 
-      // AGREGAR
-
-      await interaction.member.roles.add(
-        roleId
-      );
-
-      return interaction.reply({
-
-        content:
-          '✅ Juego añadido.',
-
-        flags: 64
-
-      });
+      return;
 
     }
 
-    // =========================
-    // BOTONES PLATAFORMAS
-    // =========================
+    // ==================================================
+    // BOTONES - PLATAFORMAS
+    // ==================================================
 
     if (
       interaction.isButton() &&
-      platformRoles[interaction.customId]
+      platformRoles[
+        interaction.customId
+      ]
     ) {
 
-      const roleId =
-        platformRoles[interaction.customId];
+      try {
 
-      // TOGGLE
+        const roleId =
+          platformRoles[
+            interaction.customId
+          ];
 
-      if (
-        interaction.member.roles.cache.has(roleId)
-      ) {
+        // TOGGLE ROL
 
-        await interaction.member.roles.remove(
-          roleId
+        if (
+          interaction.member.roles.cache.has(
+            roleId
+          )
+        ) {
+
+          await interaction.member.roles.remove(
+            roleId
+          );
+
+        } else {
+
+          await interaction.member.roles.add(
+            roleId
+          );
+
+        }
+
+      } catch (err) {
+
+        console.error(
+          'Error en plataformas:',
+          err
         );
-
-        return interaction.reply({
-
-          content:
-            '❌ Plataforma removida.',
-
-          flags: 64
-
-        });
 
       }
 
-      // AGREGAR
-
-      await interaction.member.roles.add(
-        roleId
-      );
-
-      return interaction.reply({
-
-        content:
-          '✅ Plataforma añadida.',
-
-        flags: 64
-
-      });
+      return;
 
     }
 

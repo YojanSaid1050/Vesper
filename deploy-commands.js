@@ -1,7 +1,6 @@
 require('dotenv').config();
 
 const fs = require('fs');
-
 const path = require('path');
 
 const {
@@ -9,115 +8,232 @@ const {
   Routes
 } = require('discord.js');
 
-// =========================
-// CONFIG
-// =========================
+// ==================================================
+// VARIABLES
+// ==================================================
 
-const GUILD_ID =
-  '1506580021232406540';
+const CLIENT_ID =
+  process.env.CLIENT_ID;
 
-// =========================
+const TOKEN =
+  process.env.TOKEN;
+
+// ==================================================
+// VALIDAR VARIABLES
+// ==================================================
+
+if (!CLIENT_ID) {
+
+  console.error(
+    '❌ Falta CLIENT_ID en el archivo .env'
+  );
+
+  process.exit(1);
+
+}
+
+if (!TOKEN) {
+
+  console.error(
+    '❌ Falta TOKEN en el archivo .env'
+  );
+
+  process.exit(1);
+
+}
+
+// ==================================================
 // CARGAR COMANDOS
-// =========================
+// ==================================================
 
 const commands = [];
 
 const commandsPath =
   path.join(__dirname, 'commands');
 
+// VALIDAR CARPETA
+
+if (!fs.existsSync(commandsPath)) {
+
+  console.error(
+    '❌ La carpeta "commands" no existe.'
+  );
+
+  process.exit(1);
+
+}
+
+// LEER ARCHIVOS
+
 const commandFiles =
   fs.readdirSync(commandsPath)
-    .filter(file => file.endsWith('.js'));
+    .filter(file =>
+      file.endsWith('.js')
+    );
+
+// ==================================================
+// IMPORTAR COMANDOS
+// ==================================================
 
 for (const file of commandFiles) {
 
-  const filePath =
-    path.join(commandsPath, file);
+  try {
 
-  const command =
-    require(filePath);
+    const filePath =
+      path.join(commandsPath, file);
 
-  if ('data' in command) {
+    const command =
+      require(filePath);
+
+    // VALIDAR ESTRUCTURA
+
+    if (
+      !command.data ||
+      typeof command.data.toJSON !== 'function'
+    ) {
+
+      console.warn(
+        `⚠️ ${file} no tiene "data" válida.`
+      );
+
+      continue;
+
+    }
+
+    if (
+      typeof command.execute !== 'function'
+    ) {
+
+      console.warn(
+        `⚠️ ${file} no tiene "execute".`
+      );
+
+      continue;
+
+    }
+
+    // AGREGAR COMANDO
 
     commands.push(
       command.data.toJSON()
     );
 
-  }
-
-}
-
-// =========================
-// REST
-// =========================
-
-const rest = new REST({
-  version: '10'
-}).setToken(process.env.TOKEN);
-
-// =========================
-// REGISTRAR
-// =========================
-
-(async () => {
-
-  try {
-
-    // =========================
-    // GLOBAL
-    // =========================
-
     console.log(
-      '🌍 Registrando comandos globales...'
-    );
-
-    await rest.put(
-
-      Routes.applicationCommands(
-        process.env.CLIENT_ID
-      ),
-
-      {
-        body: commands
-      }
-
-    );
-
-    console.log(
-      '✅ Comandos globales registrados.'
-    );
-
-    // =========================
-    // GUILD
-    // =========================
-
-    console.log(
-      '🏠 Registrando comandos del servidor...'
-    );
-
-    await rest.put(
-
-      Routes.applicationGuildCommands(
-
-        process.env.CLIENT_ID,
-        GUILD_ID
-
-      ),
-
-      {
-        body: commands
-      }
-
-    );
-
-    console.log(
-      '✅ Comandos del servidor registrados.'
+      `✅ Comando cargado: ${command.data.name || file}`
     );
 
   } catch (error) {
+
+    console.error(
+      `❌ Error cargando comando: ${file}`
+    );
 
     console.error(error);
 
   }
 
+}
+
+// ==================================================
+// VALIDAR COMANDOS
+// ==================================================
+
+if (commands.length === 0) {
+
+  console.error(
+    '❌ No se encontraron comandos válidos.'
+  );
+
+  process.exit(1);
+
+}
+
+// ==================================================
+// REST
+// ==================================================
+
+const rest = new REST({
+  version: '10'
+}).setToken(TOKEN);
+
+// ==================================================
+// REGISTRAR COMANDOS GLOBALES
+// ==================================================
+
+(async () => {
+
+  try {
+
+    console.log(
+      `🌍 Registrando ${commands.length} comandos globales...`
+    );
+
+    await rest.put(
+
+      Routes.applicationCommands(
+        CLIENT_ID
+      ),
+
+      {
+        body: commands
+      }
+
+    );
+
+    console.log(
+      '✅ Comandos globales registrados correctamente.'
+    );
+
+    console.log(
+      '⏳ Los comandos globales pueden tardar varios minutos en aparecer.'
+    );
+
+  } catch (error) {
+
+    console.error(
+      '❌ Error registrando comandos globales.'
+    );
+
+    console.error(error);
+
+    process.exit(1);
+
+  }
+
 })();
+
+// ==================================================
+// ERRORES GLOBALES
+// ==================================================
+
+process.on(
+
+  'unhandledRejection',
+
+  error => {
+
+    console.error(
+      '❌ Unhandled Rejection:'
+    );
+
+    console.error(error);
+
+  }
+
+);
+
+process.on(
+
+  'uncaughtException',
+
+  error => {
+
+    console.error(
+      '❌ Uncaught Exception:'
+    );
+
+    console.error(error);
+
+  }
+
+);
