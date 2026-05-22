@@ -8,7 +8,14 @@ module.exports = {
 
   async execute(interaction) {
 
-    if (!interaction.isButton()) return;
+    // =========================
+    // SOLO BOTONES Y SELECTS
+    // =========================
+
+    if (
+      !interaction.isButton() &&
+      !interaction.isStringSelectMenu()
+    ) return;
 
     // =========================
     // ROLES COLORES
@@ -145,43 +152,50 @@ module.exports = {
     };
 
     // =========================
-    // RESET COLOR
+    // SELECT MENU COLORES
     // =========================
 
     if (
+      interaction.isStringSelectMenu() &&
       interaction.customId ===
-      'color_remove'
+      'select_color'
     ) {
+
+      const selected =
+        interaction.values[0];
+
+      // RESET COLOR
+
+      if (
+        selected ===
+        'color_remove'
+      ) {
+
+        await interaction.member.roles.remove(
+          Object.values(colorRoles)
+        );
+
+        return interaction.reply({
+
+          content:
+            '❌ Color eliminado.',
+
+          flags: 64
+
+        });
+
+      }
+
+      // REMOVER COLORES ANTERIORES
 
       await interaction.member.roles.remove(
         Object.values(colorRoles)
       );
 
-      return interaction.reply({
-
-        content:
-          '❌ Color eliminado.',
-
-        ephemeral: true
-
-      });
-
-    }
-
-    // =========================
-    // COLORES
-    // =========================
-
-    if (
-      colorRoles[interaction.customId]
-    ) {
-
-      await interaction.member.roles.remove(
-        Object.values(colorRoles)
-      );
+      // AGREGAR NUEVO COLOR
 
       await interaction.member.roles.add(
-        colorRoles[interaction.customId]
+        colorRoles[selected]
       );
 
       return interaction.reply({
@@ -189,28 +203,35 @@ module.exports = {
         content:
           '✅ Color actualizado.',
 
-        ephemeral: true
+        flags: 64
 
       });
 
     }
 
     // =========================
-    // PAISES
+    // SELECT MENU PAISES
     // =========================
 
     if (
-      countryRoles[interaction.customId]
+      interaction.isStringSelectMenu() &&
+      interaction.customId ===
+      'select_country'
     ) {
 
-      // SOLO 1 PAIS A LA VEZ
+      const selected =
+        interaction.values[0];
+
+      // SOLO 1 PAIS
 
       await interaction.member.roles.remove(
         Object.values(countryRoles)
       );
 
+      // AGREGAR NUEVO PAIS
+
       await interaction.member.roles.add(
-        countryRoles[interaction.customId]
+        countryRoles[selected]
       );
 
       return interaction.reply({
@@ -218,17 +239,18 @@ module.exports = {
         content:
           '🌍 País actualizado.',
 
-        ephemeral: true
+        flags: 64
 
       });
 
     }
 
     // =========================
-    // JUEGOS
+    // BOTONES JUEGOS
     // =========================
 
     if (
+      interaction.isButton() &&
       gameRoles[interaction.customId]
     ) {
 
@@ -250,11 +272,13 @@ module.exports = {
           content:
             '❌ Juego removido.',
 
-          ephemeral: true
+          flags: 64
 
         });
 
       }
+
+      // AGREGAR
 
       await interaction.member.roles.add(
         roleId
@@ -265,17 +289,18 @@ module.exports = {
         content:
           '✅ Juego añadido.',
 
-        ephemeral: true
+        flags: 64
 
       });
 
     }
 
     // =========================
-    // PLATAFORMAS
+    // BOTONES PLATAFORMAS
     // =========================
 
     if (
+      interaction.isButton() &&
       platformRoles[interaction.customId]
     ) {
 
@@ -297,11 +322,13 @@ module.exports = {
           content:
             '❌ Plataforma removida.',
 
-          ephemeral: true
+          flags: 64
 
         });
 
       }
+
+      // AGREGAR
 
       await interaction.member.roles.add(
         roleId
@@ -312,7 +339,7 @@ module.exports = {
         content:
           '✅ Plataforma añadida.',
 
-        ephemeral: true
+        flags: 64
 
       });
 
