@@ -1,6 +1,7 @@
 require('dotenv').config();
 
 const fs = require('fs');
+const path = require('path');
 
 const {
   Client,
@@ -16,7 +17,9 @@ const client = new Client({
   ]
 });
 
+// =========================
 // EXPRESS PARA RENDER
+// =========================
 
 const express = require('express');
 
@@ -32,17 +35,31 @@ app.listen(PORT, () => {
   console.log(`🌐 Web activa en puerto ${PORT}`);
 });
 
+// =========================
 // CARGAR EVENTS
+// =========================
 
-const eventFiles = fs.readdirSync('./events');
+const eventsPath = path.join(__dirname, 'events');
+
+const eventFiles = fs.readdirSync(eventsPath);
 
 for (const file of eventFiles) {
 
   const event = require(`./events/${file}`);
 
-  const eventName = file.split('.')[0];
+  if (event.once) {
 
-  client.on(eventName, (...args) => event(...args, client));
+    client.once(event.name, (...args) =>
+      event.execute(...args)
+    );
+
+  } else {
+
+    client.on(event.name, (...args) =>
+      event.execute(...args)
+    );
+
+  }
 
 }
 
