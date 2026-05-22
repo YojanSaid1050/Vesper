@@ -28,20 +28,20 @@ module.exports = {
 
         try {
 
-  await member.roles.add(role);
+          await member.roles.add(role);
 
-  console.log(`✅ Rol BOT añadido a ${member.user.tag}`);
+          console.log(`✅ Rol BOT añadido a ${member.user.tag}`);
 
-} catch (error) {
+        } catch (error) {
 
-  console.log('❌ ERROR AL AÑADIR ROL');
-  console.error(error);
+          console.log('❌ ERROR AL AÑADIR ROL');
+          console.error(error);
 
-}
+        }
 
       }
 
-      // ENVIAR LOG BOT
+      // LOG BOT
 
       const botChannel = member.guild.channels.cache.get(
         config.botLogChannel
@@ -83,11 +83,10 @@ module.exports = {
 
       }
 
-      return;
     }
 
     // =========================
-    // WELCOME NORMAL
+    // WELCOME (USUARIOS Y BOTS)
     // =========================
 
     const welcomeChannel = member.guild.channels.cache.get(
@@ -107,12 +106,25 @@ module.exports = {
     if (!logChannel) return;
 
     const embed = new EmbedBuilder()
-      .setTitle('📥 Member Joined')
-      .setColor('#57F287')
+
+      .setTitle(
+        member.user.bot
+          ? '🤖 Bot Joined'
+          : '📥 Member Joined'
+      )
+
+      .setColor(
+        member.user.bot
+          ? '#5865F2'
+          : '#57F287'
+      )
 
       .addFields(
         {
-          name: '👤 Usuario',
+          name: member.user.bot
+            ? '🤖 Bot'
+            : '👤 Usuario',
+
           value: `${member.user.tag}`
         },
 
@@ -122,7 +134,9 @@ module.exports = {
         }
       )
 
-      .setThumbnail(member.user.displayAvatarURL())
+      .setThumbnail(
+        member.user.displayAvatarURL()
+      )
 
       .setTimestamp();
 
