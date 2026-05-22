@@ -26,8 +26,18 @@ module.exports = {
 
       if (role) {
 
-        await member.roles.add(role)
-          .catch(console.error);
+        try {
+
+  await member.roles.add(role);
+
+  console.log(`✅ Rol BOT añadido a ${member.user.tag}`);
+
+} catch (error) {
+
+  console.log('❌ ERROR AL AÑADIR ROL');
+  console.error(error);
+
+}
 
       }
 
