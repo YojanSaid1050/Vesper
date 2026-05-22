@@ -171,19 +171,6 @@ if (fs.existsSync(eventsPath)) {
 
   for (const file of eventFiles) {
 
-    // ⚠️ IGNORAR verifyButton.js
-    // porque ya manejamos botones aquí
-
-    if (file === 'verifyButton.js') {
-
-      console.log(
-        '⚠️ verifyButton.js ignorado para evitar respuestas duplicadas.'
-      );
-
-      continue;
-
-    }
-
     try {
 
       const filePath =
@@ -331,8 +318,12 @@ client.on(
 
           const role =
             interaction.guild.roles.cache.get(
-              'ID_DEL_ROL'
+              '1506900567199449179'
             );
+
+          // ==================================================
+          // VALIDAR ROL
+          // ==================================================
 
           if (!role) {
 

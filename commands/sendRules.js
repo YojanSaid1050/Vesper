@@ -20,11 +20,16 @@ module.exports = {
   async execute(interaction) {
 
     // ============================================
-    // SOLO DEFER PARA EVITAR ERROR DE INTERACTION
+    // RESPUESTA EPHEMERAL
     // ============================================
 
-    await interaction.deferReply({
+    await interaction.reply({
+
+      content:
+        '✅ Panel de reglas enviado.',
+
       flags: 64
+
     });
 
     // ============================================
@@ -171,12 +176,6 @@ module.exports = {
       ]
 
     });
-
-    // ============================================
-    // ELIMINAR RESPUESTA EPHEMERAL
-    // ============================================
-
-    await interaction.deleteReply();
 
   }
 
