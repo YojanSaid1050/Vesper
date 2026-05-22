@@ -11,7 +11,7 @@ module.exports = {
     client.user.setPresence({
       activities: [
         {
-          name: '🌑 the embers beyond the void',
+          name: '𝑡ℎ𝑒 𝑒𝑚𝑏𝑒𝑟𝑠 𝑏𝑒𝑦𝑜𝑛𝑑 𝑡ℎ𝑒 𝑣𝑜𝑖𝑑',
           type: ActivityType.Custom
         }
       ],
