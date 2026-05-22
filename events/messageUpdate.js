@@ -1,4 +1,7 @@
-const { Events } = require('discord.js');
+const {
+  Events,
+  EmbedBuilder
+} = require('discord.js');
 
 const config = require('../config/config.json');
 
@@ -17,21 +20,38 @@ module.exports = {
 
     if (!canal) return;
 
-    await canal.send({
-      content:
-`# ✏️ Message Edited
+    const embed = new EmbedBuilder()
+      .setTitle('✏️ Message Edited')
+      .setColor('#ffaa00')
 
-### 👤 Usuario
-${oldMessage.author}
+      .addFields(
+        {
+          name: '👤 Usuario',
+          value: `${oldMessage.author}`,
+          inline: true
+        },
 
-### 📍 Canal
-${oldMessage.channel}
+        {
+          name: '📍 Canal',
+          value: `${oldMessage.channel}`,
+          inline: true
+        },
 
-### 📝 Antes
-${oldMessage.content || '*Vacío*'}
+        {
+          name: '📝 Antes',
+          value: oldMessage.content || '*Vacío*'
+        },
 
-### 📝 Después
-${newMessage.content || '*Vacío*'}`
+        {
+          name: '📝 Después',
+          value: newMessage.content || '*Vacío*'
+        }
+      )
+
+      .setTimestamp();
+
+    canal.send({
+      embeds: [embed]
     });
 
   }
