@@ -171,6 +171,19 @@ if (fs.existsSync(eventsPath)) {
 
   for (const file of eventFiles) {
 
+    // ⚠️ IGNORAR verifyButton.js
+    // porque ya manejamos botones aquí
+
+    if (file === 'verifyButton.js') {
+
+      console.log(
+        '⚠️ verifyButton.js ignorado para evitar respuestas duplicadas.'
+      );
+
+      continue;
+
+    }
+
     try {
 
       const filePath =
@@ -251,7 +264,7 @@ if (fs.existsSync(eventsPath)) {
 }
 
 // ==================================================
-// SLASH COMMANDS
+// INTERACCIONES
 // ==================================================
 
 client.on(
@@ -260,27 +273,119 @@ client.on(
 
   async interaction => {
 
-    // SOLO SLASH COMMANDS
-
-    if (
-      !interaction.isChatInputCommand()
-    ) return;
-
-    const command =
-      client.commands.get(
-        interaction.commandName
-      );
-
-    if (!command) return;
-
     try {
 
-      // EJECUTAR COMANDO
+      // ==================================================
+      // SLASH COMMANDS
+      // ==================================================
 
-      await command.execute(
-        interaction,
-        client
-      );
+      if (
+        interaction.isChatInputCommand()
+      ) {
+
+        const command =
+          client.commands.get(
+            interaction.commandName
+          );
+
+        if (!command) return;
+
+        await command.execute(
+          interaction,
+          client
+        );
+
+      }
+
+      // ==================================================
+      // BOTON VERIFY
+      // ==================================================
+
+      else if (
+        interaction.isButton()
+      ) {
+
+        if (
+          interaction.customId ===
+          'verify_void'
+        ) {
+
+          // EVITAR DOBLE RESPUESTA
+
+          if (
+            interaction.replied ||
+            interaction.deferred
+          ) return;
+
+          // RESPUESTA INICIAL
+
+          await interaction.deferReply({
+
+            flags: 64
+
+          });
+
+          // ==================================================
+          // ROL
+          // ==================================================
+
+          const role =
+            interaction.guild.roles.cache.get(
+              'ID_DEL_ROL'
+            );
+
+          if (!role) {
+
+            return await interaction.editReply({
+
+              content:
+                '❌ No se encontró el rol.'
+
+            });
+
+          }
+
+          // ==================================================
+          // SI YA TIENE EL ROL
+          // ==================================================
+
+          if (
+            interaction.member.roles.cache.has(
+              role.id
+            )
+          ) {
+
+            return await interaction.editReply({
+
+              content:
+                '🌑 Ya has abrazado el vacío.'
+
+            });
+
+          }
+
+          // ==================================================
+          // AGREGAR ROL
+          // ==================================================
+
+          await interaction.member.roles.add(
+            role
+          );
+
+          // ==================================================
+          // RESPUESTA FINAL
+          // ==================================================
+
+          await interaction.editReply({
+
+            content:
+              '🌑 Has abrazado el vacío.'
+
+          });
+
+        }
+
+      }
 
     } catch (error) {
 
@@ -288,7 +393,9 @@ client.on(
 
       try {
 
+        // ==================================================
         // SI YA RESPONDIO
+        // ==================================================
 
         if (
           interaction.replied ||
@@ -298,20 +405,24 @@ client.on(
           await interaction.followUp({
 
             content:
-              '❌ Ocurrió un error ejecutando el comando.',
+              '❌ Ocurrió un error.',
 
             flags: 64
 
           });
 
-        } else {
+        }
 
-          // SI NO RESPONDIO
+        // ==================================================
+        // SI NO RESPONDIO
+        // ==================================================
+
+        else {
 
           await interaction.reply({
 
             content:
-              '❌ Ocurrió un error ejecutando el comando.',
+              '❌ Ocurrió un error.',
 
             flags: 64
 

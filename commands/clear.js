@@ -10,14 +10,23 @@ module.exports = {
 
     .setName('clear')
 
-    .setDescription('Borra mensajes del canal')
+    .setDescription(
+      'Borra mensajes del canal'
+    )
 
     .addIntegerOption(option =>
       option
+
         .setName('cantidad')
-        .setDescription('Cantidad de mensajes a borrar')
+
+        .setDescription(
+          'Cantidad de mensajes a borrar'
+        )
+
         .setRequired(true)
+
         .setMinValue(1)
+
         .setMaxValue(100)
     )
 
@@ -27,33 +36,97 @@ module.exports = {
 
   async execute(interaction) {
 
-    const cantidad =
-      interaction.options.getInteger(
-        'cantidad'
-      );
+    try {
 
-    const mensajes =
-      await interaction.channel.bulkDelete(
-        cantidad,
-        true
-      );
+      const cantidad =
+        interaction.options.getInteger(
+          'cantidad'
+        );
 
-    const embed = new EmbedBuilder()
+      // ============================================
+      // RESPUESTA INICIAL
+      // ============================================
 
-      .setTitle('🧹 Messages Cleared')
+      await interaction.deferReply({
 
-      .setDescription(
-        `Se eliminaron **${mensajes.size}** mensajes.\n\n👮 Moderador: ${interaction.user}`
-      )
+        flags: 64
 
-      .setColor('#ffffff')
+      });
 
-      .setTimestamp();
+      // ============================================
+      // BORRAR MENSAJES
+      // ============================================
 
-    await interaction.reply({
-      embeds: [embed],
-      ephemeral: true
-    });
+      const mensajes =
+        await interaction.channel.bulkDelete(
+          cantidad,
+          true
+        );
+
+      // ============================================
+      // EMBED
+      // ============================================
+
+      const embed =
+        new EmbedBuilder()
+
+          .setTitle(
+            '🧹 Messages Cleared'
+          )
+
+          .setDescription(
+            `Se eliminaron **${mensajes.size}** mensajes.\n\n👮 Moderador: ${interaction.user}`
+          )
+
+          .setColor('#ffffff')
+
+          .setTimestamp();
+
+      // ============================================
+      // EDITAR RESPUESTA
+      // ============================================
+
+      await interaction.editReply({
+
+        embeds: [embed]
+
+      });
+
+    } catch (error) {
+
+      console.error(error);
+
+      // ============================================
+      // ERROR
+      // ============================================
+
+      if (
+        interaction.deferred ||
+        interaction.replied
+      ) {
+
+        await interaction.editReply({
+
+          content:
+            '❌ Ocurrió un error al borrar mensajes.'
+
+        });
+
+      } else {
+
+        await interaction.reply({
+
+          content:
+            '❌ Ocurrió un error al borrar mensajes.',
+
+          flags: 64
+
+        });
+
+      }
+
+    }
 
   }
+
 };
