@@ -183,4 +183,18 @@ client.on(Events.MessageCreate, async (message) => {
 
 });
 
+const express = require('express');
+
+const app = express();
+
+app.get('/', (req, res) => {
+  res.send('Embers Void Bot Online');
+});
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🌐 Web activa en puerto ${PORT}`);
+});
+
 client.login(process.env.TOKEN);
