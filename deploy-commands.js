@@ -10,6 +10,13 @@ const {
 } = require('discord.js');
 
 // =========================
+// CONFIG
+// =========================
+
+const GUILD_ID =
+  '1506580021232406540';
+
+// =========================
 // CARGAR COMANDOS
 // =========================
 
@@ -41,19 +48,27 @@ for (const file of commandFiles) {
 }
 
 // =========================
-// REGISTRAR COMANDOS
+// REST
 // =========================
 
 const rest = new REST({
   version: '10'
 }).setToken(process.env.TOKEN);
 
+// =========================
+// REGISTRAR
+// =========================
+
 (async () => {
 
   try {
 
+    // =========================
+    // GLOBAL
+    // =========================
+
     console.log(
-      '🔄 Registrando comandos globales...'
+      '🌍 Registrando comandos globales...'
     );
 
     await rest.put(
@@ -70,6 +85,33 @@ const rest = new REST({
 
     console.log(
       '✅ Comandos globales registrados.'
+    );
+
+    // =========================
+    // GUILD
+    // =========================
+
+    console.log(
+      '🏠 Registrando comandos del servidor...'
+    );
+
+    await rest.put(
+
+      Routes.applicationGuildCommands(
+
+        process.env.CLIENT_ID,
+        GUILD_ID
+
+      ),
+
+      {
+        body: commands
+      }
+
+    );
+
+    console.log(
+      '✅ Comandos del servidor registrados.'
     );
 
   } catch (error) {

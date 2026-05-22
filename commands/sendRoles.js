@@ -47,64 +47,7 @@ module.exports = {
     };
 
     // =========================
-    // PANEL PRINCIPAL
-    // =========================
-
-    await interaction.channel.send({
-
-      flags: 32768,
-
-      components: [
-
-        {
-          type: 17,
-
-          accent_color: 16777215,
-
-          spoiler: false,
-
-          components: [
-
-            {
-              type: 10,
-
-              content:
-'# ꧁𓊈𒆜𓆩༺ 𝑪𝒉𝒐𝒐𝒔𝒆 𝒀𝒐𝒖𝒓 𝑷𝒂𝒕𝒉 ༻𓆪𒆜𓊉꧂'
-            },
-
-            {
-              type: 14,
-              spacing: 2
-            },
-
-            {
-              type: 10,
-
-              content:
-'### 𝐸𝑙 𝑣𝑎𝑐𝑖́𝑜 𝑜𝑏𝑠𝑒𝑟𝑣𝑎, 𝑝𝑒𝑟𝑜 𝑙𝑎𝑠 𝑏𝑟𝑎𝑠𝑎𝑠 𝑟𝑒𝑐𝑢𝑒𝑟𝑑𝑎𝑛.\n\n𝐴𝑛𝑡𝑒𝑠 𝑑𝑒 𝑐𝑜𝑛𝑡𝑖𝑛𝑢𝑎𝑟 𝑡𝑢 𝑡𝑟𝑎𝑣𝑒𝑠𝑖́𝑎, 𝑟𝑒𝑣𝑒𝑙𝑎 𝑎𝑞𝑢𝑒𝑙𝑙𝑜 𝑞𝑢𝑒 𝑡𝑒 𝑑𝑒𝑓𝑖𝑛𝑒.'
-            },
-
-            {
-              type: 14,
-              spacing: 2
-            },
-
-            {
-              type: 10,
-
-              content:
-'### ¿𝑄𝑢𝑒́ 𝑙𝑙𝑎𝑚𝑎 𝑔𝑢𝑖́𝑎 𝑡𝑢 𝑐𝑎𝑚𝑖𝑛𝑜?'
-            }
-
-          ]
-        }
-
-      ]
-
-    });
-
-    // =========================
-    // BOTONES COLORES
+    // FILAS COLORES
     // =========================
 
     const colorRow1 =
@@ -183,53 +126,9 @@ module.exports = {
 
         );
 
-    await interaction.channel.send({
-
-      components: [
-        colorRow1,
-        colorRow2,
-        colorRow3
-      ]
-
-    });
-
     // =========================
-    // PAISES
+    // FILAS PAISES
     // =========================
-
-    await interaction.channel.send({
-
-      flags: 32768,
-
-      components: [
-
-        {
-          type: 17,
-
-          accent_color: 16777215,
-
-          spoiler: false,
-
-          components: [
-
-            {
-              type: 14,
-              spacing: 2
-            },
-
-            {
-              type: 10,
-
-              content:
-'### ¿𝐷𝑒 𝑞𝑢𝑒́ 𝑟𝑒𝑖𝑛𝑜 𝑝𝑟𝑜𝑣𝑖𝑒𝑛𝑒𝑠?'
-            }
-
-          ]
-        }
-
-      ]
-
-    });
 
     const countryRow1 =
       new ActionRowBuilder()
@@ -295,52 +194,9 @@ module.exports = {
 
         );
 
-    await interaction.channel.send({
-
-      components: [
-        countryRow1,
-        countryRow2
-      ]
-
-    });
-
     // =========================
-    // JUEGOS
+    // FILAS JUEGOS
     // =========================
-
-    await interaction.channel.send({
-
-      flags: 32768,
-
-      components: [
-
-        {
-          type: 17,
-
-          accent_color: 16777215,
-
-          spoiler: false,
-
-          components: [
-
-            {
-              type: 14,
-              spacing: 2
-            },
-
-            {
-              type: 10,
-
-              content:
-'### ¿𝑄𝑢𝑒́ 𝑚𝑢𝑛𝑑𝑜𝑠 𝑟𝑒𝑐𝑜𝑟𝑟𝑒𝑠?'
-            }
-
-          ]
-        }
-
-      ]
-
-    });
 
     const gamesRow1 =
       new ActionRowBuilder()
@@ -428,52 +284,9 @@ module.exports = {
 
         );
 
-    await interaction.channel.send({
-
-      components: [
-        gamesRow1,
-        gamesRow2
-      ]
-
-    });
-
     // =========================
-    // PLATAFORMAS
+    // FILA PLATAFORMAS
     // =========================
-
-    await interaction.channel.send({
-
-      flags: 32768,
-
-      components: [
-
-        {
-          type: 17,
-
-          accent_color: 16777215,
-
-          spoiler: false,
-
-          components: [
-
-            {
-              type: 14,
-              spacing: 2
-            },
-
-            {
-              type: 10,
-
-              content:
-'### ¿𝐷𝑜́𝑛𝑑𝑒 𝑒𝑚𝑝𝑟𝑒𝑛𝑑𝑒𝑠 𝑡𝑢𝑠 𝑡𝑟𝑎𝑣𝑒𝑠𝑖́𝑎𝑠?'
-            }
-
-          ]
-        }
-
-      ]
-
-    });
 
     const platformRow =
       new ActionRowBuilder()
@@ -522,17 +335,146 @@ module.exports = {
 
         );
 
+    // =========================
+    // ENVIAR PANEL COMPLETO
+    // =========================
+
     await interaction.channel.send({
 
+      flags: 32768,
+
       components: [
+
+        {
+          type: 17,
+
+          accent_color: 16777215,
+
+          spoiler: false,
+
+          components: [
+
+            {
+              type: 10,
+
+              content:
+'# ꧁𓊈𒆜𓆩༺ 𝑪𝒉𝒐𝒐𝒔𝒆 𝒀𝒐𝒖𝒓 𝑷𝒂𝒕𝒉 ༻𓆪𒆜𓊉꧂'
+            },
+
+            {
+              type: 14,
+              spacing: 2
+            },
+
+            {
+              type: 10,
+
+              content:
+'### 𝐸𝑙 𝑣𝑎𝑐𝑖́𝑜 𝑜𝑏𝑠𝑒𝑟𝑣𝑎, 𝑝𝑒𝑟𝑜 𝑙𝑎𝑠 𝑏𝑟𝑎𝑠𝑎𝑠 𝑟𝑒𝑐𝑢𝑒𝑟𝑑𝑎𝑛.\n\n𝐴𝑛𝑡𝑒𝑠 𝑑𝑒 𝑐𝑜𝑛𝑡𝑖𝑛𝑢𝑎𝑟 𝑡𝑢 𝑡𝑟𝑎𝑣𝑒𝑠𝑖́𝑎, 𝑟𝑒𝑣𝑒𝑙𝑎 𝑎𝑞𝑢𝑒𝑙𝑙𝑜 𝑞𝑢𝑒 𝑡𝑒 𝑑𝑒𝑓𝑖𝑛𝑒.'
+            },
+
+            {
+              type: 14,
+              spacing: 2
+            },
+
+            {
+              type: 10,
+
+              content:
+'### ¿𝑄𝑢𝑒́ 𝑙𝑙𝑎𝑚𝑎 𝑔𝑢𝑖́𝑎 𝑡𝑢 𝑐𝑎𝑚𝑖𝑛𝑜?'
+            }
+
+          ]
+        },
+
+        colorRow1,
+        colorRow2,
+        colorRow3,
+
+        {
+          type: 17,
+
+          accent_color: 16777215,
+
+          spoiler: false,
+
+          components: [
+
+            {
+              type: 14,
+              spacing: 2
+            },
+
+            {
+              type: 10,
+
+              content:
+'### ¿𝐷𝑒 𝑞𝑢𝑒́ 𝑟𝑒𝑖𝑛𝑜 𝑝𝑟𝑜𝑣𝑖𝑒𝑛𝑒𝑠?'
+            }
+
+          ]
+        },
+
+        countryRow1,
+        countryRow2,
+
+        {
+          type: 17,
+
+          accent_color: 16777215,
+
+          spoiler: false,
+
+          components: [
+
+            {
+              type: 14,
+              spacing: 2
+            },
+
+            {
+              type: 10,
+
+              content:
+'### ¿𝑄𝑢𝑒́ 𝑚𝑢𝑛𝑑𝑜𝑠 𝑟𝑒𝑐𝑜𝑟𝑟𝑒𝑠?'
+            }
+
+          ]
+        },
+
+        gamesRow1,
+        gamesRow2,
+
+        {
+          type: 17,
+
+          accent_color: 16777215,
+
+          spoiler: false,
+
+          components: [
+
+            {
+              type: 14,
+              spacing: 2
+            },
+
+            {
+              type: 10,
+
+              content:
+'### ¿𝐷𝑜́𝑛𝑑𝑒 𝑒𝑚𝑝𝑟𝑒𝑛𝑑𝑒𝑠 𝑡𝑢𝑠 𝑡𝑟𝑎𝑣𝑒𝑠𝑖́𝑎𝑠?'
+            }
+
+          ]
+        },
+
         platformRow
+
       ]
 
     });
-
-    // =========================
-    // RESPUESTA FINAL
-    // =========================
 
     await interaction.reply({
 
