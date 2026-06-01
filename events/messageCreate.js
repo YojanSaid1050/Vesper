@@ -1,41 +1,75 @@
-const { Events } = require('discord.js');
+const {
+  Events,
+  PermissionFlagsBits
+} = require('discord.js');
 
 const config = require('../config/config.json');
 
-const enviarWelcome = require('../functions/welcomeEmbed');
+const enviarWelcome =
+  require('../functions/welcomeEmbed');
 
-const enviarGoodbye = require('../functions/goodbyeEmbed');
+const enviarGoodbye =
+  require('../functions/goodbyeEmbed');
 
 module.exports = {
+
   name: Events.MessageCreate,
 
   async execute(message) {
 
+    // Ignorar bots
     if (message.author.bot) return;
 
+    // Solo administradores pueden usar comandos de prueba
+    if (
+      message.content.startsWith('!test') &&
+      !message.member.permissions.has(
+        PermissionFlagsBits.Administrator
+      )
+    ) {
+      return;
+    }
+
+    // ============================================
     // TEST WELCOME
+    // ============================================
 
     if (message.content === '!testwelcome') {
 
-      const canal = message.guild.channels.cache.get(
-        config.welcomeChannel
-      );
+      const canal =
+        message.guild.channels.cache.get(
+          config.welcomeChannel
+        );
 
-      enviarWelcome(message.member, canal);
+      if (!canal) return;
+
+      await enviarWelcome(
+        message.member,
+        canal
+      );
 
     }
 
+    // ============================================
     // TEST GOODBYE
+    // ============================================
 
     if (message.content === '!testgoodbye') {
 
-      const canal = message.guild.channels.cache.get(
-        config.goodbyeChannel
-      );
+      const canal =
+        message.guild.channels.cache.get(
+          config.goodbyeChannel
+        );
 
-      enviarGoodbye(message.member, canal);
+      if (!canal) return;
+
+      await enviarGoodbye(
+        message.member,
+        canal
+      );
 
     }
 
   }
+
 };

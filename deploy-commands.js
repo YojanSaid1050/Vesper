@@ -170,15 +170,16 @@ const rest = new REST({
 
     await rest.put(
 
-      Routes.applicationCommands(
-        CLIENT_ID
-      ),
+  Routes.applicationGuildCommands(
+    CLIENT_ID,
+    process.env.GUILD_ID
+  ),
 
-      {
-        body: commands
-      }
+  {
+    body: commands
+  }
 
-    );
+);
 
     console.log(
       '✅ Comandos globales registrados correctamente.'

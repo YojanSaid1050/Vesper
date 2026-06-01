@@ -10,6 +10,8 @@ const {
   Collection,
   Events
 } = require('discord.js');
+const monitorStreams =
+  require('./functions/twitch/monitorStreams');
 
 // ==================================================
 // VALIDAR .ENV
@@ -447,6 +449,22 @@ client.once(
 
     console.log(
       `🤖 Bot conectado como ${readyClient.user.tag}`
+    );
+
+    // ==========================================
+    // MONITOR TWITCH
+    // ==========================================
+
+    monitorStreams(client);
+
+    setInterval(() => {
+
+      monitorStreams(client);
+
+    }, 120000);
+
+    console.log(
+      '📺 Monitor de Twitch iniciado.'
     );
 
   }

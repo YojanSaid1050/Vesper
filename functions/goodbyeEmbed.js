@@ -34,7 +34,7 @@ module.exports = async (member, canal) => {
             items: [
               {
                 media: {
-                  url: 'https://i.redd.it/gaoeixac0boe1.gif'
+                  url: 'https://i.redd.it/vru2z0kl9uaf1.gif'
                 }
               }
             ]
