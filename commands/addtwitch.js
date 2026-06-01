@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 const checkStreamer =
-  require('../functions/twitch/checkStreamer');
+  require('../functions/Twitch/checkStreamer');
 
 const configPath = path.join(
   __dirname,

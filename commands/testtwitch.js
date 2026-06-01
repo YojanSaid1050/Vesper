@@ -4,7 +4,7 @@ const {
 } = require('discord.js');
 
 const checkStreamer =
-  require('../functions/twitch/checkStreamer');
+  require('../functions/Twitch/checkStreamer');
 
 module.exports = {
 
