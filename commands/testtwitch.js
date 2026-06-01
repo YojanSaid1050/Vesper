@@ -1,6 +1,7 @@
 const {
   SlashCommandBuilder,
-  EmbedBuilder
+  EmbedBuilder,
+  PermissionFlagsBits
 } = require('discord.js');
 
 const checkStreamer =
@@ -26,6 +27,10 @@ module.exports = {
         )
 
         .setRequired(true)
+    )
+
+    .setDefaultMemberPermissions(
+      PermissionFlagsBits.Administrator
     ),
 
   async execute(interaction) {
