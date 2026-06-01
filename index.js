@@ -11,7 +11,7 @@ const {
   Events
 } = require('discord.js');
 const monitorStreams =
-  require('./functions/twitch/monitorStreams');
+  require('./functions/Twitch/monitorStreams');
 
 // ==================================================
 // VALIDAR .ENV
