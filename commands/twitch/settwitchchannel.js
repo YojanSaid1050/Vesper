@@ -9,8 +9,10 @@ const path = require('path');
 const configPath = path.join(
   __dirname,
   '..',
+  '..',
   'data',
-  'twitchConfig.json'
+  'twitch',
+  'config.json'
 );
 
 module.exports = {

@@ -4,12 +4,16 @@ const path = require('path');
 const checkStreamer =
   require('./checkStreamer');
 
+const twitchLiveEmbed =
+  require('../Embeds/twitchLiveEmbed');
+
 const configPath = path.join(
   __dirname,
   '..',
   '..',
   'data',
-  'twitchConfig.json'
+  'twitch',
+  'config.json'
 );
 
 const statusPath = path.join(
@@ -17,7 +21,8 @@ const statusPath = path.join(
   '..',
   '..',
   'data',
-  'twitchStatus.json'
+  'twitch',
+  'status.json'
 );
 
 module.exports = async (client) => {
@@ -141,107 +146,31 @@ module.exports = async (client) => {
           `🔴 ${streamer} acaba de iniciar directo`
         );
 
-        await channel.send({
+        await channel.send(
 
-          flags: 32768,
+          twitchLiveEmbed({
 
-          components: [
+            streamer:
+              data.streamer,
 
-            {
+            title:
+              data.title,
 
-              type: 17,
+            game:
+              data.game,
 
-              accent_color: 16777215,
+            viewers:
+              data.viewers,
 
-              spoiler: false,
+            thumbnail:
+              data.thumbnail,
 
-              components: [
+            streamUrl:
+              `https://twitch.tv/${streamer}`
 
-                {
+          })
 
-                  type: 10,
-
-                  content:
-'# ✧°.⋆༺ 𝐴𝑛 𝑒𝑐ℎ𝑜 𝑐𝑎𝑙𝑙𝑠 𝑓𝑟𝑜𝑚 𝑏𝑒𝑦𝑜𝑛𝑑 𝑡ℎ𝑒 𝑣𝑜𝑖𝑑 ༻⋆.°✧'
-
-                },
-
-                {
-
-                  type: 14,
-
-                  spacing: 1
-
-                },
-
-                {
-
-                  type: 10,
-
-                  content:
-`## ｡ ﾟ ꒰ঌ ${data.streamer} 𝒉𝒂𝒔 𝒂𝒘𝒂𝒌𝒆𝒏𝒆𝒅
-
-**${data.title}**
-
-𓆰♕𓆪 𝑹𝒆𝒂𝒍𝒎: ${data.game || 'Unknown'}
-
-𓆩ꨄ︎𓆪 𝑺𝒐𝒖𝒍𝒔 𝑾𝒂𝒕𝒄𝒉𝒊𝒏𝒈: ${data.viewers}
-
-༺𓆩~~𝑎 𝑓𝑜𝑟𝑔𝑜𝑡𝑡𝑒𝑛 𝑒𝑚𝑏𝑒𝑟 𝑔𝑙𝑜𝑤𝑠 𝑜𝑛𝑐𝑒 𝑎𝑔𝑎𝑖𝑛~~𓆪༻`
-
-                },
-
-                {
-
-                  type: 12,
-
-                  items: [
-
-                    {
-
-                      media: {
-
-                        url: data.thumbnail
-
-                      }
-
-                    }
-
-                  ]
-
-                },
-
-                {
-
-                  type: 1,
-
-                  components: [
-
-                    {
-
-                      type: 2,
-
-                      style: 5,
-
-                      label:
-                        '☾ 𝑬𝒏𝒕𝒆𝒓 𝒕𝒉𝒆 𝒂𝒃𝒚𝒔𝒔',
-
-                      url:
-                        `https://twitch.tv/${streamer}`
-
-                    }
-
-                  ]
-
-                }
-
-              ]
-
-            }
-
-          ]
-
-        });
+        );
 
       }
 

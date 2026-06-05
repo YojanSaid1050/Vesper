@@ -6,33 +6,35 @@ const {
 const fs = require('fs');
 const path = require('path');
 
-const checkStreamer =
-  require('../functions/Twitch/checkStreamer');
+const checkUser =
+  require('../../functions/TikTok/checkUser');
 
 const configPath = path.join(
   __dirname,
   '..',
+  '..',
   'data',
-  'twitchConfig.json'
+  'tiktok',
+  'config.json'
 );
 
 module.exports = {
 
   data: new SlashCommandBuilder()
 
-    .setName('addtwitch')
+    .setName('addtiktok')
 
     .setDescription(
-      'Añade un streamer a la lista de seguimiento'
+      'Añade una cuenta TikTok'
     )
 
     .addStringOption(option =>
       option
 
-        .setName('streamer')
+        .setName('usuario')
 
         .setDescription(
-          'Nombre del streamer'
+          'Usuario TikTok'
         )
 
         .setRequired(true)
@@ -50,30 +52,33 @@ module.exports = {
 
     try {
 
-      const streamer =
+      const username =
         interaction.options
-          .getString('streamer')
+          .getString('usuario')
+          .replace('@', '')
           .trim()
           .toLowerCase();
 
-      // =====================================
-      // VALIDAR EN TWITCH
-      // =====================================
+      // ==========================
+      // VALIDAR USUARIO EN TIKTOK
+      // ==========================
 
-      const data =
-        await checkStreamer(streamer);
+      const user =
+        await checkUser(
+          username
+        );
 
-      if (!data?.exists) {
+      if (!user.exists) {
 
-  return interaction.editReply(
-    '❌ Ese canal de Twitch no existe.'
-  );
+        return interaction.editReply(
+          '❌ Esa cuenta de TikTok no existe.'
+        );
 
-}
+      }
 
-      // =====================================
-      // CARGAR CONFIG
-      // =====================================
+      // ==========================
+      // LEER CONFIG
+      // ==========================
 
       const config =
         JSON.parse(
@@ -83,29 +88,29 @@ module.exports = {
           )
         );
 
-      // =====================================
+      // ==========================
       // EVITAR DUPLICADOS
-      // =====================================
+      // ==========================
 
       if (
-        config.streamers.includes(
-          streamer
+        config.users.includes(
+          username
         )
       ) {
 
         return interaction.editReply(
-          '⚠️ Ese streamer ya está registrado.'
+          '⚠️ Ese usuario ya está registrado.'
         );
 
       }
 
-      // =====================================
+      // ==========================
       // GUARDAR
-      // =====================================
+      // ==========================
 
-      config.streamers.push(
-        streamer
-      );
+      config.users.push(
+  user.username.toLowerCase()
+);
 
       fs.writeFileSync(
 
@@ -120,7 +125,7 @@ module.exports = {
       );
 
       await interaction.editReply(
-        `✅ Streamer añadido: **${streamer}**`
+        `✅ Usuario añadido: @${user.username}`
       );
 
     } catch (error) {
@@ -128,7 +133,7 @@ module.exports = {
       console.error(error);
 
       await interaction.editReply(
-        '❌ Error añadiendo streamer.'
+        '❌ Error añadiendo usuario.'
       );
 
     }

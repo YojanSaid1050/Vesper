@@ -6,10 +6,10 @@ const {
 const config = require('../config/config.json');
 
 const enviarWelcome =
-  require('../functions/welcomeEmbed');
+  require('../functions/Embeds/welcomeEmbed');
 
 const enviarGoodbye =
-  require('../functions/goodbyeEmbed');
+  require('../functions/Embeds/goodbyeEmbed');
 
 module.exports = {
 

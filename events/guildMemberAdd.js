@@ -5,7 +5,7 @@ const {
 
 const config = require('../config/config.json');
 
-const enviarWelcome = require('../functions/welcomeEmbed');
+const enviarWelcome = require('../functions/Embeds/welcomeEmbed');
 
 module.exports = {
   name: Events.GuildMemberAdd,

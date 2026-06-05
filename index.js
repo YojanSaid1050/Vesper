@@ -13,6 +13,12 @@ const {
 const monitorStreams =
   require('./functions/Twitch/monitorStreams');
 
+const monitorTikTokLives =
+  require('./functions/TikTok/monitorLives');
+
+const monitorTikTokVideos =
+  require('./functions/TikTok/monitorVideos');
+
 // ==================================================
 // VALIDAR .ENV
 // ==================================================
@@ -94,25 +100,52 @@ app.listen(PORT, () => {
 const commandsPath =
   path.join(__dirname, 'commands');
 
+function getCommandFiles(dir) {
+
+  let results = [];
+
+  const files =
+    fs.readdirSync(dir);
+
+  for (const file of files) {
+
+    const filePath =
+      path.join(dir, file);
+
+    if (
+      fs.statSync(filePath).isDirectory()
+    ) {
+
+      results =
+        results.concat(
+          getCommandFiles(filePath)
+        );
+
+    } else if (
+      file.endsWith('.js')
+    ) {
+
+      results.push(filePath);
+
+    }
+
+  }
+
+  return results;
+
+}
+
 if (fs.existsSync(commandsPath)) {
 
   const commandFiles =
-    fs.readdirSync(commandsPath)
-      .filter(file =>
-        file.endsWith('.js')
-      );
+    getCommandFiles(commandsPath);
 
-  for (const file of commandFiles) {
+  for (const filePath of commandFiles) {
 
     try {
 
-      const filePath =
-        path.join(commandsPath, file);
-
       const command =
         require(filePath);
-
-      // VALIDAR
 
       if (
         !command.data ||
@@ -120,7 +153,7 @@ if (fs.existsSync(commandsPath)) {
       ) {
 
         console.log(
-          `⚠️ ${file} no tiene data o execute`
+          `⚠️ ${filePath} no tiene data o execute`
         );
 
         continue;
@@ -139,7 +172,7 @@ if (fs.existsSync(commandsPath)) {
     } catch (error) {
 
       console.error(
-        `❌ Error cargando comando: ${file}`
+        `❌ Error cargando comando: ${filePath}`
       );
 
       console.error(error);
@@ -467,10 +500,35 @@ client.once(
       '📺 Monitor de Twitch iniciado.'
     );
 
+    // ==========================================
+    // TIKTOK VIDEOS
+    // ==========================================
+
+    monitorTikTokVideos(client);
+
+    console.log(
+      '🎬 Monitor TikTok Videos iniciado.'
+    );
+
+    // ==========================================
+    // TIKTOK LIVES
+    // ==========================================
+
+    monitorTikTokLives(client);
+
+    setInterval(() => {
+
+      monitorTikTokLives(client);
+
+    }, 120000);
+
+    console.log(
+      '🔴 Monitor TikTok Lives iniciado.'
+    );
+
   }
 
 );
-
 // ==================================================
 // ERRORES GLOBALES
 // ==================================================

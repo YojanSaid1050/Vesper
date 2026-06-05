@@ -6,28 +6,26 @@ const {
 const fs = require('fs');
 const path = require('path');
 
+const checkStreamer =
+  require('../../functions/Twitch/checkStreamer');
+
 const configPath = path.join(
   __dirname,
   '..',
-  'data',
-  'twitchConfig.json'
-);
-
-const statusPath = path.join(
-  __dirname,
   '..',
   'data',
-  'twitchStatus.json'
+  'twitch',
+  'config.json'
 );
 
 module.exports = {
 
   data: new SlashCommandBuilder()
 
-    .setName('removetwitch')
+    .setName('addtwitch')
 
     .setDescription(
-      'Elimina un streamer de la lista'
+      'Añade un streamer a la lista de seguimiento'
     )
 
     .addStringOption(option =>
@@ -60,9 +58,24 @@ module.exports = {
           .trim()
           .toLowerCase();
 
-      // ============================
-      // CONFIG
-      // ============================
+      // =====================================
+      // VALIDAR EN TWITCH
+      // =====================================
+
+      const data =
+        await checkStreamer(streamer);
+
+      if (!data?.exists) {
+
+        return interaction.editReply(
+          '❌ Ese canal de Twitch no existe.'
+        );
+
+      }
+
+      // =====================================
+      // CARGAR CONFIG
+      // =====================================
 
       const config =
         JSON.parse(
@@ -72,22 +85,29 @@ module.exports = {
           )
         );
 
+      // =====================================
+      // EVITAR DUPLICADOS
+      // =====================================
+
       if (
-        !config.streamers.includes(
+        config.streamers.includes(
           streamer
         )
       ) {
 
         return interaction.editReply(
-          '⚠️ Ese streamer no está registrado.'
+          '⚠️ Ese streamer ya está registrado.'
         );
 
       }
 
-      config.streamers =
-        config.streamers.filter(
-          s => s !== streamer
-        );
+      // =====================================
+      // GUARDAR
+      // =====================================
+
+      config.streamers.push(
+        streamer
+      );
 
       fs.writeFileSync(
 
@@ -101,40 +121,8 @@ module.exports = {
 
       );
 
-      // ============================
-      // STATUS
-      // ============================
-
-      if (
-        fs.existsSync(statusPath)
-      ) {
-
-        const status =
-          JSON.parse(
-            fs.readFileSync(
-              statusPath,
-              'utf8'
-            )
-          );
-
-        delete status[streamer];
-
-        fs.writeFileSync(
-
-          statusPath,
-
-          JSON.stringify(
-            status,
-            null,
-            2
-          )
-
-        );
-
-      }
-
       await interaction.editReply(
-        `✅ Streamer eliminado: **${streamer}**`
+        `✅ Streamer añadido: **${streamer}**`
       );
 
     } catch (error) {
@@ -142,7 +130,7 @@ module.exports = {
       console.error(error);
 
       await interaction.editReply(
-        '❌ Error eliminando streamer.'
+        '❌ Error añadiendo streamer.'
       );
 
     }
