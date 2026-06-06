@@ -1,19 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const checkStreamer =
-  require('./checkStreamer');
+const checkStreamer = require('./checkStreamer');
+const twitchLiveEmbed = require('../Embeds/twitchLiveEmbed');
 
-const twitchLiveEmbed =
-  require('../Embeds/twitchLiveEmbed');
-
-const {
-  sendBrandedMessage
-} = require('../../utils/webhookSender');
-
-const {
-  getAllGuilds
-} = require('../../utils/guildManager');
+const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { getAllGuilds } = require('../../utils/guildManager');
 
 const statusPath = path.join(
   __dirname,
@@ -24,18 +16,15 @@ const statusPath = path.join(
   'status.json'
 );
 
-// ==================================================
-// CARGAR JSON SEGURO
-// ==================================================
-
+// =========================
+// SAFE LOAD
+// =========================
 function loadStatus() {
 
   try {
 
     if (!fs.existsSync(statusPath)) {
-
       return {};
-
     }
 
     const raw =
@@ -48,9 +37,7 @@ function loadStatus() {
       ? JSON.parse(raw)
       : {};
 
-  }
-
-  catch {
+  } catch {
 
     console.error(
       '⚠️ status.json corrupto, restaurando...'
@@ -62,38 +49,119 @@ function loadStatus() {
 
 }
 
-// ==================================================
-// GUARDAR JSON SEGURO
-// ==================================================
-
+// =========================
+// SAFE SAVE
+// =========================
 function saveStatus(status) {
 
-  const tempPath =
-    `${statusPath}.tmp`;
+  try {
 
-  fs.writeFileSync(
+    fs.mkdirSync(
+      path.dirname(statusPath),
+      { recursive: true }
+    );
 
-    tempPath,
+    const tmp =
+      statusPath + '.tmp';
 
-    JSON.stringify(
-      status,
-      null,
-      2
-    )
+    fs.writeFileSync(
+      tmp,
+      JSON.stringify(
+        status,
+        null,
+        2
+      ),
+      'utf8'
+    );
 
-  );
+    fs.renameSync(
+      tmp,
+      statusPath
+    );
 
-  fs.renameSync(
-    tempPath,
-    statusPath
-  );
+  } catch (err) {
+
+    console.error(
+      '❌ Error guardando status.json',
+      err
+    );
+
+  }
 
 }
 
-// ==================================================
-// MONITOR
-// ==================================================
+// =========================
+// NORMALIZE
+// =========================
+function normalize(username) {
 
+  return (
+    username || ''
+  )
+    .toLowerCase()
+    .replace('@', '')
+    .trim();
+
+}
+
+// =========================
+// CLEAN GUILD STATUS
+// =========================
+function cleanGuildStatus(
+  status,
+  guildId,
+  validUsers
+) {
+
+  const validSet =
+    new Set(
+      validUsers.map(
+        normalize
+      )
+    );
+
+  for (
+    const key of Object.keys(
+      status
+    )
+  ) {
+
+    if (
+      !key.startsWith(
+        `${guildId}_`
+      )
+    ) {
+      continue;
+    }
+
+    const username =
+      normalize(
+        key.substring(
+          guildId.length + 1
+        )
+      );
+
+    if (
+      !validSet.has(
+        username
+      )
+    ) {
+
+      console.log(
+        `🧹 Eliminando estado Twitch: ${username}`
+      );
+
+      delete status[key];
+
+    }
+
+  }
+
+}
+
+// =========================
+// MONITOR
+// =========================
 module.exports = async (client) => {
 
   try {
@@ -105,16 +173,12 @@ module.exports = async (client) => {
       getAllGuilds();
 
     if (!guilds.length) {
-
-      console.log(
-        '⚠️ No hay servidores configurados.'
-      );
-
       return;
-
     }
 
-    for (const guildConfig of guilds) {
+    for (
+      const guildConfig of guilds
+    ) {
 
       try {
 
@@ -123,35 +187,78 @@ module.exports = async (client) => {
           twitch
         } = guildConfig;
 
-        if (!twitch) {
+        const users =
+          (twitch?.users || [])
+            .map(
+              normalize
+            );
+
+        const liveChannel =
+          twitch?.liveChannel;
+
+        // =========================
+        // NO USERS -> DELETE CACHE
+        // =========================
+        if (
+          users.length === 0
+        ) {
+
+          let removed =
+            false;
+
+          for (
+            const key of Object.keys(
+              status
+            )
+          ) {
+
+            if (
+              key.startsWith(
+                `${guildId}_`
+              )
+            ) {
+
+              delete status[
+                key
+              ];
+
+              removed =
+                true;
+
+            }
+
+          }
+
+          if (removed) {
+
+            console.log(
+              `🧹 Eliminando historial Twitch de ${guildId}`
+            );
+
+          }
 
           continue;
 
         }
 
-        if (
-          !twitch.liveChannel
-        ) {
+        if (!liveChannel) {
 
-          continue;
-
-        }
-
-        if (
-          !Array.isArray(
-            twitch.users
-          ) ||
-          !twitch.users.length
-        ) {
+          console.log(
+            `⚠️ Twitch sin canal configurado (${guildId})`
+          );
 
           continue;
 
         }
 
         const channel =
-          await client.channels.fetch(
-            twitch.liveChannel
-          ).catch(() => null);
+          await client.channels
+            .fetch(
+              liveChannel
+            )
+            .catch(
+              () => null
+            );
 
         if (!channel) {
 
@@ -163,11 +270,25 @@ module.exports = async (client) => {
 
         }
 
-        console.log(
-          `📺 [${guildId}] Revisando ${twitch.users.length} streamers...`
+        // =========================
+        // CLEAN REMOVED USERS
+        // =========================
+        cleanGuildStatus(
+          status,
+          guildId,
+          users
         );
 
-        for (const streamer of twitch.users) {
+        console.log(
+          `📺 [${guildId}] Revisando ${users.length} streamers`
+        );
+
+        // =========================
+        // CHECK STREAMERS
+        // =========================
+        for (
+          const streamer of users
+        ) {
 
           try {
 
@@ -176,120 +297,82 @@ module.exports = async (client) => {
                 streamer
               );
 
-            if (!data) {
-
-              console.log(
-                `❌ Error consultando ${streamer}`
-              );
-
+            if (
+              !data?.exists
+            ) {
               continue;
-
             }
 
-            if (!data.exists) {
-
-              console.log(
-                `⚠️ ${streamer} no existe`
-              );
-
-              continue;
-
-            }
-
-            const statusKey =
+            const key =
               `${guildId}_${streamer}`;
 
             const wasOnline =
-              status[statusKey] || false;
+              status[key] === true;
+
+            const isOnline =
+              Boolean(
+                data.online
+              );
 
             console.log(
-
               `[${guildId}] ${streamer}: ${
-                data.online
+                isOnline
                   ? 'ONLINE'
                   : 'OFFLINE'
               }`
-
             );
 
             // =========================
-            // OFFLINE -> ONLINE
+            // STREAM START
             // =========================
-
             if (
-              data.online &&
+              isOnline &&
               !wasOnline
             ) {
 
-              console.log(
-                `🔴 ${streamer} inició directo (${guildId})`
-              );
-
               await sendBrandedMessage(
-
                 channel,
-
                 twitchLiveEmbed({
-
                   streamer:
                     data.streamer,
-
                   title:
                     data.title,
-
                   game:
                     data.game,
-
                   viewers:
                     data.viewers,
-
                   thumbnail:
                     data.thumbnail,
-
                   streamUrl:
                     `https://twitch.tv/${streamer}`
-
                 }),
-
                 guildId
-
               );
 
             }
 
             // =========================
-            // ACTUALIZAR ESTADO
+            // UPDATE STATUS
             // =========================
+            status[key] =
+              isOnline;
 
-            status[statusKey] =
-              data.online;
-
-          }
-
-          catch (error) {
+          } catch (errStreamer) {
 
             console.error(
-              `❌ Error procesando ${streamer}`
-            );
-
-            console.error(
-              error
+              `❌ Error streamer ${streamer}`,
+              errStreamer
             );
 
           }
 
         }
 
-      }
-
-      catch (guildError) {
+      } catch (errGuild) {
 
         console.error(
-          `❌ Error procesando servidor ${guildConfig.guildId}`
-        );
-
-        console.error(
-          guildError
+          `❌ Error guild ${guildConfig.guildId}`,
+          errGuild
         );
 
       }
@@ -300,16 +383,11 @@ module.exports = async (client) => {
       status
     );
 
-  }
-
-  catch (error) {
+  } catch (err) {
 
     console.error(
-      '❌ Error monitor Twitch'
-    );
-
-    console.error(
-      error
+      '❌ Error monitor Twitch',
+      err
     );
 
   }

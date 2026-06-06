@@ -3,7 +3,9 @@ const {
   TextInputBuilder,
   TextInputStyle,
   ActionRowBuilder,
-  EmbedBuilder
+  EmbedBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } = require('discord.js');
 
 const {
@@ -44,7 +46,7 @@ module.exports =
           return await interaction.update(data);
         }
       } catch (err) {
-        if (err.code === 10062) return; // interacción expirada
+        if (err.code === 10062) return;
         console.error('❌ Update error:', err);
       }
     };
@@ -55,7 +57,6 @@ module.exports =
       // BRANDING - EDITAR NOMBRE
       // ==================================
       if (interaction.customId === 'branding_name') {
-
         const modal = new ModalBuilder()
           .setCustomId('branding_name_modal')
           .setTitle('Editar Nombre');
@@ -78,7 +79,6 @@ module.exports =
       // BRANDING - EDITAR AVATAR
       // ==================================
       if (interaction.customId === 'branding_avatar') {
-
         const modal = new ModalBuilder()
           .setCustomId('branding_avatar_modal')
           .setTitle('Editar Avatar');
@@ -101,7 +101,6 @@ module.exports =
       // BRANDING - RESET
       // ==================================
       if (interaction.customId === 'branding_reset') {
-
         updateGuildSection(
           interaction.guild.id,
           'branding',
@@ -117,7 +116,6 @@ module.exports =
       // TIKTOK - ADD
       // ==================================
       if (interaction.customId === 'tiktok_add_user') {
-
         const modal = new ModalBuilder()
           .setCustomId('tiktok_add_modal')
           .setTitle('Añadir Usuario TikTok');
@@ -140,7 +138,6 @@ module.exports =
       // TIKTOK - REMOVE
       // ==================================
       if (interaction.customId === 'tiktok_remove_user') {
-
         const modal = new ModalBuilder()
           .setCustomId('tiktok_remove_modal')
           .setTitle('Eliminar Usuario TikTok');
@@ -160,32 +157,56 @@ module.exports =
       }
 
       // ==================================
+      // TIKTOK - DELETE ALL (con confirmación de botones)
+      // ==================================
+      if (interaction.customId === 'tiktok_clear_all_users') {
+        const embed = new EmbedBuilder()
+          .setTitle('⚠️ Eliminar todos los usuarios de TikTok')
+          .setDescription('¿Estás seguro de que quieres eliminar **todos** los usuarios de TikTok?\n\nEsta acción no se puede deshacer.')
+          .setColor('#ff0000')
+          .setFooter({ text: 'Confirma para continuar' });
+
+        const confirmButton = new ButtonBuilder()
+          .setCustomId('confirm_tiktok_delete_all')
+          .setLabel('✅ Aceptar')
+          .setStyle(ButtonStyle.Danger);
+
+        const cancelButton = new ButtonBuilder()
+          .setCustomId('cancel_action')
+          .setLabel('❌ Cancelar')
+          .setStyle(ButtonStyle.Secondary);
+
+        const row = new ActionRowBuilder()
+          .addComponents(confirmButton, cancelButton);
+
+        return interaction.reply({
+          embeds: [embed],
+          components: [row],
+          flags: 64
+        });
+      }
+
+      // ==================================
       // TIKTOK - LIST
       // ==================================
       if (interaction.customId === 'tiktok_list_users') {
+        const config = getGuildConfig(interaction.guild.id);
+        
+        const isAlreadyList = config.tiktok?.showUsers || false;
+        const mode = isAlreadyList ? 'default' : 'list';
 
-  const config = getGuildConfig(interaction.guild.id);
+        updateGuildSection(interaction.guild.id, 'tiktok', {
+          showUsers: !isAlreadyList
+        });
 
-  const users = config.tiktok?.users || [];
-
-  // Detectar si ya está en modo list viendo el texto del mensaje
-  const isAlreadyList =
-    interaction.message?.components?.some(c =>
-      JSON.stringify(c).includes('𝑼𝒔𝒆𝒓𝒔 𝑳𝒊𝒔𝒕')
-    );
-
-  const mode = isAlreadyList ? 'default' : 'list';
-
-  const panel = tiktokPanel(interaction.guild.id, mode);
-
-  return interaction.update(panel);
-}
+        const panel = tiktokPanel(interaction.guild.id, mode);
+        return interaction.update(panel);
+      }
 
       // ==================================
       // TWITCH - ADD
       // ==================================
       if (interaction.customId === 'twitch_add_user') {
-
         const modal = new ModalBuilder()
           .setCustomId('twitch_add_modal')
           .setTitle('Añadir Usuario Twitch');
@@ -208,7 +229,6 @@ module.exports =
       // TWITCH - REMOVE
       // ==================================
       if (interaction.customId === 'twitch_remove_user') {
-
         const modal = new ModalBuilder()
           .setCustomId('twitch_remove_modal')
           .setTitle('Eliminar Usuario Twitch');
@@ -228,35 +248,59 @@ module.exports =
       }
 
       // ==================================
+      // TWITCH - DELETE ALL (con confirmación de botones)
+      // ==================================
+      if (interaction.customId === 'twitch_clear_all_users') {
+        const embed = new EmbedBuilder()
+          .setTitle('⚠️ Eliminar todos los streamers de Twitch')
+          .setDescription('¿Estás seguro de que quieres eliminar **todos** los streamers de Twitch?\n\nEsta acción no se puede deshacer.')
+          .setColor('#ff0000')
+          .setFooter({ text: 'Confirma para continuar' });
+
+        const confirmButton = new ButtonBuilder()
+          .setCustomId('confirm_twitch_delete_all')
+          .setLabel('✅ Aceptar')
+          .setStyle(ButtonStyle.Danger);
+
+        const cancelButton = new ButtonBuilder()
+          .setCustomId('cancel_action')
+          .setLabel('❌ Cancelar')
+          .setStyle(ButtonStyle.Secondary);
+
+        const row = new ActionRowBuilder()
+          .addComponents(confirmButton, cancelButton);
+
+        return interaction.reply({
+          embeds: [embed],
+          components: [row],
+          flags: 64
+        });
+      }
+
+      // ==================================
       // TWITCH - LIST
       // ==================================
       if (interaction.customId === 'twitch_list_users') {
+        const config = getGuildConfig(interaction.guild.id);
 
-  const config = getGuildConfig(interaction.guild.id);
+        const isAlreadyList = config.twitch?.showUsers || false;
+        
+        updateGuildSection(interaction.guild.id, 'twitch', {
+          showUsers: !isAlreadyList
+        });
 
-  config.twitch.showUsers = !config.twitch.showUsers;
-
-  updateGuildSection(interaction.guild.id, 'twitch', {
-    showUsers: config.twitch.showUsers
-  });
-
-  const twitchPanel =
-    require('../functions/Embeds/dashboard/twitchPanel');
-
-  return interaction.update(
-    twitchPanel(interaction.guild.id)
-  );
-}
+        const panel = twitchPanel(interaction.guild.id);
+        return interaction.update(panel);
+      }
 
       // ==================================
-      // NAVEGACIÓN (FIX SEGURO)
+      // NAVEGACIÓN
       // ==================================
       let panel = null;
 
       switch (interaction.customId) {
-
         case 'dashboard_home':
-          panel = mainPanel();
+          panel = mainPanel(interaction.guild.id);
           break;
 
         case 'dashboard_general':
@@ -289,7 +333,6 @@ module.exports =
       return safeUpdate(panel);
 
     } catch (error) {
-
       console.error('❌ Error dashboardButtons');
       console.error(error);
 
@@ -304,5 +347,4 @@ module.exports =
         }
       } catch {}
     }
-
   };

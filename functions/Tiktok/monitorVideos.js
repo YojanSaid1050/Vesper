@@ -1,19 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const checkUsers =
-  require('./checkUsers');
+const checkUsers = require('./checkUsers');
+const tiktokVideoEmbed = require('../Embeds/tiktokVideoEmbed');
 
-const tiktokVideoEmbed =
-  require('../Embeds/tiktokVideoEmbed');
-
-const {
-  sendBrandedMessage
-} = require('../../utils/webhookSender');
-
-const {
-  getAllGuilds
-} = require('../../utils/guildManager');
+const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { getAllGuilds } = require('../../utils/guildManager');
 
 const videosPath = path.join(
   __dirname,
@@ -24,76 +16,128 @@ const videosPath = path.join(
   'videos.json'
 );
 
-// ==================================================
-// CARGAR JSON SEGURO
-// ==================================================
-
+// =========================
+// SAFE LOAD
+// =========================
 function loadVideos() {
-
   try {
-
     if (!fs.existsSync(videosPath)) {
-
       return {};
-
     }
 
-    const raw =
-      fs.readFileSync(
-        videosPath,
-        'utf8'
-      );
+    const raw = fs.readFileSync(
+      videosPath,
+      'utf8'
+    );
 
     return raw.trim()
       ? JSON.parse(raw)
       : {};
 
-  }
-
-  catch {
+  } catch (err) {
 
     console.error(
-      '⚠️ videos.json corrupto, restaurando...'
+      '⚠️ videos.json corrupto:',
+      err
     );
 
     return {};
 
   }
-
 }
 
-// ==================================================
-// GUARDAR JSON SEGURO
-// ==================================================
-
+// =========================
+// SAFE SAVE
+// =========================
 function saveVideos(videos) {
 
-  const tempPath =
-    `${videosPath}.tmp`;
+  try {
 
-  fs.writeFileSync(
+    const tmp =
+      videosPath + '.tmp';
 
-    tempPath,
+    fs.writeFileSync(
+      tmp,
+      JSON.stringify(
+        videos,
+        null,
+        2
+      ),
+      'utf8'
+    );
 
-    JSON.stringify(
-      videos,
-      null,
-      2
-    )
+    fs.renameSync(
+      tmp,
+      videosPath
+    );
 
-  );
+  } catch (err) {
 
-  fs.renameSync(
-    tempPath,
-    videosPath
-  );
+    console.error(
+      '❌ Error guardando videos.json',
+      err
+    );
+
+  }
 
 }
 
-// ==================================================
-// MONITOR
-// ==================================================
+// =========================
+// NORMALIZE
+// =========================
+function norm(user) {
 
+  return (user || '')
+    .toLowerCase()
+    .replace('@', '')
+    .trim();
+
+}
+
+// =========================
+// CLEAN GUILD USERS
+// =========================
+function cleanGuildVideos(
+  guildVideos,
+  validUsers
+) {
+
+  const validSet =
+    new Set(
+      validUsers.map(norm)
+    );
+
+  for (
+    const savedUser of Object.keys(
+      guildVideos
+    )
+  ) {
+
+    if (
+      !validSet.has(
+        norm(savedUser)
+      )
+    ) {
+
+      console.log(
+        `🧹 Eliminando video guardado de ${savedUser}`
+      );
+
+      delete guildVideos[
+        savedUser
+      ];
+
+    }
+
+  }
+
+  return guildVideos;
+
+}
+
+// =========================
+// MONITOR
+// =========================
 module.exports = async (client) => {
 
   try {
@@ -101,62 +145,102 @@ module.exports = async (client) => {
     const guilds =
       getAllGuilds();
 
-    if (!guilds.length) {
-
-      console.log(
-        '⚠️ No hay servidores configurados.'
-      );
-
+    if (
+      !guilds ||
+      guilds.length === 0
+    ) {
       return;
-
     }
 
     const videos =
       loadVideos();
 
-    for (const guildConfig of guilds) {
+    for (
+      const {
+        guildId,
+        tiktok
+      }
+      of guilds
+    ) {
 
       try {
 
-        const {
-          guildId,
-          tiktok
-        } = guildConfig;
+        const users =
+          (tiktok?.users || [])
+            .map(norm);
 
-        if (!tiktok) {
+        const videoChannel =
+          tiktok?.videoChannel;
+
+        // =========================
+        // NO USERS
+        // =========================
+        if (
+          users.length === 0
+        ) {
+
+          if (
+            videos[guildId]
+          ) {
+
+            console.log(
+              `🧹 Eliminando historial TikTok Videos de ${guildId}`
+            );
+
+            delete videos[
+              guildId
+            ];
+
+          }
 
           continue;
 
         }
 
-        const users =
-          tiktok.users || [];
-
-        const videoChannelId =
-          tiktok.videoChannel;
-
         if (
-          !videoChannelId ||
-          !Array.isArray(users) ||
-          !users.length
+          !videoChannel
         ) {
-
           continue;
-
         }
 
         const channel =
-          await client.channels.fetch(
-            videoChannelId
-          ).catch(() => null);
+          await client.channels
+            .fetch(
+              videoChannel
+            )
+            .catch(
+              () => null
+            );
 
         if (!channel) {
-
-          console.log(
-            `⚠️ Canal TikTok Videos inválido (${guildId})`
-          );
-
           continue;
+        }
+
+        const guildVideos =
+          videos[guildId] || {};
+
+        // =========================
+        // CLEAN USERS
+        // =========================
+        cleanGuildVideos(
+          guildVideos,
+          users
+        );
+
+        if (
+          Object.keys(
+            guildVideos
+          ).length === 0 &&
+          videos[guildId]
+        ) {
+
+          delete videos[
+            guildId
+          ];
+
+          saveVideos(
+            videos
+          );
 
         }
 
@@ -170,154 +254,175 @@ module.exports = async (client) => {
           );
 
         if (
-          !Array.isArray(items)
+          !Array.isArray(
+            items
+          )
         ) {
-
           continue;
-
         }
 
-        for (const item of items) {
+        for (
+          const item
+          of items
+        ) {
 
           try {
 
             const username =
-              item.authorMeta?.name
-                ?.toLowerCase();
+              norm(
+                item
+                  ?.authorMeta
+                  ?.name
+              );
 
-            if (!username) {
-
+            if (
+              !username
+            ) {
               continue;
-
             }
 
-            const data = {
+            const videoId =
+              item?.id
+                ?.toString();
 
-              username,
-
-              nickname:
-                item.authorMeta?.nickName,
-
-              avatar:
-                item.authorMeta?.avatar,
-
-              videoId:
-                item.id,
-
-              description:
-                item.text ||
-                'Sin descripción',
-
-              url:
-                item.webVideoUrl,
-
-              thumbnail:
-                item.videoMeta?.coverUrl
-
-            };
-
-            if (!videos[guildId]) {
-
-              videos[guildId] = {};
-
+            if (
+              !videoId
+            ) {
+              continue;
             }
 
             const lastVideo =
-              videos[guildId][username];
+              guildVideos[
+                username
+              ];
 
-            // ==========================
-            // PRIMER VIDEO
-            // ==========================
+            // =========================
+            // FIRST VIDEO
+            // =========================
+            if (
+              !lastVideo
+            ) {
 
-            if (!lastVideo) {
-
-              videos[guildId][username] =
-                data.videoId;
-
-              console.log(
-                `💾 [${guildId}] Video inicial guardado para ${username}`
-              );
+              guildVideos[
+                username
+              ] = videoId;
 
               continue;
 
             }
 
-            // ==========================
-            // VIDEO NUEVO
-            // ==========================
-
+            // =========================
+            // NEW VIDEO
+            // =========================
             if (
               lastVideo !==
-              data.videoId
+              videoId
             ) {
 
               console.log(
-                `🎬 [${guildId}] Nuevo video detectado: ${username}`
+                `🆕 Nuevo video ${username}: ${videoId}`
               );
 
               await sendBrandedMessage(
-
                 channel,
 
                 tiktokVideoEmbed(
-                  data,
+                  {
+                    username,
+
+                    nickname:
+                      item
+                        ?.authorMeta
+                        ?.nickName,
+
+                    avatar:
+                      item
+                        ?.authorMeta
+                        ?.avatar,
+
+                    videoId,
+
+                    description:
+                      item?.text ||
+                      'Sin descripción',
+
+                    url:
+                      item?.webVideoUrl,
+
+                    thumbnail:
+                      item
+                        ?.videoMeta
+                        ?.coverUrl
+                  },
+
                   item
                 )
-
               );
 
-              videos[guildId][username] =
-                data.videoId;
+              guildVideos[
+                username
+              ] = videoId;
 
             }
 
-          }
-
-          catch (error) {
-
-            console.error(
-              `❌ Error procesando video TikTok`
-            );
+          } catch (
+            errItem
+          ) {
 
             console.error(
-              error
+              '❌ Error video item',
+              errItem
             );
 
           }
 
         }
 
-      }
+        // =========================
+        // SAVE GUILD
+        // =========================
+        if (
+          Object.keys(
+            guildVideos
+          ).length === 0
+        ) {
 
-      catch (guildError) {
+          delete videos[
+            guildId
+          ];
+
+        } else {
+
+          videos[
+            guildId
+          ] = guildVideos;
+
+        }
+
+      } catch (
+        errGuild
+      ) {
 
         console.error(
-          '❌ Error procesando servidor TikTok'
-        );
-
-        console.error(
-          guildError
+          `❌ Error guild videos (${guildId})`,
+          errGuild
         );
 
       }
 
     }
 
-    saveVideos(videos);
-
-  }
-
-  catch (error) {
-
-    console.error(
-      '❌ Error monitor TikTok Videos'
+    saveVideos(
+      videos
     );
 
+  } catch (err) {
+
     console.error(
-      error
+      '❌ Error monitor videos',
+      err
     );
 
   }
 
 };
-

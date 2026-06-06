@@ -12,17 +12,18 @@ const {
 
 module.exports = (guildId, mode = 'default') => {
 
-  const config =
-    getGuildConfig(guildId);
+  const config = getGuildConfig(guildId) || {};
 
-  const tiktok =
-    config.tiktok || {};
+  const tiktok = config.tiktok || {};
 
-  const users =
-    tiktok.users || [];
+  const users = Array.isArray(tiktok.users)
+    ? tiktok.users
+    : [];
 
-  const isList =
-    mode === 'list';
+  const isList = mode === 'list';
+
+  const liveChannel = tiktok.liveChannel || null;
+  const videoChannel = tiktok.videoChannel || null;
 
   return {
 
@@ -46,10 +47,7 @@ module.exports = (guildId, mode = 'default') => {
 `# ⛧°. ⋆༺ 𝑬𝒄𝒉𝒐𝒆𝒔 𝒐𝒇 𝑻𝒊𝒌𝑻𝒐𝒌 ༻⋆. °⛧`
           },
 
-          {
-            type: 14,
-            spacing: 2
-          },
+          { type: 14, spacing: 2 },
 
           // =========================
           // INTRO
@@ -62,10 +60,7 @@ module.exports = (guildId, mode = 'default') => {
 𝑬𝒗𝒆𝒓𝒚 𝒓𝒆𝒂𝒍𝒎 𝒃𝒆𝒄𝒐𝒎𝒆𝒔 𝒂 𝒔𝒊𝒈𝒏𝒂𝒍.`
           },
 
-          {
-            type: 14,
-            spacing: 2
-          },
+          { type: 14, spacing: 2 },
 
           // =========================
           // STATUS
@@ -74,22 +69,19 @@ module.exports = (guildId, mode = 'default') => {
             type: 10,
             content:
 `🔴 **𝑳𝒊𝒗𝒆 𝑪𝒉𝒂𝒏𝒏𝒆𝒍**
-${tiktok.liveChannel ? `<#${tiktok.liveChannel}>` : '`No configurado`'}
+${liveChannel ? `<#${liveChannel}>` : '`No configurado`'}
 
 🎬 **𝑽𝒊𝒅𝒆𝒐 𝑪𝒉𝒂𝒏𝒏𝒆𝒍**
-${tiktok.videoChannel ? `<#${tiktok.videoChannel}>` : '`No configurado`'}
+${videoChannel ? `<#${videoChannel}>` : '`No configurado`'}
 
 👤 **𝑹𝒆𝒈𝒊𝒔𝒕𝒆𝒓𝒆𝒅**
 ${users.length} streamers`
           },
 
-          {
-            type: 14,
-            spacing: 2
-          },
+          { type: 14, spacing: 2 },
 
           // =========================
-          // LIST VIEW (NUEVO)
+          // LIST VIEW
           // =========================
           ...(isList ? [
             {
@@ -103,10 +95,7 @@ ${
     : '`No hay usuarios registrados`'
 }`
             },
-            {
-              type: 14,
-              spacing: 2
-            }
+            { type: 14, spacing: 2 }
           ] : []),
 
           // =========================
@@ -118,7 +107,6 @@ ${
 `⚙️ 𝑪𝒐𝒏𝒇𝒊𝒈𝒖𝒓𝒂 𝒍𝒐𝒔 𝒄𝒂𝒏𝒂𝒍𝒆𝒔`
           },
 
-          // LIVE CHANNEL
           new ActionRowBuilder().addComponents(
             new ChannelSelectMenuBuilder()
               .setCustomId('tiktok_live_channel')
@@ -128,7 +116,6 @@ ${
               .setMaxValues(1)
           ).toJSON(),
 
-          // VIDEO CHANNEL
           new ActionRowBuilder().addComponents(
             new ChannelSelectMenuBuilder()
               .setCustomId('tiktok_video_channel')
@@ -138,10 +125,7 @@ ${
               .setMaxValues(1)
           ).toJSON(),
 
-          {
-            type: 14,
-            spacing: 2
-          },
+          { type: 14, spacing: 2 },
 
           // =========================
           // ACTIONS
@@ -167,14 +151,17 @@ ${
             new ButtonBuilder()
               .setCustomId('tiktok_list_users')
               .setLabel(isList ? 'Ocultar' : 'Ver')
-              .setStyle(ButtonStyle.Secondary)
+              .setStyle(ButtonStyle.Secondary),
+
+            // ✅ FIX REAL (match handler)
+            new ButtonBuilder()
+              .setCustomId('tiktok_clear_all_users')
+              .setLabel('Borrar todo')
+              .setStyle(ButtonStyle.Danger)
 
           ).toJSON(),
 
-          {
-            type: 14,
-            spacing: 2
-          },
+          { type: 14, spacing: 2 },
 
           // =========================
           // BACK
@@ -186,12 +173,10 @@ ${
           },
 
           new ActionRowBuilder().addComponents(
-
             new ButtonBuilder()
               .setCustomId('dashboard_home')
               .setLabel('Volver')
               .setStyle(ButtonStyle.Secondary)
-
           ).toJSON()
 
         ]
@@ -201,5 +186,4 @@ ${
     ]
 
   };
-
 };

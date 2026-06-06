@@ -1,19 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const checkLiveUsers =
-  require('./checkLiveUsers');
+const checkLiveUsers = require('./checkLiveUsers');
+const tiktokLiveEmbed = require('../Embeds/tiktokLiveEmbed');
 
-const tiktokLiveEmbed =
-  require('../Embeds/tiktokLiveEmbed');
-
-const {
-  sendBrandedMessage
-} = require('../../utils/webhookSender');
-
-const {
-  getAllGuildConfigs
-} = require('../../utils/guildManager');
+const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { getAllGuildConfigs } = require('../../utils/guildManager');
 
 const statusPath = path.join(
   __dirname,
@@ -24,76 +16,124 @@ const statusPath = path.join(
   'liveStatus.json'
 );
 
-// ==================================================
-// CARGAR JSON SEGURO
-// ==================================================
-
+// =========================
+// SAFE LOAD
+// =========================
 function loadStatus() {
-
   try {
+    if (!fs.existsSync(statusPath)) return {};
 
-    if (!fs.existsSync(statusPath)) {
-
-      return {};
-
-    }
-
-    const raw =
-      fs.readFileSync(
-        statusPath,
-        'utf8'
-      );
+    const raw = fs.readFileSync(
+      statusPath,
+      'utf8'
+    );
 
     return raw.trim()
       ? JSON.parse(raw)
       : {};
 
-  }
-
-  catch {
+  } catch {
 
     console.error(
       '⚠️ liveStatus.json corrupto, restaurando...'
     );
 
     return {};
+  }
+}
+
+// =========================
+// SAFE SAVE
+// =========================
+function saveStatus(status) {
+  try {
+
+    const tmp =
+      statusPath + '.tmp';
+
+    fs.writeFileSync(
+      tmp,
+      JSON.stringify(
+        status,
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    fs.renameSync(
+      tmp,
+      statusPath
+    );
+
+  } catch (err) {
+
+    console.error(
+      '❌ Error guardando liveStatus.json',
+      err
+    );
+
+  }
+}
+
+// =========================
+// NORMALIZE
+// =========================
+function norm(user) {
+
+  return (
+    user || ''
+  )
+    .toLowerCase()
+    .replace('@', '')
+    .trim();
+
+}
+
+// =========================
+// CLEAN GUILD STATUS
+// =========================
+function cleanGuildStatus(
+  guildStatus,
+  validUsers
+) {
+
+  const validSet =
+    new Set(
+      validUsers.map(norm)
+    );
+
+  for (
+    const savedUser of Object.keys(
+      guildStatus
+    )
+  ) {
+
+    if (
+      !validSet.has(
+        norm(savedUser)
+      )
+    ) {
+
+      console.log(
+        `🧹 Eliminando estado antiguo: ${savedUser}`
+      );
+
+      delete guildStatus[
+        savedUser
+      ];
+
+    }
 
   }
 
-}
-
-// ==================================================
-// GUARDAR JSON SEGURO
-// ==================================================
-
-function saveStatus(status) {
-
-  const tempPath =
-    `${statusPath}.tmp`;
-
-  fs.writeFileSync(
-
-    tempPath,
-
-    JSON.stringify(
-      status,
-      null,
-      2
-    )
-
-  );
-
-  fs.renameSync(
-    tempPath,
-    statusPath
-  );
+  return guildStatus;
 
 }
 
-// ==================================================
+// =========================
 // MONITOR
-// ==================================================
-
+// =========================
 module.exports = async (client) => {
 
   try {
@@ -104,33 +144,70 @@ module.exports = async (client) => {
     const guilds =
       getAllGuildConfigs();
 
-    for (const [guildId, config] of Object.entries(guilds)) {
+    if (
+      !guilds ||
+      Object.keys(guilds).length === 0
+    ) {
+
+      console.log(
+        '⚠️ No hay servidores configurados.'
+      );
+
+      return;
+
+    }
+
+    for (
+      const [guildId, config]
+      of Object.entries(guilds)
+    ) {
 
       try {
 
+        const usersConfig =
+          (config.tiktok?.users || [])
+            .map(norm);
+
+        const liveChannelId =
+          config.tiktok?.liveChannel;
+
+        // =========================
+        // NO USERS -> DELETE CACHE
+        // =========================
         if (
-          !config.tiktok?.liveChannel
+          usersConfig.length === 0
         ) {
+
+          if (
+            liveStatus[guildId]
+          ) {
+
+            console.log(
+              `🧹 Eliminando estado TikTok completo de ${guildId}`
+            );
+
+            delete liveStatus[
+              guildId
+            ];
+
+          }
 
           continue;
 
         }
 
-        if (
-          !Array.isArray(
-            config.tiktok?.users
-          ) ||
-          !config.tiktok.users.length
-        ) {
-
+        if (!liveChannelId) {
           continue;
-
         }
 
         const channel =
-          await client.channels.fetch(
-            config.tiktok.liveChannel
-          ).catch(() => null);
+          await client.channels
+            .fetch(
+              liveChannelId
+            )
+            .catch(
+              () => null
+            );
 
         if (!channel) {
 
@@ -142,7 +219,9 @@ module.exports = async (client) => {
 
         }
 
-        if (!liveStatus[guildId]) {
+        if (
+          !liveStatus[guildId]
+        ) {
 
           liveStatus[guildId] = {};
 
@@ -151,42 +230,48 @@ module.exports = async (client) => {
         const guildStatus =
           liveStatus[guildId];
 
-        console.log(
-          `🔴 [${guildId}] Revisando ${config.tiktok.users.length} cuentas TikTok Live...`
+        // =========================
+        // CLEAN REMOVED USERS
+        // =========================
+        cleanGuildStatus(
+          guildStatus,
+          usersConfig
         );
 
-        const users =
+        console.log(
+          `🔴 [${guildId}] Revisando ${usersConfig.length} cuentas TikTok Live...`
+        );
+
+        const results =
           await checkLiveUsers(
-            config.tiktok.users
+            usersConfig
           );
 
         if (
-          !Array.isArray(users)
+          !Array.isArray(results)
         ) {
-
           continue;
-
         }
 
-        for (const user of users) {
+        for (
+          const user of results
+        ) {
 
           try {
 
             if (
               !user?.success
             ) {
-
               continue;
-
             }
 
             const username =
-              user.handle?.toLowerCase();
+              norm(
+                user.handle
+              );
 
             if (!username) {
-
               continue;
-
             }
 
             const streamId =
@@ -196,173 +281,104 @@ module.exports = async (client) => {
               user.liveRoomUserInfo?.roomId ||
               user.liveRoom?.roomId;
 
-            const status =
+            const statusCode =
               user.liveRoomUserInfo?.status;
 
             const isLive =
-              !!streamId &&
-              !!roomId &&
-              status !== 4;
+              Boolean(
+                streamId &&
+                roomId &&
+                statusCode !== 4
+              );
 
             const wasLive =
-              guildStatus[username] || false;
+              Boolean(
+                guildStatus[
+                  username
+                ]
+              );
 
             console.log(
-
               `[${guildId}] ${username}: ${
                 isLive
                   ? 'ONLINE'
                   : 'OFFLINE'
               }`
-
             );
 
-            // =====================
-            // OFFLINE -> ONLINE
-            // =====================
-
+            // =========================
+            // LIVE START
+            // =========================
             if (
               isLive &&
               !wasLive
             ) {
 
-              console.log(
-                `🔴 LIVE detectado: ${username} (${guildId})`
-              );
-
-              const nickname =
-                user.liveRoomUserInfo
-                  ?.nickname ||
-                username;
-
-              const viewers =
-                user.liveRoom
-                  ?.liveRoomStats
-                  ?.userCount ||
-                0;
-
-              const title =
-                user.liveRoom
-                  ?.title ||
-                'TikTok Live';
-
-              const cover =
-                user.liveRoom
-                  ?.coverUrl;
-
-              const liveUrl =
-                `https://www.tiktok.com/@${username}/live`;
-
-              try {
-
-                await sendBrandedMessage(
-
-                  channel,
-
-                  tiktokLiveEmbed({
-
+              await sendBrandedMessage(
+                channel,
+                tiktokLiveEmbed({
+                  username,
+                  nickname:
+                    user.liveRoomUserInfo?.nickname ||
                     username,
-
-                    nickname,
-
-                    viewers,
-
-                    title,
-
-                    cover,
-
-                    liveUrl
-
-                  })
-
-                );
-
-              }
-
-              catch (sendError) {
-
-                console.error(
-                  `❌ Error enviando alerta de ${username}`
-                );
-
-                console.error(
-                  sendError
-                );
-
-              }
-
-            }
-
-            // =====================
-            // ONLINE -> OFFLINE
-            // =====================
-
-            if (
-              !isLive &&
-              wasLive
-            ) {
-
-              console.log(
-                `⚫ LIVE finalizado: ${username}`
+                  viewers:
+                    user.liveRoom?.liveRoomStats?.userCount ||
+                    0,
+                  title:
+                    user.liveRoom?.title ||
+                    'TikTok Live',
+                  cover:
+                    user.liveRoom?.coverUrl,
+                  liveUrl:
+                    `https://www.tiktok.com/@${username}/live`
+                })
               );
 
             }
 
-            guildStatus[username] =
-              isLive;
+            // =========================
+            // UPDATE STATUS
+            // =========================
+            guildStatus[
+              username
+            ] = isLive;
 
-          }
-
-          catch (error) {
-
-            console.error(
-              `❌ Error procesando ${user?.handle || 'usuario'}`
-            );
+          } catch (errUser) {
 
             console.error(
-              error
+              `❌ Error usuario ${user?.handle}`,
+              errUser
             );
 
           }
-
         }
 
+        // =========================
+        // SAVE GUILD STATUS
+        // =========================
         liveStatus[guildId] =
           guildStatus;
 
-      }
-
-      catch (guildError) {
+      } catch (errGuild) {
 
         console.error(
-          `❌ Error procesando servidor ${guildId}`
-        );
-
-        console.error(
-          guildError
+          `❌ Error guild ${guildId}`,
+          errGuild
         );
 
       }
-
     }
 
     saveStatus(
       liveStatus
     );
 
-  }
-
-  catch (error) {
+  } catch (error) {
 
     console.error(
-      '❌ Error monitor TikTok Lives'
-    );
-
-    console.error(
+      '❌ Error monitor TikTok Lives',
       error
     );
 
   }
-
 };
-
