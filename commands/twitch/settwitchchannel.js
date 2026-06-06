@@ -3,17 +3,9 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 
-const fs = require('fs');
-const path = require('path');
-
-const configPath = path.join(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'twitch',
-  'config.json'
-);
+const {
+  updateGuildSection
+} = require('../../utils/guildManager');
 
 module.exports = {
 
@@ -27,13 +19,10 @@ module.exports = {
 
     .addChannelOption(option =>
       option
-
         .setName('canal')
-
         .setDescription(
           'Canal donde se enviarán las alertas'
         )
-
         .setRequired(true)
     )
 
@@ -50,33 +39,22 @@ module.exports = {
 
     try {
 
-      const config =
-        JSON.parse(
-          fs.readFileSync(
-            configPath,
-            'utf8'
-          )
-        );
+      updateGuildSection(
 
-      config.alertChannel =
-        canal.id;
+        interaction.guild.id,
 
-      fs.writeFileSync(
+        'twitch',
 
-        configPath,
-
-        JSON.stringify(
-          config,
-          null,
-          2
-        )
+        {
+          liveChannel: canal.id
+        }
 
       );
 
       await interaction.reply({
 
         content:
-          `✅ Canal de alertas configurado: ${canal}`,
+          `✅ Canal de alertas Twitch configurado: ${canal}`,
 
         flags: 64
 

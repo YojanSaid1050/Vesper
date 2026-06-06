@@ -45,25 +45,33 @@ module.exports = {
       );
 
     const data =
-      await checkStreamer(
-        streamer
-      );
+  await checkStreamer(
+    streamer
+  );
 
-    if (!data) {
+if (!data) {
 
-      return interaction.editReply(
-        '❌ Error consultando Twitch.'
-      );
+  return interaction.editReply(
+    '❌ Error consultando Twitch.'
+  );
 
-    }
+}
 
-    if (!data.online) {
+if (!data.exists) {
 
-      return interaction.editReply(
-        `⚫ ${streamer} está offline.`
-      );
+  return interaction.editReply(
+    '❌ Ese canal de Twitch no existe.'
+  );
 
-    }
+}
+
+if (!data.online) {
+
+  return interaction.editReply(
+    `⚫ ${streamer} está offline.`
+  );
+
+}
 
     const embed =
       new EmbedBuilder()

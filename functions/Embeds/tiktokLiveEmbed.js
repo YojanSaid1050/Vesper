@@ -1,11 +1,11 @@
-module.exports = ({
+function buildTikTokLivePayload({
   username,
   nickname,
   viewers,
   title,
   cover,
   liveUrl
-}) => {
+}) {
 
   return {
 
@@ -46,7 +46,7 @@ module.exports = ({
 
             content:
 
-`##  ᯓᡣ𐭩 ${nickname} 𝒉𝒂𝒔 𝒓𝒆𝒔𝒐𝒏𝒂𝒕𝒆𝒅
+`## ᯓᡣ𐭩 ${nickname} 𝒉𝒂𝒔 𝒓𝒆𝒔𝒐𝒏𝒂𝒕𝒆𝒅
 
 **${title}**
 
@@ -113,4 +113,10 @@ module.exports = ({
 
   };
 
-};
+}
+
+module.exports =
+  buildTikTokLivePayload;
+
+module.exports.buildTikTokLivePayload =
+  buildTikTokLivePayload;

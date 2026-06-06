@@ -7,14 +7,13 @@ const checkStreamer =
 const twitchLiveEmbed =
   require('../Embeds/twitchLiveEmbed');
 
-const configPath = path.join(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'twitch',
-  'config.json'
-);
+const {
+  sendBrandedMessage
+} = require('../../utils/webhookSender');
+
+const {
+  getAllGuilds
+} = require('../../utils/guildManager');
 
 const statusPath = path.join(
   __dirname,
@@ -25,179 +24,293 @@ const statusPath = path.join(
   'status.json'
 );
 
+// ==================================================
+// CARGAR JSON SEGURO
+// ==================================================
+
+function loadStatus() {
+
+  try {
+
+    if (!fs.existsSync(statusPath)) {
+
+      return {};
+
+    }
+
+    const raw =
+      fs.readFileSync(
+        statusPath,
+        'utf8'
+      );
+
+    return raw.trim()
+      ? JSON.parse(raw)
+      : {};
+
+  }
+
+  catch {
+
+    console.error(
+      '⚠️ status.json corrupto, restaurando...'
+    );
+
+    return {};
+
+  }
+
+}
+
+// ==================================================
+// GUARDAR JSON SEGURO
+// ==================================================
+
+function saveStatus(status) {
+
+  const tempPath =
+    `${statusPath}.tmp`;
+
+  fs.writeFileSync(
+
+    tempPath,
+
+    JSON.stringify(
+      status,
+      null,
+      2
+    )
+
+  );
+
+  fs.renameSync(
+    tempPath,
+    statusPath
+  );
+
+}
+
+// ==================================================
+// MONITOR
+// ==================================================
+
 module.exports = async (client) => {
 
   try {
 
-    const config = JSON.parse(
-      fs.readFileSync(
-        configPath,
-        'utf8'
-      )
-    );
+    const status =
+      loadStatus();
 
-    if (!config.alertChannel) {
+    const guilds =
+      getAllGuilds();
+
+    if (!guilds.length) {
 
       console.log(
-        '⚠️ No hay canal de alertas configurado.'
+        '⚠️ No hay servidores configurados.'
       );
 
       return;
 
     }
 
-    if (
-      !config.streamers ||
-      !config.streamers.length
-    ) {
+    for (const guildConfig of guilds) {
 
-      console.log(
-        '⚠️ No hay streamers configurados.'
-      );
+      try {
 
-      return;
+        const {
+          guildId,
+          twitch
+        } = guildConfig;
+
+        if (!twitch) {
+
+          continue;
+
+        }
+
+        if (
+          !twitch.liveChannel
+        ) {
+
+          continue;
+
+        }
+
+        if (
+          !Array.isArray(
+            twitch.users
+          ) ||
+          !twitch.users.length
+        ) {
+
+          continue;
+
+        }
+
+        const channel =
+          await client.channels.fetch(
+            twitch.liveChannel
+          ).catch(() => null);
+
+        if (!channel) {
+
+          console.log(
+            `⚠️ Canal Twitch inválido (${guildId})`
+          );
+
+          continue;
+
+        }
+
+        console.log(
+          `📺 [${guildId}] Revisando ${twitch.users.length} streamers...`
+        );
+
+        for (const streamer of twitch.users) {
+
+          try {
+
+            const data =
+              await checkStreamer(
+                streamer
+              );
+
+            if (!data) {
+
+              console.log(
+                `❌ Error consultando ${streamer}`
+              );
+
+              continue;
+
+            }
+
+            if (!data.exists) {
+
+              console.log(
+                `⚠️ ${streamer} no existe`
+              );
+
+              continue;
+
+            }
+
+            const statusKey =
+              `${guildId}_${streamer}`;
+
+            const wasOnline =
+              status[statusKey] || false;
+
+            console.log(
+
+              `[${guildId}] ${streamer}: ${
+                data.online
+                  ? 'ONLINE'
+                  : 'OFFLINE'
+              }`
+
+            );
+
+            // =========================
+            // OFFLINE -> ONLINE
+            // =========================
+
+            if (
+              data.online &&
+              !wasOnline
+            ) {
+
+              console.log(
+                `🔴 ${streamer} inició directo (${guildId})`
+              );
+
+              await sendBrandedMessage(
+
+                channel,
+
+                twitchLiveEmbed({
+
+                  streamer:
+                    data.streamer,
+
+                  title:
+                    data.title,
+
+                  game:
+                    data.game,
+
+                  viewers:
+                    data.viewers,
+
+                  thumbnail:
+                    data.thumbnail,
+
+                  streamUrl:
+                    `https://twitch.tv/${streamer}`
+
+                }),
+
+                guildId
+
+              );
+
+            }
+
+            // =========================
+            // ACTUALIZAR ESTADO
+            // =========================
+
+            status[statusKey] =
+              data.online;
+
+          }
+
+          catch (error) {
+
+            console.error(
+              `❌ Error procesando ${streamer}`
+            );
+
+            console.error(
+              error
+            );
+
+          }
+
+        }
+
+      }
+
+      catch (guildError) {
+
+        console.error(
+          `❌ Error procesando servidor ${guildConfig.guildId}`
+        );
+
+        console.error(
+          guildError
+        );
+
+      }
 
     }
 
-    const channel =
-      await client.channels.fetch(
-        config.alertChannel
-      );
-
-    if (!channel) {
-
-      console.log(
-        '❌ No se encontró el canal de alertas.'
-      );
-
-      return;
-
-    }
-
-    let status = {};
-
-    if (fs.existsSync(statusPath)) {
-
-      status = JSON.parse(
-        fs.readFileSync(
-          statusPath,
-          'utf8'
-        )
-      );
-
-    }
-
-    console.log(
-      `📺 Revisando ${config.streamers.length} streamers...`
+    saveStatus(
+      status
     );
 
-    for (const streamer of config.streamers) {
+  }
 
-      console.log(
-        `🔍 Comprobando ${streamer}`
-      );
-
-      const data =
-        await checkStreamer(
-          streamer
-        );
-
-      if (!data) {
-
-        console.log(
-          `❌ No se pudo consultar ${streamer}`
-        );
-
-        continue;
-
-      }
-
-      if (!data.exists) {
-
-        console.log(
-          `⚠️ ${streamer} no existe en Twitch`
-        );
-
-        continue;
-
-      }
-
-      const wasOnline =
-        status[streamer] || false;
-
-      console.log(
-        `${streamer}: ${
-          data.online
-            ? 'ONLINE'
-            : 'OFFLINE'
-        }`
-      );
-
-      // =====================================
-      // OFFLINE -> ONLINE
-      // =====================================
-
-      if (
-        data.online &&
-        !wasOnline
-      ) {
-
-        console.log(
-          `🔴 ${streamer} acaba de iniciar directo`
-        );
-
-        await channel.send(
-
-          twitchLiveEmbed({
-
-            streamer:
-              data.streamer,
-
-            title:
-              data.title,
-
-            game:
-              data.game,
-
-            viewers:
-              data.viewers,
-
-            thumbnail:
-              data.thumbnail,
-
-            streamUrl:
-              `https://twitch.tv/${streamer}`
-
-          })
-
-        );
-
-      }
-
-      status[streamer] =
-        data.online;
-
-    }
-
-    fs.writeFileSync(
-
-      statusPath,
-
-      JSON.stringify(
-        status,
-        null,
-        2
-      )
-
-    );
-
-  } catch (error) {
+  catch (error) {
 
     console.error(
       '❌ Error monitor Twitch'
     );
 
-    console.error(error);
+    console.error(
+      error
+    );
 
   }
 

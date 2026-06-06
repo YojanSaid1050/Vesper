@@ -1,4 +1,7 @@
-module.exports = (data, item) => {
+function buildTikTokVideoPayload(
+  data,
+  item
+) {
 
   return {
 
@@ -107,4 +110,10 @@ ${item.commentCount || 0}
 
   };
 
-};
+}
+
+module.exports =
+  buildTikTokVideoPayload;
+
+module.exports.buildTikTokVideoPayload =
+  buildTikTokVideoPayload;

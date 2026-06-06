@@ -10,6 +10,7 @@ const {
   Collection,
   Events
 } = require('discord.js');
+
 const monitorStreams =
   require('./functions/Twitch/monitorStreams');
 
@@ -61,12 +62,7 @@ const client = new Client({
 
 });
 
-// ==================================================
-// COMANDOS
-// ==================================================
-
-client.commands =
-  new Collection();
+client.commands = new Collection();
 
 // ==================================================
 // EXPRESS
@@ -94,15 +90,18 @@ app.listen(PORT, () => {
 });
 
 // ==================================================
-// CARGAR COMANDOS
+// OBTENER ARCHIVOS RECURSIVOS
 // ==================================================
 
-const commandsPath =
-  path.join(__dirname, 'commands');
-
-function getCommandFiles(dir) {
+function getFiles(dir) {
 
   let results = [];
+
+  if (!fs.existsSync(dir)) {
+
+    return results;
+
+  }
 
   const files =
     fs.readdirSync(dir);
@@ -116,12 +115,13 @@ function getCommandFiles(dir) {
       fs.statSync(filePath).isDirectory()
     ) {
 
-      results =
-        results.concat(
-          getCommandFiles(filePath)
-        );
+      results.push(
+        ...getFiles(filePath)
+      );
 
-    } else if (
+    }
+
+    else if (
       file.endsWith('.js')
     ) {
 
@@ -135,10 +135,17 @@ function getCommandFiles(dir) {
 
 }
 
+// ==================================================
+// CARGAR COMANDOS
+// ==================================================
+
+const commandsPath =
+  path.join(__dirname, 'commands');
+
 if (fs.existsSync(commandsPath)) {
 
   const commandFiles =
-    getCommandFiles(commandsPath);
+    getFiles(commandsPath);
 
   for (const filePath of commandFiles) {
 
@@ -169,7 +176,9 @@ if (fs.existsSync(commandsPath)) {
         `✅ Comando cargado: ${command.data.name}`
       );
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.error(
         `❌ Error cargando comando: ${filePath}`
@@ -181,7 +190,9 @@ if (fs.existsSync(commandsPath)) {
 
   }
 
-} else {
+}
+
+else {
 
   console.log(
     '⚠️ La carpeta commands no existe.'
@@ -199,22 +210,14 @@ const eventsPath =
 if (fs.existsSync(eventsPath)) {
 
   const eventFiles =
-    fs.readdirSync(eventsPath)
-      .filter(file =>
-        file.endsWith('.js')
-      );
+    getFiles(eventsPath);
 
-  for (const file of eventFiles) {
+  for (const filePath of eventFiles) {
 
     try {
 
-      const filePath =
-        path.join(eventsPath, file);
-
       const event =
         require(filePath);
-
-      // VALIDAR
 
       if (
         !event.name ||
@@ -222,14 +225,12 @@ if (fs.existsSync(eventsPath)) {
       ) {
 
         console.log(
-          `⚠️ ${file} no tiene name o execute`
+          `⚠️ ${filePath} no tiene name o execute`
         );
 
         continue;
 
       }
-
-      // EVENTOS
 
       if (event.once) {
 
@@ -245,7 +246,9 @@ if (fs.existsSync(eventsPath)) {
 
         );
 
-      } else {
+      }
+
+      else {
 
         client.on(
 
@@ -262,13 +265,18 @@ if (fs.existsSync(eventsPath)) {
       }
 
       console.log(
-        `✅ Evento cargado: ${event.name}`
+        `✅ Evento cargado: ${path.relative(
+          eventsPath,
+          filePath
+        )}`
       );
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
       console.error(
-        `❌ Error cargando evento: ${file}`
+        `❌ Error cargando evento: ${filePath}`
       );
 
       console.error(error);
@@ -277,7 +285,9 @@ if (fs.existsSync(eventsPath)) {
 
   }
 
-} else {
+}
+
+else {
 
   console.log(
     '⚠️ La carpeta events no existe.'
@@ -285,190 +295,6 @@ if (fs.existsSync(eventsPath)) {
 
 }
 
-// ==================================================
-// INTERACCIONES
-// ==================================================
-
-client.on(
-
-  Events.InteractionCreate,
-
-  async interaction => {
-
-    try {
-
-      // ==================================================
-      // SLASH COMMANDS
-      // ==================================================
-
-      if (
-        interaction.isChatInputCommand()
-      ) {
-
-        const command =
-          client.commands.get(
-            interaction.commandName
-          );
-
-        if (!command) return;
-
-        await command.execute(
-          interaction,
-          client
-        );
-
-      }
-
-      // ==================================================
-      // BOTON VERIFY
-      // ==================================================
-
-      else if (
-        interaction.isButton()
-      ) {
-
-        if (
-          interaction.customId ===
-          'verify_void'
-        ) {
-
-          // EVITAR DOBLE RESPUESTA
-
-          if (
-            interaction.replied ||
-            interaction.deferred
-          ) return;
-
-          // RESPUESTA INICIAL
-
-          await interaction.deferReply({
-
-            flags: 64
-
-          });
-
-          // ==================================================
-          // ROL
-          // ==================================================
-
-          const role =
-            interaction.guild.roles.cache.get(
-              '1506900567199449179'
-            );
-
-          // ==================================================
-          // VALIDAR ROL
-          // ==================================================
-
-          if (!role) {
-
-            return await interaction.editReply({
-
-              content:
-                '❌ No se encontró el rol.'
-
-            });
-
-          }
-
-          // ==================================================
-          // SI YA TIENE EL ROL
-          // ==================================================
-
-          if (
-            interaction.member.roles.cache.has(
-              role.id
-            )
-          ) {
-
-            return await interaction.editReply({
-
-              content:
-                '🌑 Ya has abrazado el vacío.'
-
-            });
-
-          }
-
-          // ==================================================
-          // AGREGAR ROL
-          // ==================================================
-
-          await interaction.member.roles.add(
-            role
-          );
-
-          // ==================================================
-          // RESPUESTA FINAL
-          // ==================================================
-
-          await interaction.editReply({
-
-            content:
-              '🌑 Has abrazado el vacío.'
-
-          });
-
-        }
-
-      }
-
-    } catch (error) {
-
-      console.error(error);
-
-      try {
-
-        // ==================================================
-        // SI YA RESPONDIO
-        // ==================================================
-
-        if (
-          interaction.replied ||
-          interaction.deferred
-        ) {
-
-          await interaction.followUp({
-
-            content:
-              '❌ Ocurrió un error.',
-
-            flags: 64
-
-          });
-
-        }
-
-        // ==================================================
-        // SI NO RESPONDIO
-        // ==================================================
-
-        else {
-
-          await interaction.reply({
-
-            content:
-              '❌ Ocurrió un error.',
-
-            flags: 64
-
-          });
-
-        }
-
-      } catch (err) {
-
-        console.error(
-          '❌ Error enviando mensaje de error.'
-        );
-
-      }
-
-    }
-
-  }
-
-);
 
 // ==================================================
 // READY
@@ -485,14 +311,40 @@ client.once(
     );
 
     // ==========================================
-    // MONITOR TWITCH
+    // TWITCH
     // ==========================================
+
+    let checkingStreams = false;
 
     monitorStreams(client);
 
-    setInterval(() => {
+    setInterval(async () => {
 
-      monitorStreams(client);
+      if (checkingStreams) return;
+
+      checkingStreams = true;
+
+      try {
+
+        await monitorStreams(client);
+
+      }
+
+      catch (error) {
+
+        console.error(
+          '❌ Error monitor Twitch:'
+        );
+
+        console.error(error);
+
+      }
+
+      finally {
+
+        checkingStreams = false;
+
+      }
 
     }, 120000);
 
@@ -504,7 +356,39 @@ client.once(
     // TIKTOK VIDEOS
     // ==========================================
 
+    let checkingTikTokVideos = false;
+
     monitorTikTokVideos(client);
+
+    setInterval(async () => {
+
+      if (checkingTikTokVideos) return;
+
+      checkingTikTokVideos = true;
+
+      try {
+
+        await monitorTikTokVideos(client);
+
+      }
+
+      catch (error) {
+
+        console.error(
+          '❌ Error monitor TikTok Videos:'
+        );
+
+        console.error(error);
+
+      }
+
+      finally {
+
+        checkingTikTokVideos = false;
+
+      }
+
+    }, 120000);
 
     console.log(
       '🎬 Monitor TikTok Videos iniciado.'
@@ -514,11 +398,37 @@ client.once(
     // TIKTOK LIVES
     // ==========================================
 
+    let checkingTikTokLives = false;
+
     monitorTikTokLives(client);
 
-    setInterval(() => {
+    setInterval(async () => {
 
-      monitorTikTokLives(client);
+      if (checkingTikTokLives) return;
+
+      checkingTikTokLives = true;
+
+      try {
+
+        await monitorTikTokLives(client);
+
+      }
+
+      catch (error) {
+
+        console.error(
+          '❌ Error monitor TikTok Lives:'
+        );
+
+        console.error(error);
+
+      }
+
+      finally {
+
+        checkingTikTokLives = false;
+
+      }
 
     }, 120000);
 
@@ -529,6 +439,7 @@ client.once(
   }
 
 );
+
 // ==================================================
 // ERRORES GLOBALES
 // ==================================================

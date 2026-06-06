@@ -3,25 +3,16 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 
-const fs = require('fs');
-const path = require('path');
-
-const configPath = path.join(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'tiktok',
-  'config.json'
-);
+const {
+  getGuildConfig,
+  updateGuildConfig
+} = require('../../utils/guildManager');
 
 module.exports = {
 
   data: new SlashCommandBuilder()
 
-    .setName(
-      'settiktoklivechannel'
-    )
+    .setName('settiktoklivechannel')
 
     .setDescription(
       'Canal para transmisiones en vivo de TikTok'
@@ -30,9 +21,7 @@ module.exports = {
     .addChannelOption(option =>
       option
         .setName('canal')
-        .setDescription(
-          'Canal'
-        )
+        .setDescription('Canal')
         .setRequired(true)
     )
 
@@ -42,38 +31,61 @@ module.exports = {
 
   async execute(interaction) {
 
-    const channel =
-      interaction.options.getChannel(
-        'canal'
+    try {
+
+      const channel =
+        interaction.options.getChannel(
+          'canal'
+        );
+
+      const config =
+        getGuildConfig(
+          interaction.guild.id
+        );
+
+      if (!config.tiktok) {
+
+        config.tiktok = {
+
+          liveChannel: null,
+          videoChannel: null,
+          users: []
+
+        };
+
+      }
+
+      config.tiktok.liveChannel =
+        channel.id;
+
+      updateGuildConfig(
+        interaction.guild.id,
+        config
       );
 
-    const config = JSON.parse(
-      fs.readFileSync(
-        configPath,
-        'utf8'
-      )
-    );
+      await interaction.reply({
 
-    config.liveChannel =
-      channel.id;
+        content:
+          `✅ Canal TikTok Live configurado: ${channel}`,
 
-    fs.writeFileSync(
-      configPath,
-      JSON.stringify(
-        config,
-        null,
-        2
-      )
-    );
+        flags: 64
 
-    await interaction.reply({
+      });
 
-      content:
-        `✅ Canal de transmisiones en vivo configurado: ${channel}`,
+    } catch (error) {
 
-      flags: 64
+      console.error(error);
 
-    });
+      await interaction.reply({
+
+        content:
+          '❌ Error configurando el canal.',
+
+        flags: 64
+
+      });
+
+    }
 
   }
 

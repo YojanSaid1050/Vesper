@@ -4,17 +4,9 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 
-const fs = require('fs');
-const path = require('path');
-
-const configPath = path.join(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'twitch',
-  'config.json'
-);
+const {
+  getGuildConfig
+} = require('../../utils/guildManager');
 
 module.exports = {
 
@@ -34,18 +26,15 @@ module.exports = {
 
     try {
 
-      const config =
-        JSON.parse(
-          fs.readFileSync(
-            configPath,
-            'utf8'
-          )
+      const guildConfig =
+        getGuildConfig(
+          interaction.guild.id
         );
 
-      if (
-        !config.streamers ||
-        !config.streamers.length
-      ) {
+      const streamers =
+        guildConfig.twitch.users || [];
+
+      if (!streamers.length) {
 
         return interaction.reply({
 
@@ -67,7 +56,7 @@ module.exports = {
 
           .setDescription(
 
-            config.streamers
+            streamers
               .map(
                 streamer =>
                   `• ${streamer}`

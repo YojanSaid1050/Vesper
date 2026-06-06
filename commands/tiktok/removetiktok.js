@@ -6,14 +6,10 @@ const {
 const fs = require('fs');
 const path = require('path');
 
-const configPath = path.join(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'tiktok',
-  'config.json'
-);
+const {
+  getGuildConfig,
+  updateGuildConfig
+} = require('../../utils/guildManager');
 
 const videosPath = path.join(
   __dirname,
@@ -71,19 +67,19 @@ module.exports = {
           .trim()
           .toLowerCase();
 
-      const config = JSON.parse(
-        fs.readFileSync(
-          configPath,
-          'utf8'
-        )
-      );
-
-      const exists =
-        config.users.includes(
-          username
+      const config =
+        getGuildConfig(
+          interaction.guild.id
         );
 
-      if (!exists) {
+      const users =
+        config.tiktok?.users || [];
+
+      if (
+        !users.includes(
+          username
+        )
+      ) {
 
         return interaction.editReply(
           `❌ El usuario @${username} no está registrado.`
@@ -91,28 +87,16 @@ module.exports = {
 
       }
 
-      // =====================
-      // CONFIG.JSON
-      // =====================
-
-      config.users =
-        config.users.filter(
+      config.tiktok.users =
+        users.filter(
           user =>
             user !== username
         );
 
-      fs.writeFileSync(
-        configPath,
-        JSON.stringify(
-          config,
-          null,
-          2
-        )
+      updateGuildConfig(
+        interaction.guild.id,
+        config
       );
-
-      // =====================
-      // VIDEOS.JSON
-      // =====================
 
       if (
         fs.existsSync(
@@ -133,19 +117,18 @@ module.exports = {
         ];
 
         fs.writeFileSync(
+
           videosPath,
+
           JSON.stringify(
             videos,
             null,
             2
           )
+
         );
 
       }
-
-      // =====================
-      // LIVESTATUS.JSON
-      // =====================
 
       if (
         fs.existsSync(
@@ -166,20 +149,21 @@ module.exports = {
         ];
 
         fs.writeFileSync(
+
           liveStatusPath,
+
           JSON.stringify(
             liveStatus,
             null,
             2
           )
+
         );
 
       }
 
       await interaction.editReply(
-
         `✅ Usuario eliminado correctamente: @${username}`
-
       );
 
     } catch (error) {

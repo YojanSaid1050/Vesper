@@ -7,14 +7,13 @@ const checkLiveUsers =
 const tiktokLiveEmbed =
   require('../Embeds/tiktokLiveEmbed');
 
-const configPath = path.join(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'tiktok',
-  'config.json'
-);
+const {
+  sendBrandedMessage
+} = require('../../utils/webhookSender');
+
+const {
+  getAllGuildConfigs
+} = require('../../utils/guildManager');
 
 const statusPath = path.join(
   __dirname,
@@ -25,257 +24,345 @@ const statusPath = path.join(
   'liveStatus.json'
 );
 
+// ==================================================
+// CARGAR JSON SEGURO
+// ==================================================
+
+function loadStatus() {
+
+  try {
+
+    if (!fs.existsSync(statusPath)) {
+
+      return {};
+
+    }
+
+    const raw =
+      fs.readFileSync(
+        statusPath,
+        'utf8'
+      );
+
+    return raw.trim()
+      ? JSON.parse(raw)
+      : {};
+
+  }
+
+  catch {
+
+    console.error(
+      '⚠️ liveStatus.json corrupto, restaurando...'
+    );
+
+    return {};
+
+  }
+
+}
+
+// ==================================================
+// GUARDAR JSON SEGURO
+// ==================================================
+
+function saveStatus(status) {
+
+  const tempPath =
+    `${statusPath}.tmp`;
+
+  fs.writeFileSync(
+
+    tempPath,
+
+    JSON.stringify(
+      status,
+      null,
+      2
+    )
+
+  );
+
+  fs.renameSync(
+    tempPath,
+    statusPath
+  );
+
+}
+
+// ==================================================
+// MONITOR
+// ==================================================
+
 module.exports = async (client) => {
 
   try {
 
-    const config = JSON.parse(
-      fs.readFileSync(
-        configPath,
-        'utf8'
-      )
-    );
+    const liveStatus =
+      loadStatus();
 
-    if (!config.liveChannel) {
+    const guilds =
+      getAllGuildConfigs();
 
-      console.log(
-        '⚠️ No hay canal de lives configurado.'
-      );
-
-      return;
-
-    }
-
-    if (
-      !Array.isArray(config.users) ||
-      !config.users.length
-    ) {
-
-      console.log(
-        '⚠️ No hay usuarios TikTok configurados.'
-      );
-
-      return;
-
-    }
-
-    const channel =
-      await client.channels.fetch(
-        config.liveChannel
-      );
-
-    if (!channel) {
-
-      console.log(
-        '❌ Canal TikTok Live no encontrado.'
-      );
-
-      return;
-
-    }
-
-    let liveStatus = {};
-
-    try {
-
-      if (
-        fs.existsSync(statusPath)
-      ) {
-
-        liveStatus = JSON.parse(
-          fs.readFileSync(
-            statusPath,
-            'utf8'
-          )
-        );
-
-      }
-
-    } catch {
-
-      liveStatus = {};
-
-    }
-
-    console.log(
-      `🔴 Revisando ${config.users.length} cuentas TikTok Live...`
-    );
-
-    const users =
-      await checkLiveUsers(
-        config.users
-      );
-
-    for (const user of users) {
+    for (const [guildId, config] of Object.entries(guilds)) {
 
       try {
 
-        if (!user?.success)
-          continue;
-
-        const username =
-          user.handle?.toLowerCase();
-
-        if (!username)
-          continue;
-
-        const streamId =
-          user.liveRoom?.streamId;
-
-        const roomId =
-          user.liveRoomUserInfo?.roomId ||
-          user.liveRoom?.roomId;
-
-        const status =
-          user.liveRoomUserInfo?.status;
-
-        const isLive =
-          !!streamId &&
-          !!roomId &&
-          status !== 4;
-
-        const wasLive =
-          liveStatus[username] || false;
-
-        console.log({
-          username,
-          streamId,
-          roomId,
-          status,
-          wasLive,
-          isLive
-        });
-
-        console.log(
-          `${username}: ${
-            isLive
-              ? 'ONLINE'
-              : 'OFFLINE'
-          }`
-        );
-
-        // =====================
-        // OFFLINE -> ONLINE
-        // =====================
-
         if (
-          isLive &&
-          !wasLive
+          !config.tiktok?.liveChannel
         ) {
 
+          continue;
+
+        }
+
+        if (
+          !Array.isArray(
+            config.tiktok?.users
+          ) ||
+          !config.tiktok.users.length
+        ) {
+
+          continue;
+
+        }
+
+        const channel =
+          await client.channels.fetch(
+            config.tiktok.liveChannel
+          ).catch(() => null);
+
+        if (!channel) {
+
           console.log(
-            `🔴 LIVE detectado: ${username}`
+            `⚠️ Canal TikTok Live inválido (${guildId})`
           );
 
-          const nickname =
-            user.liveRoomUserInfo
-              ?.nickname ||
-            username;
+          continue;
 
-          const viewers =
-            user.liveRoom
-              ?.liveRoomStats
-              ?.userCount ||
-            0;
+        }
 
-          const title =
-            user.liveRoom
-              ?.title ||
-            'TikTok Live';
+        if (!liveStatus[guildId]) {
 
-          const cover =
-            user.liveRoom
-              ?.coverUrl;
+          liveStatus[guildId] = {};
 
-          const liveUrl =
-            `https://www.tiktok.com/@${username}/live`;
+        }
+
+        const guildStatus =
+          liveStatus[guildId];
+
+        console.log(
+          `🔴 [${guildId}] Revisando ${config.tiktok.users.length} cuentas TikTok Live...`
+        );
+
+        const users =
+          await checkLiveUsers(
+            config.tiktok.users
+          );
+
+        if (
+          !Array.isArray(users)
+        ) {
+
+          continue;
+
+        }
+
+        for (const user of users) {
 
           try {
 
-            await channel.send(
+            if (
+              !user?.success
+            ) {
 
-              tiktokLiveEmbed({
+              continue;
 
-                username,
+            }
 
-                nickname,
+            const username =
+              user.handle?.toLowerCase();
 
-                viewers,
+            if (!username) {
 
-                title,
+              continue;
 
-                cover,
+            }
 
-                liveUrl
+            const streamId =
+              user.liveRoom?.streamId;
 
-              })
+            const roomId =
+              user.liveRoomUserInfo?.roomId ||
+              user.liveRoom?.roomId;
+
+            const status =
+              user.liveRoomUserInfo?.status;
+
+            const isLive =
+              !!streamId &&
+              !!roomId &&
+              status !== 4;
+
+            const wasLive =
+              guildStatus[username] || false;
+
+            console.log(
+
+              `[${guildId}] ${username}: ${
+                isLive
+                  ? 'ONLINE'
+                  : 'OFFLINE'
+              }`
 
             );
 
-          } catch (sendError) {
+            // =====================
+            // OFFLINE -> ONLINE
+            // =====================
+
+            if (
+              isLive &&
+              !wasLive
+            ) {
+
+              console.log(
+                `🔴 LIVE detectado: ${username} (${guildId})`
+              );
+
+              const nickname =
+                user.liveRoomUserInfo
+                  ?.nickname ||
+                username;
+
+              const viewers =
+                user.liveRoom
+                  ?.liveRoomStats
+                  ?.userCount ||
+                0;
+
+              const title =
+                user.liveRoom
+                  ?.title ||
+                'TikTok Live';
+
+              const cover =
+                user.liveRoom
+                  ?.coverUrl;
+
+              const liveUrl =
+                `https://www.tiktok.com/@${username}/live`;
+
+              try {
+
+                await sendBrandedMessage(
+
+                  channel,
+
+                  tiktokLiveEmbed({
+
+                    username,
+
+                    nickname,
+
+                    viewers,
+
+                    title,
+
+                    cover,
+
+                    liveUrl
+
+                  })
+
+                );
+
+              }
+
+              catch (sendError) {
+
+                console.error(
+                  `❌ Error enviando alerta de ${username}`
+                );
+
+                console.error(
+                  sendError
+                );
+
+              }
+
+            }
+
+            // =====================
+            // ONLINE -> OFFLINE
+            // =====================
+
+            if (
+              !isLive &&
+              wasLive
+            ) {
+
+              console.log(
+                `⚫ LIVE finalizado: ${username}`
+              );
+
+            }
+
+            guildStatus[username] =
+              isLive;
+
+          }
+
+          catch (error) {
 
             console.error(
-              `❌ Error enviando alerta de ${username}`
+              `❌ Error procesando ${user?.handle || 'usuario'}`
             );
 
             console.error(
-              sendError
+              error
             );
 
           }
 
         }
 
-        // =====================
-        // ONLINE -> OFFLINE
-        // =====================
+        liveStatus[guildId] =
+          guildStatus;
 
-        if (
-          !isLive &&
-          wasLive
-        ) {
+      }
 
-          console.log(
-            `⚫ LIVE finalizado: ${username}`
-          );
-
-        }
-
-        liveStatus[username] =
-          isLive;
-
-      } catch (error) {
+      catch (guildError) {
 
         console.error(
-          `❌ Error procesando usuario`
+          `❌ Error procesando servidor ${guildId}`
         );
 
-        console.error(error);
+        console.error(
+          guildError
+        );
 
       }
 
     }
 
-    fs.writeFileSync(
-
-      statusPath,
-
-      JSON.stringify(
-        liveStatus,
-        null,
-        2
-      )
-
+    saveStatus(
+      liveStatus
     );
 
-  } catch (error) {
+  }
+
+  catch (error) {
 
     console.error(
       '❌ Error monitor TikTok Lives'
     );
 
-    console.error(error);
+    console.error(
+      error
+    );
 
   }
 
 };
+

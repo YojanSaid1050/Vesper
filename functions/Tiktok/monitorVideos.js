@@ -2,19 +2,18 @@ const fs = require('fs');
 const path = require('path');
 
 const checkUsers =
-require('./checkUsers');
+  require('./checkUsers');
 
 const tiktokVideoEmbed =
-require('../Embeds/tiktokVideoEmbed');
+  require('../Embeds/tiktokVideoEmbed');
 
-const configPath = path.join(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'tiktok',
-  'config.json'
-);
+const {
+  sendBrandedMessage
+} = require('../../utils/webhookSender');
+
+const {
+  getAllGuilds
+} = require('../../utils/guildManager');
 
 const videosPath = path.join(
   __dirname,
@@ -25,197 +24,300 @@ const videosPath = path.join(
   'videos.json'
 );
 
+// ==================================================
+// CARGAR JSON SEGURO
+// ==================================================
+
+function loadVideos() {
+
+  try {
+
+    if (!fs.existsSync(videosPath)) {
+
+      return {};
+
+    }
+
+    const raw =
+      fs.readFileSync(
+        videosPath,
+        'utf8'
+      );
+
+    return raw.trim()
+      ? JSON.parse(raw)
+      : {};
+
+  }
+
+  catch {
+
+    console.error(
+      '⚠️ videos.json corrupto, restaurando...'
+    );
+
+    return {};
+
+  }
+
+}
+
+// ==================================================
+// GUARDAR JSON SEGURO
+// ==================================================
+
+function saveVideos(videos) {
+
+  const tempPath =
+    `${videosPath}.tmp`;
+
+  fs.writeFileSync(
+
+    tempPath,
+
+    JSON.stringify(
+      videos,
+      null,
+      2
+    )
+
+  );
+
+  fs.renameSync(
+    tempPath,
+    videosPath
+  );
+
+}
+
+// ==================================================
+// MONITOR
+// ==================================================
+
 module.exports = async (client) => {
 
   try {
 
-    const config = JSON.parse(
+    const guilds =
+      getAllGuilds();
 
-      fs.readFileSync(
-        configPath,
-        'utf8'
-      )
-
-    );
-
-    if (!config.videoChannel) {
+    if (!guilds.length) {
 
       console.log(
-        '⚠️ No hay canal de videos configurado.'
+        '⚠️ No hay servidores configurados.'
       );
 
       return;
 
     }
 
-    if (
-      !config.users ||
-      !config.users.length
-    ) {
+    const videos =
+      loadVideos();
 
-      console.log(
-        '⚠️ No hay usuarios TikTok configurados.'
-      );
-
-      return;
-
-    }
-
-    const channel =
-      await client.channels.fetch(
-        config.videoChannel
-      );
-
-    if (!channel) {
-
-      console.log(
-        '❌ Canal TikTok no encontrado.'
-      );
-
-      return;
-
-    }
-
-    let videos = {};
-
-    if (
-      fs.existsSync(videosPath)
-    ) {
-
-      videos = JSON.parse(
-
-        fs.readFileSync(
-          videosPath,
-          'utf8'
-        )
-
-      );
-
-    }
-
-    console.log(
-      `🎬 Revisando ${config.users.length} cuentas TikTok...`
-    );
-
-    const items =
-      await checkUsers(
-        config.users
-      );
-
-    for (const item of items) {
+    for (const guildConfig of guilds) {
 
       try {
 
-        const username =
-          item.authorMeta?.name;
+        const {
+          guildId,
+          tiktok
+        } = guildConfig;
 
-        if (!username)
-          continue;
-
-        const data = {
-
-          username,
-
-          nickname:
-            item.authorMeta?.nickName,
-
-          avatar:
-            item.authorMeta?.avatar,
-
-          videoId:
-            item.id,
-
-          description:
-            item.text ||
-            'Sin descripción',
-
-          url:
-            item.webVideoUrl,
-
-          thumbnail:
-            item.videoMeta?.coverUrl
-
-        };
-
-        const lastVideo =
-          videos[username];
-
-        // ==========================
-        // PRIMERA VEZ
-        // ==========================
-
-        if (!lastVideo) {
-
-          videos[username] =
-            data.videoId;
-
-          console.log(
-            `💾 Video inicial guardado para ${username}`
-          );
+        if (!tiktok) {
 
           continue;
 
         }
 
-        // ==========================
-        // VIDEO NUEVO
-        // ==========================
+        const users =
+          tiktok.users || [];
+
+        const videoChannelId =
+          tiktok.videoChannel;
 
         if (
-          lastVideo !==
-          data.videoId
+          !videoChannelId ||
+          !Array.isArray(users) ||
+          !users.length
         ) {
 
-          console.log(
-            `🎬 Nuevo video: ${username}`
-          );
-
-          await channel.send(
-
-            tiktokVideoEmbed(
-              data,
-              item
-            )
-
-          );
-
-          videos[username] =
-            data.videoId;
+          continue;
 
         }
 
-      } catch (error) {
+        const channel =
+          await client.channels.fetch(
+            videoChannelId
+          ).catch(() => null);
 
-        console.error(
-          `❌ Error procesando video TikTok`
+        if (!channel) {
+
+          console.log(
+            `⚠️ Canal TikTok Videos inválido (${guildId})`
+          );
+
+          continue;
+
+        }
+
+        console.log(
+          `🎬 [${guildId}] Revisando ${users.length} cuentas TikTok...`
         );
 
-        console.error(error);
+        const items =
+          await checkUsers(
+            users
+          );
+
+        if (
+          !Array.isArray(items)
+        ) {
+
+          continue;
+
+        }
+
+        for (const item of items) {
+
+          try {
+
+            const username =
+              item.authorMeta?.name
+                ?.toLowerCase();
+
+            if (!username) {
+
+              continue;
+
+            }
+
+            const data = {
+
+              username,
+
+              nickname:
+                item.authorMeta?.nickName,
+
+              avatar:
+                item.authorMeta?.avatar,
+
+              videoId:
+                item.id,
+
+              description:
+                item.text ||
+                'Sin descripción',
+
+              url:
+                item.webVideoUrl,
+
+              thumbnail:
+                item.videoMeta?.coverUrl
+
+            };
+
+            if (!videos[guildId]) {
+
+              videos[guildId] = {};
+
+            }
+
+            const lastVideo =
+              videos[guildId][username];
+
+            // ==========================
+            // PRIMER VIDEO
+            // ==========================
+
+            if (!lastVideo) {
+
+              videos[guildId][username] =
+                data.videoId;
+
+              console.log(
+                `💾 [${guildId}] Video inicial guardado para ${username}`
+              );
+
+              continue;
+
+            }
+
+            // ==========================
+            // VIDEO NUEVO
+            // ==========================
+
+            if (
+              lastVideo !==
+              data.videoId
+            ) {
+
+              console.log(
+                `🎬 [${guildId}] Nuevo video detectado: ${username}`
+              );
+
+              await sendBrandedMessage(
+
+                channel,
+
+                tiktokVideoEmbed(
+                  data,
+                  item
+                )
+
+              );
+
+              videos[guildId][username] =
+                data.videoId;
+
+            }
+
+          }
+
+          catch (error) {
+
+            console.error(
+              `❌ Error procesando video TikTok`
+            );
+
+            console.error(
+              error
+            );
+
+          }
+
+        }
+
+      }
+
+      catch (guildError) {
+
+        console.error(
+          '❌ Error procesando servidor TikTok'
+        );
+
+        console.error(
+          guildError
+        );
 
       }
 
     }
 
-    fs.writeFileSync(
+    saveVideos(videos);
 
-      videosPath,
+  }
 
-      JSON.stringify(
-        videos,
-        null,
-        2
-      )
-
-    );
-
-  } catch (error) {
+  catch (error) {
 
     console.error(
       '❌ Error monitor TikTok Videos'
     );
 
-    console.error(error);
+    console.error(
+      error
+    );
 
   }
 
 };
+

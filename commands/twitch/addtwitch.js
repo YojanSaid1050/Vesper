@@ -3,20 +3,13 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 
-const fs = require('fs');
-const path = require('path');
-
 const checkStreamer =
   require('../../functions/Twitch/checkStreamer');
 
-const configPath = path.join(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'twitch',
-  'config.json'
-);
+const {
+  getGuildConfig,
+  updateGuildSection
+} = require('../../utils/guildManager');
 
 module.exports = {
 
@@ -30,13 +23,10 @@ module.exports = {
 
     .addStringOption(option =>
       option
-
         .setName('streamer')
-
         .setDescription(
           'Nombre del streamer'
         )
-
         .setRequired(true)
     )
 
@@ -58,12 +48,14 @@ module.exports = {
           .trim()
           .toLowerCase();
 
-      // =====================================
-      // VALIDAR EN TWITCH
-      // =====================================
+      // =========================
+      // VALIDAR TWITCH
+      // =========================
 
       const data =
-        await checkStreamer(streamer);
+        await checkStreamer(
+          streamer
+        );
 
       if (!data?.exists) {
 
@@ -73,26 +65,24 @@ module.exports = {
 
       }
 
-      // =====================================
-      // CARGAR CONFIG
-      // =====================================
+      // =========================
+      // CONFIG GUILD
+      // =========================
 
-      const config =
-        JSON.parse(
-          fs.readFileSync(
-            configPath,
-            'utf8'
-          )
+      const guildConfig =
+        getGuildConfig(
+          interaction.guild.id
         );
 
-      // =====================================
-      // EVITAR DUPLICADOS
-      // =====================================
+      const users =
+        guildConfig.twitch.users || [];
+
+      // =========================
+      // DUPLICADO
+      // =========================
 
       if (
-        config.streamers.includes(
-          streamer
-        )
+        users.includes(streamer)
       ) {
 
         return interaction.editReply(
@@ -101,23 +91,17 @@ module.exports = {
 
       }
 
-      // =====================================
-      // GUARDAR
-      // =====================================
+      users.push(streamer);
 
-      config.streamers.push(
-        streamer
-      );
+      updateGuildSection(
 
-      fs.writeFileSync(
+        interaction.guild.id,
 
-        configPath,
+        'twitch',
 
-        JSON.stringify(
-          config,
-          null,
-          2
-        )
+        {
+          users
+        }
 
       );
 

@@ -1,11 +1,11 @@
-module.exports = ({
+function buildTwitchLivePayload({
   streamer,
   title,
   game,
   viewers,
   thumbnail,
   streamUrl
-}) => {
+}) {
 
   return {
 
@@ -91,10 +91,9 @@ module.exports = ({
                 style: 5,
 
                 label:
-                  '☾ 𝑬𝒏𝒕𝒆𝒓 𝒕𝒉𝒆 𝒂𝒃𝒚𝒔𝒔',
+'☾ 𝑬𝒏𝒕𝒆𝒓 𝒕𝒉𝒆 𝒂𝒃𝒚𝒔𝒔',
 
-                url:
-                  streamUrl
+                url: streamUrl
 
               }
 
@@ -110,4 +109,10 @@ module.exports = ({
 
   };
 
-};
+}
+
+module.exports =
+  buildTwitchLivePayload;
+
+module.exports.buildTwitchLivePayload =
+  buildTwitchLivePayload;

@@ -3,20 +3,13 @@ const {
   PermissionFlagsBits
 } = require('discord.js');
 
-const fs = require('fs');
-const path = require('path');
-
 const checkUser =
   require('../../functions/TikTok/checkUser');
 
-const configPath = path.join(
-  __dirname,
-  '..',
-  '..',
-  'data',
-  'tiktok',
-  'config.json'
-);
+const {
+  getGuildConfig,
+  updateGuildConfig
+} = require('../../utils/guildManager');
 
 module.exports = {
 
@@ -30,13 +23,10 @@ module.exports = {
 
     .addStringOption(option =>
       option
-
         .setName('usuario')
-
         .setDescription(
           'Usuario TikTok'
         )
-
         .setRequired(true)
     )
 
@@ -59,10 +49,6 @@ module.exports = {
           .trim()
           .toLowerCase();
 
-      // ==========================
-      // VALIDAR USUARIO EN TIKTOK
-      // ==========================
-
       const user =
         await checkUser(
           username
@@ -76,25 +62,29 @@ module.exports = {
 
       }
 
-      // ==========================
-      // LEER CONFIG
-      // ==========================
-
       const config =
-        JSON.parse(
-          fs.readFileSync(
-            configPath,
-            'utf8'
-          )
+        getGuildConfig(
+          interaction.guild.id
         );
 
-      // ==========================
-      // EVITAR DUPLICADOS
-      // ==========================
+      if (!config.tiktok) {
+
+        config.tiktok = {
+
+          liveChannel: null,
+          videoChannel: null,
+          users: []
+
+        };
+
+      }
+
+      const realUsername =
+        user.username.toLowerCase();
 
       if (
-        config.users.includes(
-          username
+        config.tiktok.users.includes(
+          realUsername
         )
       ) {
 
@@ -104,24 +94,13 @@ module.exports = {
 
       }
 
-      // ==========================
-      // GUARDAR
-      // ==========================
+      config.tiktok.users.push(
+        realUsername
+      );
 
-      config.users.push(
-  user.username.toLowerCase()
-);
-
-      fs.writeFileSync(
-
-        configPath,
-
-        JSON.stringify(
-          config,
-          null,
-          2
-        )
-
+      updateGuildConfig(
+        interaction.guild.id,
+        config
       );
 
       await interaction.editReply(
