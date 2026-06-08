@@ -6,12 +6,17 @@ let isConnected = false;
 async function connectMongo() {
   if (isConnected) return;
   
+  if (!process.env.MONGODB_URI) {
+    console.error('❌ MONGODB_URI no está configurada en .env');
+    throw new Error('MONGODB_URI missing');
+  }
+  
   try {
     await mongoose.connect(process.env.MONGODB_URI);
     isConnected = true;
     console.log('✅ Conectado a MongoDB Atlas');
   } catch (error) {
-    console.error('❌ Error conectando a MongoDB:', error);
+    console.error('❌ Error conectando a MongoDB:', error.message);
     throw error;
   }
 }
@@ -58,6 +63,21 @@ async function getAllGuilds() {
   return await Guild.find({});
 }
 
+async function getAllGuildConfigs() {
+  await connectMongo();
+  const guilds = await Guild.find({});
+  const result = {};
+  for (const guild of guilds) {
+    result[guild.guildId] = guild.toObject();
+  }
+  return result;
+}
+
+async function getGeneralConfig(guildId) {
+  const config = await getGuildConfig(guildId);
+  return config.general;
+}
+
 async function deleteGuild(guildId) {
   await connectMongo();
   return await Guild.deleteOne({ guildId });
@@ -69,5 +89,7 @@ module.exports = {
   updateGuildConfig,
   updateGuildSection,
   getAllGuilds,
+  getAllGuildConfigs,
+  getGeneralConfig,
   deleteGuild
 };

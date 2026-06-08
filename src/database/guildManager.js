@@ -1,7 +1,13 @@
-// guildManager.js - Ahora usa MongoDB en lugar de archivos JSON
-const { getGuildConfig, updateGuildConfig, updateGuildSection, getAllGuilds, getGeneralConfig, getAllGuildConfigs } = require('./mongoManager');
+// guildManager.js - Ahora usa MongoDB
+const { 
+  getGuildConfig, 
+  updateGuildConfig, 
+  updateGuildSection, 
+  getAllGuilds, 
+  getAllGuildConfigs,
+  getGeneralConfig 
+} = require('./mongoManager');
 
-// Crear función de compatibilidad para createDefaultGuild
 function createDefaultGuild() {
   return {
     general: { welcomeChannel: null, goodbyeChannel: null, logChannel: null, botLogChannel: null, botRole: null },
@@ -14,19 +20,17 @@ function createDefaultGuild() {
   };
 }
 
-// Función de migración vacía (MongoDB maneja esto automáticamente)
 function migrateGuildConfig(config) {
   return false;
 }
 
-// Re-exportar todas las funciones de mongoManager
 module.exports = {
   getGuildConfig,
   updateGuildConfig,
   updateGuildSection,
   getAllGuilds,
-  getGeneralConfig,
   getAllGuildConfigs,
+  getGeneralConfig,
   createDefaultGuild,
   migrateGuildConfig
 };
