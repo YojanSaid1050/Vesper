@@ -39,17 +39,19 @@ async function mainPanel(guildId) {
 }
 
 async function generalPanel(guildId) {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
+  const general = config.general || {};
+  
   return {
     flags: 32768,
     components: [{
-      type: 17, accent_color: 0xFFFFFF, spoiler: false, // Blanco
+      type: 17, accent_color: 0xFFFFFF, spoiler: false,
       components: [
         { type: 10, content: '# ⛧°. ⋆༺ 𝑇ℎ𝑒 𝐸𝑦𝑒𝑠 𝑜𝑓 𝑡ℎ𝑒 𝑉𝑜𝑖𝑑 ༻⋆. °⛧' },
         { type: 14, spacing: 2 },
         { type: 10, content: '### 𝑇ℎ𝑒 𝑣𝑜𝑖𝑑 𝑠𝑒𝑒𝑠 𝑒𝑣𝑒𝑟𝑦𝑡ℎ𝑖𝑛𝑔, 𝑏𝑢𝑡 𝑖𝑡 𝑛𝑒𝑒𝑑𝑠 𝑤𝑖𝑛𝑑𝑜𝑤𝑠.\n\n༺𓆩~~𝑌𝑜𝑢 𝑎𝑟𝑒 𝑛𝑜𝑡 𝑐𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑖𝑛𝑔 𝑐ℎ𝑎𝑛𝑛𝑒𝑙𝑠… 𝑦𝑜𝑢 𝑎𝑟𝑒 𝑜𝑝𝑒𝑛𝑖𝑛𝑔 𝑝𝑜𝑟𝑡𝑎𝑙𝑠.~~𓆪༻' },
         { type: 14, spacing: 2 },
-        { type: 10, content: `👁️ **𝐵𝑖𝑒𝑛𝑣𝑒𝑛𝑖𝑑𝑎**\n𝐶𝑎𝑛𝑎𝑙 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑐𝑖𝑏𝑖𝑟á 𝑎 𝑙𝑜𝑠 𝑛𝑢𝑒𝑣𝑜𝑠 𝑣𝑖𝑎𝑗𝑒𝑟𝑜𝑠.\n${config.general.welcomeChannel ? `<#${config.general.welcomeChannel}>` : '`No vinculado`'}\n\n👁️ **𝐷𝑒𝑠𝑝𝑒𝑑𝑖𝑑𝑎**\n𝐶𝑎𝑛𝑎𝑙 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑠𝑒 𝑑𝑒𝑠𝑝𝑒𝑑𝑖𝑟á 𝑑𝑒 𝑞𝑢𝑖𝑒𝑛𝑒𝑠 𝑠𝑒 𝑚𝑎𝑟𝑐ℎ𝑎𝑛.\n${config.general.goodbyeChannel ? `<#${config.general.goodbyeChannel}>` : '`No vinculado`'}\n\n👁️ **𝑅𝑒𝑔𝑖𝑠𝑡𝑟𝑜𝑠**\n𝐶𝑎𝑛𝑎𝑙 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑒𝑠𝑐𝑟𝑖𝑏𝑖𝑟á 𝑙𝑜𝑠 𝑠𝑢𝑐𝑒𝑠𝑜𝑠 𝑑𝑒𝑙 𝑠𝑒𝑟𝑣𝑖𝑑𝑜𝑟.\n${config.general.logChannel ? `<#${config.general.logChannel}>` : '`No vinculado`'}` },
+        { type: 10, content: `👁️ **𝐵𝑖𝑒𝑛𝑣𝑒𝑛𝑖𝑑𝑎**\n𝐶𝑎𝑛𝑎𝑙 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑐𝑖𝑏𝑖𝑟á 𝑎 𝑙𝑜𝑠 𝑛𝑢𝑒𝑣𝑜𝑠 𝑣𝑖𝑎𝑗𝑒𝑟𝑜𝑠.\n${general.welcomeChannel ? `<#${general.welcomeChannel}>` : '`No vinculado`'}\n\n👁️ **𝐷𝑒𝑠𝑝𝑒𝑑𝑖𝑑𝑎**\n𝐶𝑎𝑛𝑎𝑙 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑠𝑒 𝑑𝑒𝑠𝑝𝑒𝑑𝑖𝑟á 𝑑𝑒 𝑞𝑢𝑖𝑒𝑛𝑒𝑠 𝑠𝑒 𝑚𝑎𝑟𝑐ℎ𝑎𝑛.\n${general.goodbyeChannel ? `<#${general.goodbyeChannel}>` : '`No vinculado`'}\n\n👁️ **𝑅𝑒𝑔𝑖𝑠𝑡𝑟𝑜𝑠**\n𝐶𝑎𝑛𝑎𝑙 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑒𝑠𝑐𝑟𝑖𝑏𝑖𝑟á 𝑙𝑜𝑠 𝑠𝑢𝑐𝑒𝑠𝑜𝑠 𝑑𝑒𝑙 𝑠𝑒𝑟𝑣𝑖𝑑𝑜𝑟.\n${general.logChannel ? `<#${general.logChannel}>` : '`No vinculado`'}` },
         { type: 14, spacing: 2 },
         { type: 10, content: '⚙️ **𝑉𝑖𝑛𝑐𝑢𝑙𝑎 𝑙𝑜𝑠 𝑝𝑜𝑟𝑡𝑎𝑙𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑢𝑛 𝑐𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑎𝑠𝑖𝑔𝑛𝑎𝑟𝑙𝑒 𝑢𝑛𝑎 𝑑𝑒 𝑙𝑎𝑠 𝑓𝑢𝑛𝑐𝑖𝑜𝑛𝑒𝑠 𝑑𝑒𝑙 𝑣𝑎𝑐í𝑜.' },
         { type: 14, spacing: 1 },
@@ -65,17 +67,19 @@ async function generalPanel(guildId) {
 }
 
 async function botPanel(guildId) {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
+  const general = config.general || {};
+  
   return {
     flags: 32768,
     components: [{
-      type: 17, accent_color: 0x808080, spoiler: false, // Gris
+      type: 17, accent_color: 0x808080, spoiler: false,
       components: [
         { type: 10, content: '# ⛧°. ⋆༺ 𝐼𝑛𝑛𝑒𝑟 𝐶𝑙𝑜𝑐𝑘𝑤𝑜𝑟𝑘 ༻⋆. °⛧' },
         { type: 14, spacing: 2 },
         { type: 10, content: '### 𝑇ℎ𝑒 𝑚𝑎𝑐ℎ𝑖𝑛𝑒𝑟𝑦 𝑡ℎ𝑎𝑡 𝑏𝑟𝑒𝑎𝑡ℎ𝑒𝑠 𝑤𝑖𝑡ℎ𝑖𝑛 𝑡ℎ𝑒 𝑟𝑒𝑙𝑖𝑐.\n\n༺𓆩~~𝑌𝑜𝑢 𝑎𝑟𝑒 𝑛𝑜𝑡 𝑐𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑖𝑛𝑔 𝑎 𝑏𝑜𝑡… 𝑦𝑜𝑢 𝑎𝑟𝑒 𝑐𝑎𝑙𝑖𝑏𝑟𝑎𝑡𝑖𝑛𝑔 𝑖𝑡𝑠 ℎ𝑒𝑎𝑟𝑡𝑏𝑒𝑎𝑡.~~𓆪༻' },
         { type: 14, spacing: 2 },
-        { type: 10, content: `⚙️ **𝑅𝑜𝑙 𝑑𝑒 𝑙𝑎𝑠 𝑚á𝑞𝑢𝑖𝑛𝑎𝑠**\n𝑅𝑜𝑙 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑎𝑠𝑖𝑔𝑛𝑎𝑟á 𝑎 𝑙𝑜𝑠 𝑏𝑜𝑡𝑠 𝑎𝑢𝑡𝑜𝑚á𝑡𝑖𝑐𝑎𝑚𝑒𝑛𝑡𝑒.\n${config.general.botRole ? `<@&${config.general.botRole}>` : '`No vinculado`'}\n\n📜 **𝑅𝑒𝑔𝑖𝑠𝑡𝑟𝑜 𝑑𝑒 𝑚𝑎𝑞𝑢𝑖𝑛𝑎𝑟𝑖𝑎**\n𝐶𝑎𝑛𝑎𝑙 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑔𝑖𝑠𝑡𝑟𝑎𝑟á 𝑙𝑎𝑠 𝑎𝑐𝑐𝑖𝑜𝑛𝑒𝑠 𝑑𝑒 𝑙𝑜𝑠 𝑠𝑒𝑟𝑣𝑖𝑑𝑜𝑟𝑒𝑠.\n${config.general.botLogChannel ? `<#${config.general.botLogChannel}>` : '`No vinculado`'}` },
+        { type: 10, content: `⚙️ **𝑅𝑜𝑙 𝑑𝑒 𝑙𝑎𝑠 𝑚á𝑞𝑢𝑖𝑛𝑎𝑠**\n𝑅𝑜𝑙 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑎𝑠𝑖𝑔𝑛𝑎𝑟á 𝑎 𝑙𝑜𝑠 𝑏𝑜𝑡𝑠 𝑎𝑢𝑡𝑜𝑚á𝑡𝑖𝑐𝑎𝑚𝑒𝑛𝑡𝑒.\n${general.botRole ? `<@&${general.botRole}>` : '`No vinculado`'}\n\n📜 **𝑅𝑒𝑔𝑖𝑠𝑡𝑟𝑜 𝑑𝑒 𝑚𝑎𝑞𝑢𝑖𝑛𝑎𝑟𝑖𝑎**\n𝐶𝑎𝑛𝑎𝑙 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑔𝑖𝑠𝑡𝑟𝑎𝑟á 𝑙𝑎𝑠 𝑎𝑐𝑐𝑖𝑜𝑛𝑒𝑠 𝑑𝑒 𝑙𝑜𝑠 𝑠𝑒𝑟𝑣𝑖𝑑𝑜𝑟𝑒𝑠.\n${general.botLogChannel ? `<#${general.botLogChannel}>` : '`No vinculado`'}` },
         { type: 14, spacing: 2 },
         { type: 10, content: '⚙️ **𝑉𝑖𝑛𝑐𝑢𝑙𝑎 𝑙𝑜𝑠 𝑒𝑛𝑔𝑟𝑎𝑛𝑎𝑗𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑢𝑛 𝑟𝑜𝑙 𝑦 𝑢𝑛 𝑐𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑞𝑢𝑒 𝑙𝑎 𝑚𝑎𝑞𝑢𝑖𝑛𝑎𝑟𝑖𝑎 𝑓𝑢𝑛𝑐𝑖𝑜𝑛𝑒 𝑒𝑛 𝑎𝑟𝑚𝑜𝑛í𝑎.' },
         { type: 14, spacing: 1 },
@@ -90,7 +94,7 @@ async function botPanel(guildId) {
 }
 
 async function brandingPanel(guildId) {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const branding = config.branding || {};
   
   const components = [
@@ -128,7 +132,7 @@ async function brandingPanel(guildId) {
     flags: 32768,
     components: [{
       type: 17,
-      accent_color: 0xFFA500, // Naranja
+      accent_color: 0xFFA500,
       spoiler: false,
       components: components
     }]
@@ -136,7 +140,7 @@ async function brandingPanel(guildId) {
 }
 
 async function tiktokPanel(guildId, mode = 'default') {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const tiktok = config.tiktok || {};
   const users = tiktok.users || [];
   const isList = mode === 'list';
@@ -146,7 +150,7 @@ async function tiktokPanel(guildId, mode = 'default') {
   return {
     flags: 32768,
     components: [{
-      type: 17, accent_color: 0x1E90FF, spoiler: false, // Azul
+      type: 17, accent_color: 0x1E90FF, spoiler: false,
       components: [
         { type: 10, content: '# ⛧°. ⋆༺ 𝑊ℎ𝑖𝑠𝑝𝑒𝑟𝑠 ༻⋆. °⛧' },
         { type: 14, spacing: 2 },
@@ -177,7 +181,7 @@ async function tiktokPanel(guildId, mode = 'default') {
 }
 
 async function twitchPanel(guildId) {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const twitch = config.twitch || {};
   const users = twitch.users || [];
   const showUsers = twitch.showUsers ?? false;
@@ -186,7 +190,7 @@ async function twitchPanel(guildId) {
   return {
     flags: 32768,
     components: [{
-      type: 17, accent_color: 0x800080, spoiler: false, // Morado
+      type: 17, accent_color: 0x800080, spoiler: false,
       components: [
         { type: 10, content: '# ⛧°. ⋆༺ 𝑇ℎ𝑒 𝑉𝑖𝑔𝑖𝑙 ༻⋆. °⛧' },
         { type: 14, spacing: 2 },
@@ -216,7 +220,7 @@ async function twitchPanel(guildId) {
 }
 
 async function youtubePanel(guildId, mode = 'default') {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const youtube = config.youtube || {};
   const users = youtube.users || [];
   const isList = mode === 'list';
@@ -241,7 +245,7 @@ async function youtubePanel(guildId, mode = 'default') {
   return {
     flags: 32768,
     components: [{
-      type: 17, accent_color: 0xFF0000, spoiler: false, // Rojo
+      type: 17, accent_color: 0xFF0000, spoiler: false,
       components: [
         { type: 10, content: '# ⛧°. ⋆༺ 𝐸𝑡𝑒𝑟𝑛𝑎𝑙 𝑅𝑒𝑐𝑜𝑟𝑑𝑠 ༻⋆. °⛧' },
         { type: 14, spacing: 2 },
@@ -288,14 +292,13 @@ async function youtubePanel(guildId, mode = 'default') {
 }
 
 async function testPanel(guildId) {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const branding = config.branding || {};
   const tiktok = config.tiktok || {};
   const twitch = config.twitch || {};
   const youtube = config.youtube || {};
   const activeSection = config.testPanel?.activeSection || 'general';
 
-  // Contenido dinámico según la sección activa
   let sectionContent = '';
   let sectionTitle = '';
 
@@ -304,11 +307,11 @@ async function testPanel(guildId) {
       sectionTitle = '📊 **Current Configuration**';
       sectionContent = 
         `👁️ **General**\n` +
-        `└ Welcome: ${config.general.welcomeChannel ? `<#${config.general.welcomeChannel}>` : '`No vinculado`'}\n` +
-        `└ Goodbye: ${config.general.goodbyeChannel ? `<#${config.general.goodbyeChannel}>` : '`No vinculado`'}\n` +
-        `└ Logs: ${config.general.logChannel ? `<#${config.general.logChannel}>` : '`No vinculado`'}\n` +
-        `└ Bot Logs: ${config.general.botLogChannel ? `<#${config.general.botLogChannel}>` : '`No vinculado`'}\n` +
-        `└ Bot Role: ${config.general.botRole ? `<@&${config.general.botRole}>` : '`No vinculado`'}\n\n` +
+        `└ Welcome: ${config.general?.welcomeChannel ? `<#${config.general.welcomeChannel}>` : '`No vinculado`'}\n` +
+        `└ Goodbye: ${config.general?.goodbyeChannel ? `<#${config.general.goodbyeChannel}>` : '`No vinculado`'}\n` +
+        `└ Logs: ${config.general?.logChannel ? `<#${config.general.logChannel}>` : '`No vinculado`'}\n` +
+        `└ Bot Logs: ${config.general?.botLogChannel ? `<#${config.general.botLogChannel}>` : '`No vinculado`'}\n` +
+        `└ Bot Role: ${config.general?.botRole ? `<@&${config.general.botRole}>` : '`No vinculado`'}\n\n` +
         `🎭 **Whispers (TikTok)**\n` +
         `└ Live Channel: ${tiktok.liveChannel ? `<#${tiktok.liveChannel}>` : '`No vinculado`'}\n` +
         `└ Video Channel: ${tiktok.videoChannel ? `<#${tiktok.videoChannel}>` : '`No vinculado`'}\n` +
@@ -441,7 +444,6 @@ async function testPanel(guildId) {
         { type: 10, content: '### 𝑊ℎ𝑒𝑟𝑒 𝑒𝑐ℎ𝑜𝑒𝑠 𝑎𝑟𝑒 𝑡𝑒𝑠𝑡𝑒𝑑 𝑎𝑛𝑑 𝑣𝑖𝑠𝑖𝑜𝑛𝑠 𝑎𝑟𝑒 𝑣𝑒𝑟𝑖𝑓𝑖𝑒𝑑.\n\n༺𓆩~~𝐵𝑒𝑓𝑜𝑟𝑒 𝑎 𝑠𝑡𝑎𝑟 𝑠ℎ𝑖𝑛𝑒𝑠 𝑖𝑛 𝑡ℎ𝑒 𝑣𝑜𝑖𝑑, 𝑖𝑡 𝑚𝑢𝑠𝑡 𝑏𝑒 𝑠𝑢𝑚𝑚𝑜𝑛𝑒𝑑.~~𓆪༻' },
         { type: 14, spacing: 2 },
         
-        // Botones de navegación entre secciones
         new ActionRowBuilder().addComponents(
           new ButtonBuilder().setCustomId('test_section_general').setLabel('📊 General').setStyle(activeSection === 'general' ? ButtonStyle.Primary : ButtonStyle.Secondary),
           new ButtonBuilder().setCustomId('test_section_tiktok').setLabel('🎭 Whispers').setStyle(activeSection === 'tiktok' ? ButtonStyle.Primary : ButtonStyle.Secondary),
@@ -456,7 +458,6 @@ async function testPanel(guildId) {
         
         { type: 14, spacing: 2 },
         
-        // Contenido dinámico
         { type: 10, content: sectionTitle },
         { type: 14, spacing: 1 },
         { type: 10, content: sectionContent },
