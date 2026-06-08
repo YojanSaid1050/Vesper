@@ -1,5 +1,5 @@
-const { updateGuildSection, getGuildConfig, updateGuildConfig } = require('../database/guildManager');
-const { brandingPanel, tiktokPanel, twitchPanel, mainPanel } = require('../dashboard/panels');
+const { updateGuildSection, getGuildConfig, updateGuildConfig } = require('../database/mongoManager');
+const { brandingPanel, tiktokPanel, twitchPanel, youtubePanel, mainPanel } = require('../dashboard/panels');
 const { checkUser } = require('../platforms/tiktok/checks');
 const { verifyStreamer } = require('../platforms/twitch/utils');
 const { verifyChannel } = require('../platforms/youtube/utils');
@@ -12,11 +12,11 @@ const tiktokVideosCache = new CacheManager('./data/tiktok');
 const youtubeCache = new CacheManager('./data/youtube');
 
 // ==================================================
-// FUNCIONES DE REFRESH
+// FUNCIONES DE REFRESH (CORREGIDAS CON ASYNC/AWAIT)
 // ==================================================
 
 async function refreshDashboard(client, guildId) {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const channelId = config.dashboard?.channel;
   const messageId = config.dashboard?.message;
   if (!channelId || !messageId) return;
@@ -32,7 +32,7 @@ async function refreshDashboard(client, guildId) {
 }
 
 async function refreshBranding(client, guildId) {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const channelId = config.dashboard?.channel;
   const messageId = config.dashboard?.message;
   if (!channelId || !messageId) return;
@@ -48,7 +48,7 @@ async function refreshBranding(client, guildId) {
 }
 
 async function refreshTikTok(client, guildId, mode = 'default') {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const channelId = config.dashboard?.channel;
   const messageId = config.dashboard?.message;
   if (!channelId || !messageId) return;
@@ -64,7 +64,7 @@ async function refreshTikTok(client, guildId, mode = 'default') {
 }
 
 async function refreshTwitch(client, guildId) {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const channelId = config.dashboard?.channel;
   const messageId = config.dashboard?.message;
   if (!channelId || !messageId) return;
@@ -80,7 +80,7 @@ async function refreshTwitch(client, guildId) {
 }
 
 async function refreshYouTube(client, guildId, mode = 'default') {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const channelId = config.dashboard?.channel;
   const messageId = config.dashboard?.message;
   if (!channelId || !messageId) return;
@@ -182,19 +182,6 @@ function cleanYouTubeGuild(guildId) {
 }
 
 // ==================================================
-// FUNCIÓN PARA REFRESCAR PANEL DESPUÉS DE ACCIONES
-// ==================================================
-
-async function refreshPanel(interaction, panelFn, ...args) {
-  const panel = await panelFn(interaction.guild.id, ...args);
-  try {
-    await interaction.update(panel);
-  } catch {
-    await interaction.message.edit(panel);
-  }
-}
-
-// ==================================================
 // HANDLER PRINCIPAL
 // ==================================================
 
@@ -211,7 +198,7 @@ async function handleModal(interaction, client) {
     if (interaction.customId === 'confirm_tiktok_delete_all') {
       await interaction.deferUpdate();
       const guildId = interaction.guild.id;
-      let config = getGuildConfig(guildId);
+      let config = await getGuildConfig(guildId);
       config.tiktok.users = [];
       await updateGuildConfig(guildId, config);
       cleanTikTokGuild(guildId);
@@ -226,7 +213,7 @@ async function handleModal(interaction, client) {
     if (interaction.customId === 'confirm_twitch_delete_all') {
       await interaction.deferUpdate();
       const guildId = interaction.guild.id;
-      let config = getGuildConfig(guildId);
+      let config = await getGuildConfig(guildId);
       config.twitch.users = [];
       await updateGuildConfig(guildId, config);
       cleanTwitchGuild(guildId);
@@ -240,7 +227,7 @@ async function handleModal(interaction, client) {
     if (interaction.customId === 'confirm_youtube_delete_all') {
       await interaction.deferUpdate();
       const guildId = interaction.guild.id;
-      let config = getGuildConfig(guildId);
+      let config = await getGuildConfig(guildId);
       config.youtube.users = [];
       await updateGuildConfig(guildId, config);
       cleanYouTubeGuild(guildId);
@@ -254,7 +241,7 @@ async function handleModal(interaction, client) {
 
     if (interaction.customId === 'youtube_clear_confirm') {
       await interaction.deferUpdate();
-      const config = getGuildConfig(interaction.guild.id);
+      const config = await getGuildConfig(interaction.guild.id);
       updateGuildSection(interaction.guild.id, 'youtube', { ...config.youtube, users: [] });
       cleanYouTubeGuild(interaction.guild.id);
       return interaction.update({ content: '✅ Se eliminaron todos los canales del monitoreo de YouTube.', embeds: [], components: [] });
@@ -267,7 +254,7 @@ async function handleModal(interaction, client) {
 
     if (interaction.customId === 'tiktok_clear_confirm') {
       await interaction.deferUpdate();
-      const config = getGuildConfig(interaction.guild.id);
+      const config = await getGuildConfig(interaction.guild.id);
       updateGuildSection(interaction.guild.id, 'tiktok', { ...config.tiktok, users: [] });
       cleanTikTokGuild(interaction.guild.id);
       return interaction.update({ content: '✅ Se eliminaron todos los usuarios del monitoreo de TikTok.', embeds: [], components: [] });
@@ -280,7 +267,7 @@ async function handleModal(interaction, client) {
 
     if (interaction.customId === 'twitch_clear_confirm') {
       await interaction.deferUpdate();
-      const config = getGuildConfig(interaction.guild.id);
+      const config = await getGuildConfig(interaction.guild.id);
       updateGuildSection(interaction.guild.id, 'twitch', { ...config.twitch, users: [] });
       cleanTwitchGuild(interaction.guild.id);
       return interaction.update({ content: '✅ Se eliminaron todos los streamers del monitoreo de Twitch.', embeds: [], components: [] });
@@ -302,7 +289,8 @@ async function handleModal(interaction, client) {
   }
 
   const guildId = interaction.guild.id;
-  let config = getGuildConfig(guildId);
+  let config = await getGuildConfig(guildId);
+  
   if (!config.tiktok) config.tiktok = { users: [] };
   if (!config.twitch) config.twitch = { users: [] };
   if (!config.youtube) config.youtube = { users: [] };

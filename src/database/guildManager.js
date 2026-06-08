@@ -1,4 +1,4 @@
-// guildManager.js - Ahora usa MongoDB
+// guildManager.js - Ahora re-exporta desde mongoManager
 const { 
   getGuildConfig, 
   updateGuildConfig, 

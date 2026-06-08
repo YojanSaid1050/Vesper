@@ -1,4 +1,4 @@
-const { getGuildConfig, updateGuildSection, updateGuildConfig } = require('../database/guildManager');
+const { getGuildConfig, updateGuildSection, updateGuildConfig } = require('../database/mongoManager');
 const { mainPanel, generalPanel, botPanel, brandingPanel, tiktokPanel, twitchPanel, youtubePanel, testPanel } = require('../dashboard/panels');
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { checkUser } = require('../platforms/tiktok/checks');
@@ -47,7 +47,7 @@ function cleanYouTubeGuild(guildId) {
 }
 
 async function refreshTikTok(client, guildId, mode = 'default') {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const channelId = config.dashboard?.channel;
   const messageId = config.dashboard?.message;
   if (!channelId || !messageId) return;
@@ -63,7 +63,7 @@ async function refreshTikTok(client, guildId, mode = 'default') {
 }
 
 async function refreshTwitch(client, guildId) {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const channelId = config.dashboard?.channel;
   const messageId = config.dashboard?.message;
   if (!channelId || !messageId) return;
@@ -79,7 +79,7 @@ async function refreshTwitch(client, guildId) {
 }
 
 async function refreshYouTube(client, guildId, mode = 'default') {
-  const config = getGuildConfig(guildId);
+  const config = await getGuildConfig(guildId);
   const channelId = config.dashboard?.channel;
   const messageId = config.dashboard?.message;
   if (!channelId || !messageId) return;
@@ -217,7 +217,7 @@ async function handleButton(interaction, client) {
   }
 
   if (customId === 'tiktok_list_users') {
-    const config = getGuildConfig(interaction.guild.id);
+    const config = await getGuildConfig(interaction.guild.id);
     const newShow = !config.tiktok?.showUsers;
     const mode = newShow ? 'list' : 'default';
     updateGuildSection(interaction.guild.id, 'tiktok', { showUsers: newShow });
@@ -280,7 +280,7 @@ async function handleButton(interaction, client) {
   }
 
   if (customId === 'twitch_list_users') {
-    const config = getGuildConfig(interaction.guild.id);
+    const config = await getGuildConfig(interaction.guild.id);
     updateGuildSection(interaction.guild.id, 'twitch', { showUsers: !config.twitch?.showUsers });
     return safeUpdate(await twitchPanel(interaction.guild.id));
   }
@@ -341,7 +341,7 @@ async function handleButton(interaction, client) {
   }
 
   if (customId === 'youtube_list_users') {
-    const config = getGuildConfig(interaction.guild.id);
+    const config = await getGuildConfig(interaction.guild.id);
     const newShow = !config.youtube?.showUsers;
     const mode = newShow ? 'list' : 'default';
     updateGuildSection(interaction.guild.id, 'youtube', { showUsers: newShow });
@@ -378,7 +378,7 @@ async function handleButton(interaction, client) {
   if (customId === 'confirm_tiktok_delete_all') {
     await interaction.deferUpdate();
     const guildId = interaction.guild.id;
-    let config = getGuildConfig(guildId);
+    let config = await getGuildConfig(guildId);
     config.tiktok.users = [];
     await updateGuildConfig(guildId, config);
     cleanTikTokGuild(guildId);
@@ -393,7 +393,7 @@ async function handleButton(interaction, client) {
   if (customId === 'confirm_twitch_delete_all') {
     await interaction.deferUpdate();
     const guildId = interaction.guild.id;
-    let config = getGuildConfig(guildId);
+    let config = await getGuildConfig(guildId);
     config.twitch.users = [];
     await updateGuildConfig(guildId, config);
     cleanTwitchGuild(guildId);
@@ -407,7 +407,7 @@ async function handleButton(interaction, client) {
   if (customId === 'confirm_youtube_delete_all') {
     await interaction.deferUpdate();
     const guildId = interaction.guild.id;
-    let config = getGuildConfig(guildId);
+    let config = await getGuildConfig(guildId);
     config.youtube.users = [];
     await updateGuildConfig(guildId, config);
     cleanYouTubeGuild(guildId);
@@ -421,7 +421,7 @@ async function handleButton(interaction, client) {
 
   if (customId === 'youtube_clear_confirm') {
     await interaction.deferUpdate();
-    const config = getGuildConfig(interaction.guild.id);
+    const config = await getGuildConfig(interaction.guild.id);
     updateGuildSection(interaction.guild.id, 'youtube', { ...config.youtube, users: [] });
     cleanYouTubeGuild(interaction.guild.id);
     const mode = config.youtube?.showUsers ? 'list' : 'default';

@@ -1,72 +1,65 @@
-const axios = require('axios');
+const { getAllGuildConfigs } = require('../../database/mongoManager');
+const { sendBrandedMessage } = require('../../utils/webhookSender');
+const CacheManager = require('../../core/CacheManager');
+const { checkStreamers } = require('./checks');
+const { liveEmbed } = require('./embeds');
 
-let accessToken = null;
-let tokenExpiry = 0;
+const cache = new CacheManager('./data/twitch');
 
-async function getAccessToken() {
-  if (accessToken && Date.now() < tokenExpiry) {
-    return accessToken;
-  }
+async function monitorStreams(client) {
+  const streamStatus = cache.load('status', {});
+  const guilds = await getAllGuildConfigs();
 
-  try {
-    const response = await axios.post('https://id.twitch.tv/oauth2/token', null, {
-      params: {
-        client_id: process.env.TWITCH_CLIENT_ID,
-        client_secret: process.env.TWITCH_CLIENT_SECRET,
-        grant_type: 'client_credentials'
+  for (const [guildId, config] of Object.entries(guilds)) {
+    const twitchConfig = config.twitch || {};
+    const users = twitchConfig.users || [];
+    const liveChannelId = twitchConfig.liveChannel;
+
+    if (users.length === 0 || !liveChannelId) continue;
+
+    const channel = await client.channels.fetch(liveChannelId).catch(() => null);
+    if (!channel) continue;
+
+    if (!streamStatus[guildId]) {
+      streamStatus[guildId] = {};
+    }
+
+    const guildStatus = streamStatus[guildId];
+    
+    const validUsersSet = new Set(users);
+    for (const savedUser of Object.keys(guildStatus)) {
+      if (!validUsersSet.has(savedUser)) {
+        delete guildStatus[savedUser];
       }
-    });
+    }
 
-    accessToken = response.data.access_token;
-    tokenExpiry = Date.now() + (response.data.expires_in * 1000);
-    return accessToken;
-  } catch (error) {
-    console.error('Error obteniendo token de Twitch:', error.message);
-    return null;
-  }
-}
+    const results = await checkStreamers(users);
 
-function normalize(username) {
-  if (!username) return '';
-  return username.toLowerCase().trim().replace('@', '');
-}
+    for (const streamer of results) {
+      if (!streamer?.success) continue;
 
-async function getStreamerInfo(username) {
-  const token = await getAccessToken();
-  if (!token) return null;
+      const streamerLogin = streamer.login;
+      const isLive = streamer.isLive === true;
+      const wasLive = guildStatus[streamerLogin] === true;
 
-  try {
-    const response = await axios.get('https://api.twitch.tv/helix/users', {
-      params: { login: normalize(username) },
-      headers: {
-        'Client-ID': process.env.TWITCH_CLIENT_ID,
-        'Authorization': `Bearer ${token}`
+      if (isLive && !wasLive) {
+        await sendBrandedMessage(channel, liveEmbed({
+          streamer: streamer.streamerName,
+          title: streamer.title || 'Sin título',
+          game: streamer.game || 'Sin categoría',
+          viewers: streamer.viewers || 0,
+          thumbnail: streamer.thumbnail,
+          streamUrl: streamer.streamUrl || `https://twitch.tv/${streamerLogin}`
+        }));
       }
-    });
 
-    const user = response.data.data?.[0];
-    if (!user) return null;
+      guildStatus[streamerLogin] = isLive;
+    }
 
-    return {
-      id: user.id,
-      name: user.display_name,
-      login: user.login,
-      avatar: user.profile_image_url
-    };
-  } catch (error) {
-    console.error(`Error obteniendo info de ${username}:`, error.message);
-    return null;
+    streamStatus[guildId] = guildStatus;
   }
+
+  cache.save('status', streamStatus);
 }
 
-async function verifyStreamer(input) {
-  const info = await getStreamerInfo(input);
-  return info ? { exists: true, ...info } : { exists: false };
-}
-
-module.exports = {
-  getAccessToken,
-  normalize,
-  getStreamerInfo,
-  verifyStreamer
-};
+module.exports = { monitorStreams };

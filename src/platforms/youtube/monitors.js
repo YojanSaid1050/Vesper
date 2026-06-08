@@ -1,4 +1,4 @@
-const { getAllGuildConfigs } = require('../../database/guildManager');
+const { getAllGuildConfigs } = require('../../database/mongoManager');
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const CacheManager = require('../../core/CacheManager');
 const { checkLiveUsers, checkVideos, checkShorts } = require('./checks');
@@ -8,7 +8,7 @@ const cache = new CacheManager('./data/youtube');
 
 async function monitorLives(client) {
   const liveStatus = cache.load('liveStatus', {});
-  const guilds = getAllGuildConfigs();
+  const guilds = await getAllGuildConfigs();
 
   for (const [guildId, config] of Object.entries(guilds)) {
     const youtubeConfig = config.youtube || {};
@@ -60,7 +60,7 @@ async function monitorLives(client) {
 
 async function monitorVideos(client) {
   const videos = cache.load('videos', {});
-  const guilds = getAllGuildConfigs();
+  const guilds = await getAllGuildConfigs();
 
   for (const [guildId, config] of Object.entries(guilds)) {
     const youtubeConfig = config.youtube || {};
@@ -116,7 +116,7 @@ async function monitorVideos(client) {
 
 async function monitorShorts(client) {
   const shorts = cache.load('shorts', {});
-  const guilds = getAllGuildConfigs();
+  const guilds = await getAllGuildConfigs();
 
   for (const [guildId, config] of Object.entries(guilds)) {
     const youtubeConfig = config.youtube || {};

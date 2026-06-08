@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/guildManager');
+const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -11,9 +11,9 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 });
     const channel = interaction.options.getChannel('canal');
-    const config = getGuildConfig(interaction.guildId);
+    const config = await getGuildConfig(interaction.guildId);
 
-    updateGuildSection(interaction.guildId, 'twitch', { ...config.twitch, liveChannel: channel.id });
+    await updateGuildSection(interaction.guildId, 'twitch', { ...config.twitch, liveChannel: channel.id });
 
     await interaction.editReply({ content: `✅ Canal de notificaciones de Twitch configurado: <#${channel.id}>` });
   }

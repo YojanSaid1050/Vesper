@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/guildManager');
+const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 const { verifyStreamer } = require('../../platforms/twitch/utils');
 
 module.exports = {
@@ -18,7 +18,7 @@ module.exports = {
       return interaction.editReply({ content: `❌ No se encontró el streamer \`${input}\` en Twitch.` });
     }
 
-    const config = getGuildConfig(interaction.guildId);
+    const config = await getGuildConfig(interaction.guildId);
     const currentUsers = config.twitch?.users || [];
 
     if (currentUsers.includes(streamer.login)) {
@@ -26,7 +26,7 @@ module.exports = {
     }
 
     const newUsers = [...currentUsers, streamer.login];
-    updateGuildSection(interaction.guildId, 'twitch', { ...config.twitch, users: newUsers });
+    await updateGuildSection(interaction.guildId, 'twitch', { ...config.twitch, users: newUsers });
 
     await interaction.editReply({ content: `✅ Se añadió **${streamer.name}** a la lista de monitoreo.\n\n📺 ID: \`${streamer.id}\`\n📋 Total de streamers: ${newUsers.length}` });
   }

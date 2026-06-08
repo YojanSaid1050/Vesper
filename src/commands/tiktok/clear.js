@@ -1,5 +1,19 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/guildManager');
+const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
+const CacheManager = require('../../core/CacheManager');
+
+const tiktokLiveCache = new CacheManager('./data/tiktok');
+const tiktokVideosCache = new CacheManager('./data/tiktok');
+
+function cleanTikTokGuild(guildId) {
+  const live = tiktokLiveCache.load('liveStatus', {});
+  delete live[guildId];
+  tiktokLiveCache.save('liveStatus', live);
+
+  const videos = tiktokVideosCache.load('videos', {});
+  delete videos[guildId];
+  tiktokVideosCache.save('videos', videos);
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -8,7 +22,7 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    const config = getGuildConfig(interaction.guildId);
+    const config = await getGuildConfig(interaction.guildId);
     const currentUsers = config.tiktok?.users || [];
     const currentCount = currentUsers.length;
 
@@ -35,7 +49,8 @@ module.exports = {
 
     collector.on('collect', async i => {
       if (i.customId === 'tiktok_clear_confirm') {
-        updateGuildSection(interaction.guildId, 'tiktok', { ...config.tiktok, users: [] });
+        await updateGuildSection(interaction.guildId, 'tiktok', { ...config.tiktok, users: [] });
+        cleanTikTokGuild(interaction.guildId);
         await i.update({ content: `✅ Se eliminaron **${currentCount}** usuarios del monitoreo de TikTok.`, embeds: [], components: [] });
       } else {
         await i.update({ content: '❌ Operación cancelada.', embeds: [], components: [] });

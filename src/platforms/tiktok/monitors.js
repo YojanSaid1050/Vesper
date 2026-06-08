@@ -1,4 +1,4 @@
-const { getAllGuildConfigs } = require('../../database/guildManager');
+const { getAllGuildConfigs } = require('../../database/mongoManager');
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const CacheManager = require('../../core/CacheManager');
 const { checkLiveUsers, checkUsers } = require('./checks');
@@ -12,7 +12,7 @@ function normalize(username) {
 
 async function monitorLives(client) {
   const liveStatus = cache.load('liveStatus', {});
-  const guilds = getAllGuildConfigs();
+  const guilds = await getAllGuildConfigs();
 
   for (const [guildId, config] of Object.entries(guilds)) {
     const tiktokConfig = config.tiktok || {};
@@ -64,7 +64,7 @@ async function monitorLives(client) {
 
 async function monitorVideos(client) {
   const videos = cache.load('videos', {});
-  const guilds = getAllGuildConfigs();
+  const guilds = await getAllGuildConfigs();
 
   for (const [guildId, config] of Object.entries(guilds)) {
     const tiktokConfig = config.tiktok || {};

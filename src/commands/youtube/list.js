@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager');
 const { getChannelInfo } = require('../../platforms/youtube/utils');
 
 module.exports = {
@@ -10,7 +10,8 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 });
-    const config = getGuildConfig(interaction.guildId);
+
+    const config = await getGuildConfig(interaction.guildId);
     const users = config.youtube?.users || [];
     const { liveChannel, videoChannel, shortChannel } = config.youtube || {};
 

@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/guildManager');
+const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 const { checkUser } = require('../../platforms/tiktok/checks');
 
 module.exports = {
@@ -18,7 +18,7 @@ module.exports = {
       return interaction.editReply({ content: `❌ No se encontró el usuario \`${input}\` en TikTok.` });
     }
 
-    const config = getGuildConfig(interaction.guildId);
+    const config = await getGuildConfig(interaction.guildId);
     const currentUsers = config.tiktok?.users || [];
 
     if (currentUsers.includes(user.username)) {
@@ -26,7 +26,7 @@ module.exports = {
     }
 
     const newUsers = [...currentUsers, user.username];
-    updateGuildSection(interaction.guildId, 'tiktok', { ...config.tiktok, users: newUsers });
+    await updateGuildSection(interaction.guildId, 'tiktok', { ...config.tiktok, users: newUsers });
 
     await interaction.editReply({ content: `✅ Se añadió **${user.username}** a la lista de monitoreo.\n\n📋 Total de usuarios: ${newUsers.length}` });
   }

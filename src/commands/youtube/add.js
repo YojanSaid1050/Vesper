@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/guildManager');
+const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 const { verifyChannel } = require('../../platforms/youtube/utils');
 
 module.exports = {
@@ -18,7 +18,7 @@ module.exports = {
       return interaction.editReply({ content: `❌ No se encontró el canal \`${input}\` en YouTube.\n\nAsegúrate de que el nombre sea correcto o usa la URL completa.` });
     }
 
-    const config = getGuildConfig(interaction.guildId);
+    const config = await getGuildConfig(interaction.guildId);
     const currentUsers = config.youtube?.users || [];
 
     if (currentUsers.includes(channel.id)) {
@@ -26,7 +26,7 @@ module.exports = {
     }
 
     const newUsers = [...currentUsers, channel.id];
-    updateGuildSection(interaction.guildId, 'youtube', { ...config.youtube, users: newUsers });
+    await updateGuildSection(interaction.guildId, 'youtube', { ...config.youtube, users: newUsers });
 
     await interaction.editReply({ content: `✅ Se añadió **${channel.name}** a la lista de monitoreo.\n\n📺 ID: \`${channel.id}\`\n👥 Suscriptores: ${channel.subscribers.toLocaleString()}\n📋 Total de canales: ${newUsers.length}` });
   }

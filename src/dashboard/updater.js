@@ -1,11 +1,10 @@
-const { getAllGuildConfigs, updateGuildSection } = require('../database/guildManager');
+const { getAllGuildConfigs, updateGuildSection } = require('../database/mongoManager');
 const { mainPanel } = require('./panels');
 
 async function updateDashboard(client) {
   try {
-    const guildsConfig = getAllGuildConfigs();
+    const guildsConfig = await getAllGuildConfigs();
     
-    // Verificar si es un objeto y convertirlo a array
     const guilds = Object.entries(guildsConfig || {}).map(([guildId, config]) => ({
       guildId,
       dashboard: config.dashboard || {},
@@ -22,14 +21,14 @@ async function updateDashboard(client) {
 
         const channel = await client.channels.fetch(guild.dashboard.channel).catch(() => null);
         if (!channel) {
-          updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
+          await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
           continue;
         }
 
         const message = await channel.messages.fetch(guild.dashboard.message).catch(() => null);
         if (!message) {
-          updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
+          await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
           continue;
         }
@@ -44,7 +43,7 @@ async function updateDashboard(client) {
       } catch (err) {
         failed++;
         if (err.code === 10008 || err.code === 10003) {
-          updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
+          await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
         }
       }

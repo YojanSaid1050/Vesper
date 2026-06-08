@@ -9,17 +9,13 @@ app.get('/', (req, res) => res.send('Bot Online'));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🌐 Web activa en puerto ${PORT}`));
 
-// Variable para el cliente
 let client = null;
 
-// Función para iniciar el bot
 async function startBot() {
   try {
-    // Conectar a MongoDB primero
     await connectMongo();
     console.log('✅ Base de datos conectada');
 
-    // Crear e iniciar el bot
     client = new BotClient();
 
     process.on('unhandledRejection', (error) => {
@@ -43,7 +39,6 @@ async function startBot() {
   }
 }
 
-// Iniciar todo
 startBot();
 
 module.exports = { getClient: () => client };

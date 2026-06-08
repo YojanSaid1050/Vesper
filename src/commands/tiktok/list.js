@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -9,7 +9,7 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 });
-    const config = getGuildConfig(interaction.guildId);
+    const config = await getGuildConfig(interaction.guildId);
     const users = config.tiktok?.users || [];
     const { liveChannel, videoChannel } = config.tiktok || {};
 

@@ -1,6 +1,23 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/guildManager');
+const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 const { getChannelInfo } = require('../../platforms/youtube/utils');
+const CacheManager = require('../../core/CacheManager');
+
+const youtubeCache = new CacheManager('./data/youtube');
+
+function cleanYouTubeGuild(guildId) {
+  const liveStatus = youtubeCache.load('liveStatus', {});
+  delete liveStatus[guildId];
+  youtubeCache.save('liveStatus', liveStatus);
+
+  const videos = youtubeCache.load('videos', {});
+  delete videos[guildId];
+  youtubeCache.save('videos', videos);
+
+  const shorts = youtubeCache.load('shorts', {});
+  delete shorts[guildId];
+  youtubeCache.save('shorts', shorts);
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -9,7 +26,7 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    const config = getGuildConfig(interaction.guildId);
+    const config = await getGuildConfig(interaction.guildId);
     const currentUsers = config.youtube?.users || [];
     const currentCount = currentUsers.length;
 
@@ -42,16 +59,11 @@ module.exports = {
 
     collector.on('collect', async i => {
       if (i.customId === 'youtube_clear_confirm') {
-        updateGuildSection(interaction.guildId, 'youtube', { ...config.youtube, users: [] });
+        await updateGuildSection(interaction.guildId, 'youtube', { ...config.youtube, users: [] });
+        cleanYouTubeGuild(interaction.guildId);
         await i.update({ content: `✅ Se eliminaron **${currentCount}** canales del monitoreo de YouTube.`, embeds: [], components: [] });
       } else {
         await i.update({ content: '❌ Operación cancelada.', embeds: [], components: [] });
-      }
-    });
-
-    collector.on('end', async collected => {
-      if (collected.size === 0) {
-        await interaction.editReply({ content: '⏰ Tiempo de espera agotado. Operación cancelada.', embeds: [], components: [] }).catch(() => {});
       }
     });
   }

@@ -1,5 +1,17 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/guildManager');
+const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
+const CacheManager = require('../../core/CacheManager');
+
+const twitchCache = new CacheManager('./data/twitch');
+
+function cleanTwitchStatus(guildId, username) {
+  const data = twitchCache.load('status', {});
+  const key = `${guildId}_${username}`;
+  if (data[key] !== undefined) {
+    delete data[key];
+    twitchCache.save('status', data);
+  }
+}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -11,16 +23,22 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 });
     const input = interaction.options.getString('streamer').toLowerCase();
-    const config = getGuildConfig(interaction.guildId);
+    const config = await getGuildConfig(interaction.guildId);
     const currentUsers = config.twitch?.users || [];
 
-    if (!currentUsers.includes(input)) {
+    // Buscar el streamer exacto (case-insensitive)
+    const existingUser = currentUsers.find(u => u.toLowerCase() === input);
+    
+    if (!existingUser) {
       return interaction.editReply({ content: `❌ El streamer \`${input}\` no está en la lista de monitoreo.\n\nUsa \`/twitch-list\` para ver los streamers actuales.` });
     }
 
-    const newUsers = currentUsers.filter(u => u !== input);
-    updateGuildSection(interaction.guildId, 'twitch', { ...config.twitch, users: newUsers });
+    const newUsers = currentUsers.filter(u => u.toLowerCase() !== input);
+    await updateGuildSection(interaction.guildId, 'twitch', { ...config.twitch, users: newUsers });
 
-    await interaction.editReply({ content: `✅ Se eliminó **${input}** de la lista de monitoreo.\n\n📋 Streamers restantes: ${newUsers.length}` });
+    // Limpiar caché
+    cleanTwitchStatus(interaction.guildId, existingUser);
+
+    await interaction.editReply({ content: `✅ Se eliminó **${existingUser}** de la lista de monitoreo.\n\n📋 Streamers restantes: ${newUsers.length}` });
   }
 };

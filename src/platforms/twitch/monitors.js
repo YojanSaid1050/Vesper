@@ -1,4 +1,4 @@
-const { getAllGuildConfigs } = require('../../database/guildManager');
+const { getAllGuildConfigs } = require('../../database/mongoManager');
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const CacheManager = require('../../core/CacheManager');
 const { checkStreamers } = require('./checks');
@@ -8,7 +8,7 @@ const cache = new CacheManager('./data/twitch');
 
 async function monitorStreams(client) {
   const streamStatus = cache.load('status', {});
-  const guilds = getAllGuildConfigs();
+  const guilds = await getAllGuildConfigs();
 
   for (const [guildId, config] of Object.entries(guilds)) {
     const twitchConfig = config.twitch || {};
