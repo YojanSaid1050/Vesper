@@ -23,9 +23,3 @@ services:
         value: true
       - key: PORT
         value: 3000
-      - key: DATA_PATH
-        value: /opt/data
-    disks:
-      - name: bot-data
-        mountPath: /opt/data
-        sizeGB: 1
