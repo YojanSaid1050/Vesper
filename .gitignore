@@ -1,2 +1,30 @@
-node_modules
+# Dependencias
+node_modules/
+
+# Variables de entorno
 .env
+.env.local
+.env.*.local
+
+# Datos persistentes (se crean en producción)
+data/
+!data/.gitkeep
+
+# Archivos de log
+*.log
+npm-debug.log*
+
+# Archivos temporales
+*.tmp
+*.txt
+!package-lock.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

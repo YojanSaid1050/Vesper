@@ -1,0 +1,31 @@
+services:
+  - type: worker
+    name: vesper-bot
+    runtime: node
+    buildCommand: npm install
+    startCommand: node src/index.js
+    envVars:
+      - key: TOKEN
+        sync: false
+      - key: CLIENT_ID
+        sync: false
+      - key: GUILD_ID
+        sync: false
+      - key: TWITCH_CLIENT_ID
+        sync: false
+      - key: TWITCH_CLIENT_SECRET
+        sync: false
+      - key: APIFY_TOKEN
+        sync: false
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: USE_GUILD_COMMANDS
+        value: true
+      - key: PORT
+        value: 3000
+      - key: DATA_PATH
+        value: /opt/data
+    disks:
+      - name: bot-data
+        mountPath: /opt/data
+        sizeGB: 1

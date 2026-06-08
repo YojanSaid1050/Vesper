@@ -1,20 +1,20 @@
 {
-  "name": "bot-discord",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "vesper-bot",
+  "version": "2.0.0",
+  "description": "Vesper - Discord Bot for streaming monitoring",
+  "main": "src/index.js",
   "scripts": {
-    "start": "node deploy-commands.js && node index.js"
+    "start": "node src/index.js",
+    "deploy": "node deploy.js",
+    "delete": "node delete-commands.js",
+    "postinstall": "node scripts/create-data-dirs.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
   "dependencies": {
     "apify": "^3.7.2",
     "axios": "^1.16.1",
     "discord.js": "^14.26.4",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "googleapis": "^173.0.0"
   }
 }
