@@ -94,22 +94,6 @@ async function refreshYouTube(client, guildId, mode = 'default') {
   await message.edit(panel);
 }
 
-async function refreshTest(client, guildId) {
-  const config = getGuildConfig(guildId);
-  const channelId = config.dashboard?.channel;
-  const messageId = config.dashboard?.message;
-  if (!channelId || !messageId) return;
-
-  const channel = await client.channels.fetch(channelId).catch(() => null);
-  if (!channel) return;
-
-  const message = await channel.messages.fetch(messageId).catch(() => null);
-  if (!message) return;
-
-  const panel = await testPanel(guildId);
-  await message.edit(panel);
-}
-
 async function handleButton(interaction, client) {
   const customId = interaction.customId;
 
@@ -123,16 +107,12 @@ async function handleButton(interaction, client) {
     }
   };
 
-  // ==================================================
   // VERIFY BUTTON
-  // ==================================================
   if (customId === 'verify_void') {
     return verifyButton(interaction);
   }
 
-  // ==================================================
   // DASHBOARD NAVIGATION
-  // ==================================================
   if (customId === 'dashboard_home') return safeUpdate(await mainPanel(interaction.guild.id));
   if (customId === 'dashboard_general') return safeUpdate(await generalPanel(interaction.guild.id));
   if (customId === 'dashboard_bot') return safeUpdate(await botPanel(interaction.guild.id));
@@ -142,13 +122,11 @@ async function handleButton(interaction, client) {
   if (customId === 'dashboard_youtube') return safeUpdate(await youtubePanel(interaction.guild.id));
   if (customId === 'dashboard_tests') return safeUpdate(await testPanel(interaction.guild.id));
 
-  // ==================================================
   // TEST PANEL SECTION BUTTONS
-  // ==================================================
   if (customId === 'test_section_general') {
-  updateGuildSection(interaction.guild.id, 'testPanel', { activeSection: 'general' });
-  return safeUpdate(await testPanel(interaction.guild.id));
-}
+    updateGuildSection(interaction.guild.id, 'testPanel', { activeSection: 'general' });
+    return safeUpdate(await testPanel(interaction.guild.id));
+  }
 
   if (customId === 'test_section_tiktok') {
     updateGuildSection(interaction.guild.id, 'testPanel', { activeSection: 'tiktok' });
@@ -175,9 +153,7 @@ async function handleButton(interaction, client) {
     return safeUpdate(await testPanel(interaction.guild.id));
   }
 
-  // ==================================================
   // BRANDING BUTTONS
-  // ==================================================
   if (customId === 'branding_name') {
     const modal = new ModalBuilder()
       .setCustomId('branding_name_modal')
@@ -211,9 +187,7 @@ async function handleButton(interaction, client) {
     return safeUpdate(await brandingPanel(interaction.guild.id));
   }
 
-  // ==================================================
   // TIKTOK BUTTONS
-  // ==================================================
   if (customId === 'tiktok_add_user') {
     const modal = new ModalBuilder()
       .setCustomId('tiktok_add_modal')
@@ -244,8 +218,9 @@ async function handleButton(interaction, client) {
 
   if (customId === 'tiktok_list_users') {
     const config = getGuildConfig(interaction.guild.id);
-    const mode = config.tiktok?.showUsers ? 'default' : 'list';
-    updateGuildSection(interaction.guild.id, 'tiktok', { showUsers: !config.tiktok?.showUsers });
+    const newShow = !config.tiktok?.showUsers;
+    const mode = newShow ? 'list' : 'default';
+    updateGuildSection(interaction.guild.id, 'tiktok', { showUsers: newShow });
     return safeUpdate(await tiktokPanel(interaction.guild.id, mode));
   }
 
@@ -275,9 +250,7 @@ async function handleButton(interaction, client) {
     });
   }
 
-  // ==================================================
   // TWITCH BUTTONS
-  // ==================================================
   if (customId === 'twitch_add_user') {
     const modal = new ModalBuilder()
       .setCustomId('twitch_add_modal')
@@ -338,9 +311,7 @@ async function handleButton(interaction, client) {
     });
   }
 
-  // ==================================================
   // YOUTUBE BUTTONS
-  // ==================================================
   if (customId === 'youtube_add_user') {
     const modal = new ModalBuilder()
       .setCustomId('youtube_add_modal')
@@ -371,8 +342,9 @@ async function handleButton(interaction, client) {
 
   if (customId === 'youtube_list_users') {
     const config = getGuildConfig(interaction.guild.id);
-    const mode = config.youtube?.showUsers ? 'default' : 'list';
-    updateGuildSection(interaction.guild.id, 'youtube', { showUsers: !config.youtube?.showUsers });
+    const newShow = !config.youtube?.showUsers;
+    const mode = newShow ? 'list' : 'default';
+    updateGuildSection(interaction.guild.id, 'youtube', { showUsers: newShow });
     return safeUpdate(await youtubePanel(interaction.guild.id, mode));
   }
 
@@ -402,9 +374,7 @@ async function handleButton(interaction, client) {
     });
   }
 
-  // ==================================================
   // CONFIRM BUTTONS
-  // ==================================================
   if (customId === 'confirm_tiktok_delete_all') {
     await interaction.deferUpdate();
     const guildId = interaction.guild.id;

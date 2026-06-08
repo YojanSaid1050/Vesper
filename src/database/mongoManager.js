@@ -39,7 +39,7 @@ async function updateGuildConfig(guildId, updates) {
   return await Guild.findOneAndUpdate(
     { guildId },
     { $set: updates },
-    { new: true, upsert: true }
+    { returnDocument: 'after', upsert: true }
   );
 }
 
@@ -54,7 +54,7 @@ async function updateGuildSection(guildId, section, values) {
   return await Guild.findOneAndUpdate(
     { guildId },
     { $set: update },
-    { new: true, upsert: true }
+    { returnDocument: 'after', upsert: true }
   );
 }
 
