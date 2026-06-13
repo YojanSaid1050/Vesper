@@ -1,3 +1,4 @@
+// src/commands/admin/configDashboard.js
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { updateGuildSection, getGuildConfig } = require('../../database/mongoManager');
 const { mainPanel } = require('../../dashboard/panels');
@@ -9,14 +10,13 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
+    await interaction.deferReply({ flags: 64 });
+    
     try {
-      // Responder inmediatamente para evitar timeout
-      await interaction.deferReply({ flags: 64 });
-      
       const guildId = interaction.guild.id;
-      const config = await getGuildConfig(guildId);
-
+      
       // Eliminar dashboard anterior si existe
+      const config = await getGuildConfig(guildId);
       if (config.dashboard?.channel && config.dashboard?.message) {
         try {
           const oldChannel = await interaction.guild.channels.fetch(config.dashboard.channel);
@@ -29,7 +29,7 @@ module.exports = {
         }
       }
 
-      // Crear nuevo dashboard
+      // Crear nuevo dashboard usando mainPanel
       const panel = await mainPanel(guildId);
       const message = await interaction.channel.send(panel);
 
@@ -42,13 +42,11 @@ module.exports = {
         currentMode: 'default'
       });
 
-      await interaction.editReply({ content: '✅ Dashboard creado correctamente.', flags: 64 });
+      await interaction.editReply({ content: '✅ Dashboard creado correctamente.' });
       
     } catch (error) {
       console.error('Error en config-dashboard:', error);
-      const errorMessage = interaction.deferred 
-        ? interaction.editReply({ content: `❌ Error: ${error.message}`, flags: 64 })
-        : interaction.reply({ content: `❌ Error: ${error.message}`, flags: 64 });
+      await interaction.editReply({ content: `❌ Error: ${error.message}` });
     }
   }
 };
