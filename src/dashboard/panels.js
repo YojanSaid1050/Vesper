@@ -1,28 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelSelectMenuBuilder, RoleSelectMenuBuilder, ChannelType, EmbedBuilder } = require('discord.js');
 const { getGuildConfig } = require('../database/mongoManager');
 
-// Función auxiliar para crear embeds con estilo
-function createEmbed(accentColor, description, fields = [], thumbnail = null, image = null) {
-    const embed = new EmbedBuilder()
-        .setDescription(description)
-        .setColor(accentColor)
-        .setTimestamp();
-    
-    if (fields.length > 0) {
-        embed.addFields(fields);
-    }
-    
-    if (thumbnail) {
-        embed.setThumbnail(thumbnail);
-    }
-    
-    if (image) {
-        embed.setImage(image);
-    }
-    
-    return embed;
-}
-
 async function mainPanel(guildId) {
     const row1 = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('dashboard_general').setLabel('Eyes of the Void').setEmoji('👁️').setStyle(ButtonStyle.Secondary),
@@ -166,7 +144,7 @@ async function brandingPanel(guildId) {
         .setFooter({ text: '⚠️ Nota: Esto solo afecta a los mensajes enviados por webhooks, no cambia el nombre o avatar del bot principal.' });
 
     if (branding.avatar) {
-        embed.setThumbnail(branding.avatar);
+        embed.setImage(branding.avatar);
     }
 
     return { embeds: [embed], components: [buttonRow, homeRow] };
@@ -221,13 +199,12 @@ async function tiktokPanel(guildId, mode = 'default') {
     }
 
     description += `⚙️ **Vincular los portales**\nSelecciona los canales por donde el vacío recibirá los ecos.\n\n` +
-        `🎭 **Atender las voces**\nAgrega o elimina los nombres que el vacío debe escuchar.`;
+        `🎭 **Atender las voces**\nAgrega o elimina los nombres que el vacío debe escuchar.\n\n╰┈➤ Return to the main portal`;
 
     const embed = new EmbedBuilder()
         .setTitle('⛧°. ⋆༺ 𝑊ℎ𝑖𝑠𝑝𝑒𝑟𝑠 ༻⋆. °⛧')
         .setDescription(description)
-        .setColor(0x1E90FF)
-        .setFooter({ text: '╰┈➤ Return to the main portal' });
+        .setColor(0x1E90FF);
 
     return { embeds: [embed], components: [liveRow, videoRow, buttonRow, homeRow] };
 }
@@ -270,13 +247,12 @@ async function twitchPanel(guildId) {
     }
 
     description += `⚙️ **Canal de notificaciones**\nSelecciona el portal donde el vacío proclamará los avisos.\n\n` +
-        `🎭 **Administrar vigilantes**\nAgrega o elimina los nombres que el vacío debe vigilar.`;
+        `🎭 **Administrar vigilantes**\nAgrega o elimina los nombres que el vacío debe vigilar.\n\n╰┈➤ Return to the main portal`;
 
     const embed = new EmbedBuilder()
         .setTitle('⛧°. ⋆༺ 𝑇ℎ𝑒 𝑉𝑖𝑔𝑖𝑙 ༻⋆. °⛧')
         .setDescription(description)
-        .setColor(0x800080)
-        .setFooter({ text: '╰┈➤ Return to the main portal' });
+        .setColor(0x800080);
 
     return { embeds: [embed], components: [liveRow, buttonRow, homeRow] };
 }
@@ -358,13 +334,12 @@ async function youtubePanel(guildId, mode = 'default') {
     }
 
     description += `⚙️ **Vincular los portales**\nSelecciona los canales donde el vacío verterá cada tipo de mensaje.\n\n` +
-        `🎭 **Atender las sendas**\nAgrega o elimina los nombres que el vacío debe vigilar.`;
+        `🎭 **Atender las sendas**\nAgrega o elimina los nombres que el vacío debe vigilar.\n\n╰┈➤ Return to the main portal`;
 
     const embed = new EmbedBuilder()
         .setTitle('⛧°. ⋆༺ 𝐸𝑡𝑒𝑟𝑛𝑎𝑙 𝑅𝑒𝑐𝑜𝑟𝑑𝑠 ༻⋆. °⛧')
         .setDescription(description)
-        .setColor(0xFF0000)
-        .setFooter({ text: '╰┈➤ Return to the main portal' });
+        .setColor(0xFF0000);
 
     return { embeds: [embed], components: [liveRow, videoRow, shortRow, buttonRow, homeRow] };
 }
@@ -516,9 +491,8 @@ async function testPanel(guildId) {
 
     const embed = new EmbedBuilder()
         .setTitle('🔮 𝑇ℎ𝑒 𝑆𝑒𝑒𝑟\'𝑠 𝐿𝑎𝑏𝑜𝑟𝑎𝑡𝑜𝑟𝑦')
-        .setDescription(`### 𝑊ℎ𝑒𝑟𝑒 𝑒𝑐ℎ𝑜𝑒𝑠 𝑎𝑟𝑒 𝑡𝑒𝑠𝑡𝑒𝑑 𝑎𝑛𝑑 𝑣𝑖𝑠𝑖𝑜𝑛𝑠 𝑎𝑟𝑒 𝑣𝑒𝑟𝑖𝑓𝑖𝑒𝑑.\n\n༺𓆩~~𝐵𝑒𝑓𝑜𝑟𝑒 𝑎 𝑠𝑡𝑎𝑟 𝑠ℎ𝑖𝑛𝑒𝑠 𝑖𝑛 𝑡ℎ𝑒 𝑣𝑜𝑖𝑑, 𝑖𝑡 𝑚𝑢𝑠𝑡 𝑏𝑒 𝑠𝑢𝑚𝑚𝑜𝑛𝑒𝑑.~~𓆪༻`)
-        .setColor(0x00FF00)
-        .setDescription(`${sectionContent}\n\n╰┈➤ Return to the main portal`);
+        .setDescription(`### 𝑊ℎ𝑒𝑟𝑒 𝑒𝑐ℎ𝑜𝑒𝑠 𝑎𝑟𝑒 𝑡𝑒𝑠𝑡𝑒𝑑 𝑎𝑛𝑑 𝑣𝑖𝑠𝑖𝑜𝑛𝑠 𝑎𝑟𝑒 𝑣𝑒𝑟𝑖𝑓𝑖𝑒𝑑.\n\n༺𓆩~~𝐵𝑒𝑓𝑜𝑟𝑒 𝑎 𝑠𝑡𝑎𝑟 𝑠ℎ𝑖𝑛𝑒𝑠 𝑖𝑛 𝑡ℎ𝑒 𝑣𝑜𝑖𝑑, 𝑖𝑡 𝑚𝑢𝑠𝑡 𝑏𝑒 𝑠𝑢𝑚𝑚𝑜𝑛𝑒𝑑.~~𓆪༻\n\n${sectionContent}\n\n╰┈➤ Return to the main portal`)
+        .setColor(0x00FF00);
 
     return { embeds: [embed], components: [sectionRow, sectionRow2, homeRow] };
 }
