@@ -1,5 +1,5 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelSelectMenuBuilder, RoleSelectMenuBuilder, ChannelType } = require('discord.js');
-const { getGuildConfig } = require('../database/guildManager');
+const { getGuildConfig } = require('../database/mongoManager');
 
 async function mainPanel(guildId) {
   const row1 = new ActionRowBuilder().addComponents(
@@ -15,7 +15,6 @@ async function mainPanel(guildId) {
   );
 
   return {
-    flags: 32768,
     components: [{
       type: 17, accent_color: 0x000000, spoiler: false,
       components: [
@@ -43,7 +42,6 @@ async function generalPanel(guildId) {
   const general = config.general || {};
   
   return {
-    flags: 32768,
     components: [{
       type: 17, accent_color: 0xFFFFFF, spoiler: false,
       components: [
@@ -71,7 +69,6 @@ async function botPanel(guildId) {
   const general = config.general || {};
   
   return {
-    flags: 32768,
     components: [{
       type: 17, accent_color: 0x808080, spoiler: false,
       components: [
@@ -102,7 +99,7 @@ async function brandingPanel(guildId) {
     { type: 14, spacing: 2 },
     { type: 10, content: '### 𝑇ℎ𝑒 𝑓𝑖𝑟𝑒𝑠 𝑡ℎ𝑎𝑡 𝑚𝑜𝑙𝑑 𝑡ℎ𝑒 𝑟𝑒𝑙𝑖𝑐\'𝑠 𝑓𝑎𝑐𝑒.\n\n༺𓆩~~𝑌𝑜𝑢 𝑎𝑟𝑒 𝑛𝑜𝑡 𝑐𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑖𝑛𝑔 𝑏𝑟𝑎𝑛𝑑𝑖𝑛𝑔… 𝑦𝑜𝑢 𝑎𝑟𝑒 𝑓𝑜𝑟𝑔𝑖𝑛𝑔 𝑎𝑛 𝑖𝑑𝑒𝑛𝑡𝑖𝑡𝑦.~~𓆪༻' },
     { type: 14, spacing: 2 },
-    { type: 10, content: `🔥 **𝑁𝑜𝑚𝑏𝑟𝑒 𝑑𝑒𝑙 𝑟𝑒𝑙𝑖𝑐𝑎𝑟𝑖𝑜**\n𝐸𝑙 𝑛𝑜𝑚𝑏𝑟𝑒 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑝𝑟𝑜𝑐𝑙𝑎𝑚𝑎𝑟á 𝑎𝑛𝑡𝑒 𝑙𝑜𝑠 𝑑𝑒𝑚á𝑠.\n${branding.name ? `\`${branding.name}\`` : '`No vinculado`'}\n\n🎭 **𝑅𝑜𝑠𝑡𝑟𝑜 𝑑𝑒𝑙 𝑟𝑒𝑙𝑖𝑐𝑎𝑟𝑖𝑜**\n𝐿𝑎 𝑖𝑚𝑎𝑔𝑒𝑛 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑚𝑜𝑠𝑡𝑟𝑎𝑟á 𝑐𝑜𝑚𝑜 𝑠𝑢 𝑒𝑠𝑝𝑒𝑗𝑜.\n${branding.avatar ? '`Forjado ✓`' : '`No vinculado`'}` }
+    { type: 10, content: `🔥 **𝑁𝑜𝑚𝑏𝑟𝑒 𝑒𝑛 𝑤𝑒𝑏ℎ𝑜𝑜𝑘𝑠**\n𝐸𝑙 𝑛𝑜𝑚𝑏𝑟𝑒 𝑞𝑢𝑒 𝑠𝑒 𝑚𝑜𝑠𝑡𝑟𝑎𝑟á 𝑒𝑛 𝑙𝑜𝑠 𝑚𝑒𝑛𝑠𝑎𝑗𝑒𝑠 𝑑𝑒 𝑤𝑒𝑏ℎ𝑜𝑜𝑘.\n${branding.name ? `\`${branding.name}\`` : '`Nombre del bot`'}\n\n🎭 **𝐴𝑣𝑎𝑡𝑎𝑟 𝑒𝑛 𝑤𝑒𝑏ℎ𝑜𝑜𝑘𝑠**\n𝐿𝑎 𝑖𝑚𝑎𝑔𝑒𝑛 𝑞𝑢𝑒 𝑠𝑒 𝑚𝑜𝑠𝑡𝑟𝑎𝑟á 𝑒𝑛 𝑙𝑜𝑠 𝑚𝑒𝑛𝑠𝑎𝑗𝑒𝑠 𝑑𝑒 𝑤𝑒𝑏ℎ𝑜𝑜𝑘.\n${branding.avatar ? '`Forjado ✓`' : '`Avatar del bot`'}\n\n> ⚠️ **Nota:** Esto solo afecta a los mensajes enviados por webhooks, **no cambia el nombre o avatar del bot principal**.` }
   ];
 
   if (branding.avatar) {
@@ -129,7 +126,6 @@ async function brandingPanel(guildId) {
   );
 
   return {
-    flags: 32768,
     components: [{
       type: 17,
       accent_color: 0xFFA500,
@@ -148,7 +144,6 @@ async function tiktokPanel(guildId, mode = 'default') {
   const videoChannel = tiktok.videoChannel || null;
 
   return {
-    flags: 32768,
     components: [{
       type: 17, accent_color: 0x1E90FF, spoiler: false,
       components: [
@@ -158,7 +153,8 @@ async function tiktokPanel(guildId, mode = 'default') {
         { type: 14, spacing: 2 },
         { type: 10, content: `🎤 **𝐿𝑖𝑣𝑒 𝑉𝑜𝑖𝑐𝑒𝑠**\n𝐿𝑎𝑠 𝑣𝑜𝑐𝑒𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑒𝑠𝑐𝑢𝑐ℎ𝑎 𝑒𝑛 𝑣𝑖𝑣𝑜, 𝑟𝑒𝑠𝑜𝑛𝑎𝑛𝑑𝑜 𝑒𝑛 𝑙𝑎 𝑖𝑛𝑚𝑒𝑛𝑠𝑖𝑑𝑎𝑑.\n${liveChannel ? `<#${liveChannel}>` : '`No vinculado`'}\n\n🎬 **𝐸𝑐ℎ𝑜𝑒𝑠 𝑅𝑒𝑐𝑜𝑟𝑑𝑒𝑑**\n𝐿𝑜𝑠 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑎𝑡𝑟𝑎𝑝𝑎 𝑒𝑛 𝑠𝑢𝑠 𝑎𝑟𝑐ℎ𝑖𝑣𝑜𝑠 𝑝𝑎𝑟𝑎 𝑙𝑎 𝑒𝑡𝑒𝑟𝑛𝑖𝑑𝑎𝑑.\n${videoChannel ? `<#${videoChannel}>` : '`No vinculado`'}\n\n👤 **𝑉𝑜𝑐𝑒𝑠 𝐴𝑡𝑒𝑛𝑑𝑖𝑑𝑎𝑠**\n${users.length} 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 ℎ𝑎 𝑐𝑎𝑝𝑡𝑎𝑑𝑜.` },
         { type: 14, spacing: 2 },
-        ...(isList ? [{ type: 10, content: `📋 **𝑆𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑒𝑠𝑐𝑢𝑐ℎ𝑎**\n${users.length ? users.map(u => `• ${u}`).join('\n') : '`𝑁𝑖𝑛𝑔𝑢𝑛 𝑠𝑢𝑠𝑢𝑟𝑟𝑜 𝑎𝑡𝑒𝑛𝑑𝑖𝑑𝑜`'}` }, { type: 14, spacing: 2 }] : []),
+        ...(isList && users.length > 0 ? [{ type: 10, content: `📋 **𝑆𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑒𝑠𝑐𝑢𝑐ℎ𝑎**\n${users.slice(0, 25).map(u => `• ${u}`).join('\n')}${users.length > 25 ? `\n• ... y ${users.length - 25} más` : ''}` }, { type: 14, spacing: 2 }] : []),
+        ...(isList && users.length === 0 ? [{ type: 10, content: '📋 **𝑆𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑒𝑠𝑐𝑢𝑐ℎ𝑎**\n`𝑁𝑖𝑛𝑔𝑢𝑛 𝑠𝑢𝑠𝑢𝑟𝑟𝑜 𝑎𝑡𝑒𝑛𝑑𝑖𝑑𝑜`' }, { type: 14, spacing: 2 }] : []),
         { type: 10, content: '⚙️ **𝑉𝑖𝑛𝑐𝑢𝑙𝑎𝑟 𝑙𝑜𝑠 𝑝𝑜𝑟𝑡𝑎𝑙𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑙𝑜𝑠 𝑐𝑎𝑛𝑎𝑙𝑒𝑠 𝑝𝑜𝑟 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑐𝑖𝑏𝑖𝑟á 𝑙𝑜𝑠 𝑒𝑐𝑜𝑠.' },
         { type: 14, spacing: 1 },
         new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId('tiktok_live_channel').setPlaceholder('🎤 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑣𝑜𝑐𝑒𝑠 𝑒𝑛 𝑣𝑖𝑣𝑜').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)).toJSON(),
@@ -188,7 +184,6 @@ async function twitchPanel(guildId) {
   const liveChannel = twitch.liveChannel || null;
 
   return {
-    flags: 32768,
     components: [{
       type: 17, accent_color: 0x800080, spoiler: false,
       components: [
@@ -198,7 +193,8 @@ async function twitchPanel(guildId) {
         { type: 14, spacing: 2 },
         { type: 10, content: `👁️ **𝐿𝑖𝑣𝑒 𝑆𝑡𝑟𝑒𝑎𝑚𝑠**\n𝐸𝑙 𝑝𝑜𝑟𝑡𝑎𝑙 𝑝𝑜𝑟 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑎𝑛𝑢𝑛𝑐𝑖𝑎 𝑐𝑢𝑎𝑛𝑑𝑜 𝑙𝑎 𝑙𝑢𝑧 𝑖𝑟𝑟𝑢𝑚𝑝𝑒 𝑒𝑛 𝑙𝑎 𝑜𝑠𝑐𝑢𝑟𝑖𝑑𝑎𝑑.\n${liveChannel ? `<#${liveChannel}>` : '`No vinculado`'}\n\n👥 **𝑂𝑗𝑜𝑠 𝑉𝑖𝑔𝑖𝑙𝑎𝑛𝑡𝑒𝑠**\n${users.length} 𝑛𝑜𝑚𝑏𝑟𝑒𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑠𝑖𝑔𝑢𝑒 𝑒𝑛 𝑙𝑎 𝑒𝑡𝑒𝑟𝑛𝑖𝑑𝑎𝑑.` },
         { type: 14, spacing: 2 },
-        ...(showUsers ? [{ type: 10, content: `📋 **𝑆𝑡𝑟𝑒𝑎𝑚𝑒𝑟𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑣𝑖𝑔𝑖𝑙𝑎**\n${users.length ? users.map(u => `• ${u}`).join('\n') : '`𝑁𝑖𝑛𝑔𝑢𝑛𝑎 𝑎𝑙𝑚𝑎 𝑒𝑛 𝑣𝑖𝑔𝑖𝑙𝑎𝑛𝑐𝑖𝑎`'}` }, { type: 14, spacing: 2 }] : []),
+        ...(showUsers && users.length > 0 ? [{ type: 10, content: `📋 **𝑆𝑡𝑟𝑒𝑎𝑚𝑒𝑟𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑣𝑖𝑔𝑖𝑙𝑎**\n${users.slice(0, 25).map(u => `• ${u}`).join('\n')}${users.length > 25 ? `\n• ... y ${users.length - 25} más` : ''}` }, { type: 14, spacing: 2 }] : []),
+        ...(showUsers && users.length === 0 ? [{ type: 10, content: '📋 **𝑆𝑡𝑟𝑒𝑎𝑚𝑒𝑟𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑣𝑖𝑔𝑖𝑙𝑎**\n`𝑁𝑖𝑛𝑔𝑢𝑛𝑎 𝑎𝑙𝑚𝑎 𝑒𝑛 𝑣𝑖𝑔𝑖𝑙𝑎𝑛𝑐𝑖𝑎`' }, { type: 14, spacing: 2 }] : []),
         { type: 10, content: '⚙️ **𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑛𝑜𝑡𝑖𝑓𝑖𝑐𝑎𝑐𝑖𝑜𝑛𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑒𝑙 𝑝𝑜𝑟𝑡𝑎𝑙 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑝𝑟𝑜𝑐𝑙𝑎𝑚𝑎𝑟á 𝑙𝑜𝑠 𝑎𝑣𝑖𝑠𝑜𝑠.' },
         { type: 14, spacing: 1 },
         new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId('twitch_live_channel').setPlaceholder('👁️ 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑎𝑣𝑖𝑠𝑜𝑠 𝑑𝑒 𝑙𝑢𝑧').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)).toJSON(),
@@ -230,20 +226,27 @@ async function youtubePanel(guildId, mode = 'default') {
 
   let channelInfoList = [];
   if (isList && users.length > 0) {
-    const { getChannelInfo } = require('../platforms/youtube/utils');
-    for (const channelId of users.slice(0, 15)) {
-      const info = await getChannelInfo(channelId);
-      if (info) {
-        channelInfoList.push(`• **${info.name}**\n  └ \`${info.handle || info.id}\``);
-      } else {
-        channelInfoList.push(`• \`${channelId}\` (⚠️ No encontrado)`);
+    try {
+      const { getChannelInfo } = require('../platforms/youtube/utils');
+      for (const channelId of users.slice(0, 15)) {
+        const info = await getChannelInfo(channelId);
+        if (info) {
+          channelInfoList.push(`• **${info.name}**\n  └ \`${info.handle || info.id}\``);
+        } else {
+          channelInfoList.push(`• \`${channelId}\` (⚠️ No encontrado)`);
+        }
+        await new Promise(r => setTimeout(r, 100));
       }
-      await new Promise(r => setTimeout(r, 100));
+      if (users.length > 15) {
+        channelInfoList.push(`• ... y ${users.length - 15} canales más`);
+      }
+    } catch (error) {
+      console.error('Error fetching channel info:', error);
+      channelInfoList = [`• ${users.length} canales configurados (no se pudo cargar la información)`];
     }
   }
 
   return {
-    flags: 32768,
     components: [{
       type: 17, accent_color: 0xFF0000, spoiler: false,
       components: [
@@ -435,7 +438,6 @@ async function testPanel(guildId) {
   }
 
   return {
-    flags: 32768,
     components: [{
       type: 17, accent_color: 0x00FF00, spoiler: false,
       components: [

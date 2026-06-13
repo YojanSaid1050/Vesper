@@ -1,49 +1,69 @@
-const { updateGuildSection } = require('../database/mongoManager');
+const { updateGuildSection, getGuildConfig } = require('../database/mongoManager');
 const { generalPanel, botPanel, tiktokPanel, twitchPanel, youtubePanel } = require('../dashboard/panels');
+const { updateDashboard, getActivePanel } = require('../dashboard/updater');
+
+async function getPanelMode(guildId, platform) {
+  const config = await getGuildConfig(guildId);
+  if (platform === 'tiktok') return config.tiktok?.showUsers ? 'list' : 'default';
+  if (platform === 'youtube') return config.youtube?.showUsers ? 'list' : 'default';
+  return 'default';
+}
 
 async function handleSelect(interaction, client) {
+  if (!interaction.guild) return;
+
+  await interaction.deferUpdate();
   const guildId = interaction.guild.id;
-  const channelId = interaction.values[0];
+  const selectedValue = interaction.values[0];
+  const customId = interaction.customId;
 
-  const handlers = {
-    general_welcome: () => updateGuildSection(guildId, 'general', { welcomeChannel: channelId }),
-    general_goodbye: () => updateGuildSection(guildId, 'general', { goodbyeChannel: channelId }),
-    general_log: () => updateGuildSection(guildId, 'general', { logChannel: channelId }),
-    bot_log_channel: () => updateGuildSection(guildId, 'general', { botLogChannel: channelId }),
-    tiktok_live_channel: () => updateGuildSection(guildId, 'tiktok', { liveChannel: channelId }),
-    tiktok_video_channel: () => updateGuildSection(guildId, 'tiktok', { videoChannel: channelId }),
-    twitch_live_channel: () => updateGuildSection(guildId, 'twitch', { liveChannel: channelId }),
-    youtube_live_channel: () => updateGuildSection(guildId, 'youtube', { liveChannel: channelId }),
-    youtube_video_channel: () => updateGuildSection(guildId, 'youtube', { videoChannel: channelId }),
-    youtube_short_channel: () => updateGuildSection(guildId, 'youtube', { shortChannel: channelId })
+  const updateAndRefresh = async (section, data, panelType, mode = 'default') => {
+    await updateGuildSection(guildId, section, data);
+    
+    let updatedPanel;
+    switch (panelType) {
+      case 'general':
+        updatedPanel = await generalPanel(guildId);
+        break;
+      case 'bot':
+        updatedPanel = await botPanel(guildId);
+        break;
+      case 'tiktok':
+        const tiktokMode = mode === 'auto' ? await getPanelMode(guildId, 'tiktok') : mode;
+        updatedPanel = await tiktokPanel(guildId, tiktokMode);
+        break;
+      case 'twitch':
+        updatedPanel = await twitchPanel(guildId);
+        break;
+      case 'youtube':
+        const youtubeMode = mode === 'auto' ? await getPanelMode(guildId, 'youtube') : mode;
+        updatedPanel = await youtubePanel(guildId, youtubeMode);
+        break;
+    }
+    
+    await interaction.editReply(updatedPanel);
+    
+    const currentPanel = await getActivePanel(guildId);
+    await updateDashboard(client, guildId, currentPanel.type, currentPanel.mode);
   };
 
-  const roleHandlers = {
-    bot_role: () => updateGuildSection(guildId, 'general', { botRole: interaction.values[0] })
+  const configMap = {
+    general_welcome: { section: 'general', data: { welcomeChannel: selectedValue }, panel: 'general' },
+    general_goodbye: { section: 'general', data: { goodbyeChannel: selectedValue }, panel: 'general' },
+    general_log: { section: 'general', data: { logChannel: selectedValue }, panel: 'general' },
+    bot_role: { section: 'general', data: { botRole: selectedValue }, panel: 'bot' },
+    bot_log_channel: { section: 'general', data: { botLogChannel: selectedValue }, panel: 'bot' },
+    tiktok_live_channel: { section: 'tiktok', data: { liveChannel: selectedValue }, panel: 'tiktok', mode: 'auto' },
+    tiktok_video_channel: { section: 'tiktok', data: { videoChannel: selectedValue }, panel: 'tiktok', mode: 'auto' },
+    twitch_live_channel: { section: 'twitch', data: { liveChannel: selectedValue }, panel: 'twitch' },
+    youtube_live_channel: { section: 'youtube', data: { liveChannel: selectedValue }, panel: 'youtube', mode: 'auto' },
+    youtube_video_channel: { section: 'youtube', data: { videoChannel: selectedValue }, panel: 'youtube', mode: 'auto' },
+    youtube_short_channel: { section: 'youtube', data: { shortChannel: selectedValue }, panel: 'youtube', mode: 'auto' }
   };
 
-  if (handlers[interaction.customId]) {
-    handlers[interaction.customId]();
-    
-    const panelMap = {
-      general_welcome: await generalPanel(guildId),
-      general_goodbye: await generalPanel(guildId),
-      general_log: await generalPanel(guildId),
-      bot_log_channel: await botPanel(guildId),
-      tiktok_live_channel: await tiktokPanel(guildId),
-      tiktok_video_channel: await tiktokPanel(guildId),
-      twitch_live_channel: await twitchPanel(guildId),
-      youtube_live_channel: await youtubePanel(guildId),
-      youtube_video_channel: await youtubePanel(guildId),
-      youtube_short_channel: await youtubePanel(guildId)
-    };
-    
-    return interaction.update(panelMap[interaction.customId]);
-  }
-
-  if (roleHandlers[interaction.customId]) {
-    roleHandlers[interaction.customId]();
-    return interaction.update(await botPanel(guildId));
+  const config = configMap[customId];
+  if (config) {
+    await updateAndRefresh(config.section, config.data, config.panel, config.mode || 'default');
   }
 }
 

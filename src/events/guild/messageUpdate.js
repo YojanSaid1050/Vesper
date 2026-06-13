@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const { createLog } = require('../../utils/logCache');
 
@@ -9,8 +9,11 @@ module.exports = {
     if (!oldMessage.guild || oldMessage.author?.bot) return;
     if (oldMessage.content === newMessage.content) return;
 
-    const guildConfig = getGuildConfig(oldMessage.guild.id);
-    const logChannel = oldMessage.guild.channels.cache.get(guildConfig.general?.logChannel);
+    const guildConfig = await getGuildConfig(oldMessage.guild.id); // Añadir await
+    const logChannelId = guildConfig.general?.logChannel;
+    if (!logChannelId) return;
+
+    const logChannel = oldMessage.guild.channels.cache.get(logChannelId);
     if (!logChannel) return;
 
     if (!createLog(`edit-${newMessage.id}`)) return;
@@ -21,8 +24,8 @@ module.exports = {
       .addFields(
         { name: '👤 Usuario', value: oldMessage.author.tag },
         { name: '📍 Canal', value: `${oldMessage.channel}` },
-        { name: '📌 Antes', value: oldMessage.content || '*Sin texto*' },
-        { name: '📌 Después', value: newMessage.content || '*Sin texto*' }
+        { name: '📌 Antes', value: oldMessage.content?.substring(0, 500) || '*Sin texto*' },
+        { name: '📌 Después', value: newMessage.content?.substring(0, 500) || '*Sin texto*' }
       )
       .setTimestamp();
     await sendBrandedMessage(logChannel, { embeds: [embed] });

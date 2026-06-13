@@ -20,9 +20,9 @@ module.exports = {
     }
 
     const channelInfoList = [];
-    for (const userId of users) {
+    for (const userId of users.slice(0, 25)) {
       const info = await getChannelInfo(userId);
-      channelInfoList.push(info || { channelId: userId, channelName: userId, handle: userId, error: true });
+      channelInfoList.push(info || { name: userId, handle: userId, error: true });
       await new Promise(r => setTimeout(r, 100));
     }
 
@@ -30,7 +30,7 @@ module.exports = {
       .setTitle('📺 Canales de YouTube monitoreados')
       .setColor(0xFF0000)
       .addFields(
-        { name: '🎭 Canales vigilados', value: channelInfoList.map(c => c.error ? `• \`${c.channelName}\` (⚠️ No encontrado)` : `• **${c.channelName}**\n  └ \`${c.handle || c.channelId}\``).join('\n') || 'Ninguno', inline: false },
+        { name: '🎭 Canales vigilados', value: channelInfoList.map(c => c.error ? `• \`${c.name}\` (⚠️ No encontrado)` : `• **${c.name}**\n  └ \`${c.handle || c.id}\``).join('\n') + (users.length > 25 ? `\n\n*... y ${users.length - 25} más*` : '') || 'Ninguno', inline: false },
         { name: '🔴 Canal de Directos', value: liveChannel ? `<#${liveChannel}>` : '`No configurado`', inline: true },
         { name: '📹 Canal de Videos', value: videoChannel ? `<#${videoChannel}>` : '`No configurado`', inline: true },
         { name: '📱 Canal de Shorts', value: shortChannel ? `<#${shortChannel}>` : '`No configurado`', inline: true }

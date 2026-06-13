@@ -21,7 +21,7 @@ module.exports = {
       .setTitle('📺 Streamers de Twitch monitoreados')
       .setColor(0x9146FF)
       .addFields(
-        { name: '🎭 Streamers vigilados', value: users.map(u => `• **${u}**`).join('\n') || 'Ninguno', inline: false },
+        { name: '🎭 Streamers vigilados', value: users.slice(0, 25).map(u => `• **${u}**`).join('\n') + (users.length > 25 ? `\n\n*... y ${users.length - 25} más*` : '') || 'Ninguno', inline: false },
         { name: '🔴 Canal de Directos', value: liveChannel ? `<#${liveChannel}>` : '`No configurado`', inline: true }
       )
       .setFooter({ text: `${users.length} streamers en total` });

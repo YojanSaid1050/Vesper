@@ -2,24 +2,47 @@ services:
   - type: worker
     name: vesper-bot
     runtime: node
+    repo: https://github.com/YojanSaid1050/Vesper
     buildCommand: npm install
     startCommand: node src/index.js
     envVars:
       - key: TOKEN
         sync: false
+        required: true
       - key: CLIENT_ID
         sync: false
+        required: true
       - key: GUILD_ID
         sync: false
+        required: false
       - key: TWITCH_CLIENT_ID
         sync: false
+        required: true
       - key: TWITCH_CLIENT_SECRET
         sync: false
+        required: true
       - key: APIFY_TOKEN
         sync: false
+        required: true
+      - key: APIFY_TOKENS
+        sync: false
+        required: true
       - key: YOUTUBE_API_KEY
         sync: false
+        required: true
+      - key: MONGODB_URI
+        sync: false
+        required: true
       - key: USE_GUILD_COMMANDS
-        value: true
+        value: "true"
       - key: PORT
-        value: 3000
+        value: "3000"
+      - key: DEBUG
+        value: "false"
+      - key: LOG_ERRORS
+        value: "true"
+      - key: NODE_VERSION
+        value: "18"
+    healthCheckPath: /health
+    autoDeploy: true
+    plan: free

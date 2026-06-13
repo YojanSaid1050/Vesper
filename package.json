@@ -5,9 +5,36 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "deploy": "node deploy.js",
-    "delete": "node delete-commands.js",
-    "postinstall": "node scripts/create-data-dirs.js"
+    "dev": "nodemon src/index.js",
+    "deploy": "node scripts/deploy.js",
+    "deploy:local": "cross-env USE_GUILD_COMMANDS=true node scripts/deploy.js",
+    "delete": "node scripts/delete-commands.js",
+    "delete:local": "cross-env DELETE_GUILD_COMMANDS=true node scripts/delete-commands.js",
+    "deploy:all": "npm run delete && npm run deploy",
+    "deploy:local:all": "npm run delete:local && npm run deploy:local",
+    "postinstall": "node scripts/create-data-dirs.js",
+    "setup": "npm install && node scripts/create-data-dirs.js",
+    "clean": "node scripts/clean-cache.js",
+    "clean:all": "node scripts/clean-cache.js --all",
+    "clean:logs": "node scripts/clean-cache.js --logs",
+    "clean:temp": "node scripts/clean-cache.js --temp",
+    "logs": "node scripts/view-logs.js",
+    "logs:error": "node scripts/view-logs.js --type error",
+    "logs:monitor": "node scripts/view-logs.js --type monitor",
+    "logs:follow": "node scripts/view-logs.js --follow",
+    "status": "node scripts/bot-status.js",
+    "reset-config": "node scripts/reset-config.js",
+    "mongo:stats": "node scripts/clean-mongo.js --stats",
+    "mongo:clean": "node scripts/clean-mongo.js --clean",
+    "mongo:all": "node scripts/clean-mongo.js --all",
+    "mongo:reset": "node scripts/clean-mongo.js --reset-guild",
+    "mongo:delete": "node scripts/clean-mongo.js --delete-guild",
+    "apify:tokens": "node scripts/check-apify-tokens.js",
+    "apify:test": "node scripts/test-tiktok-token-manager.js",
+    "tiktok:debug": "node scripts/debug-tiktok.js",
+    "tiktok:test": "node scripts/test-tiktok-visible.js",
+    "env:check": "node scripts/check-env.js",
+    "help": "echo 'Comandos disponibles: start, dev, deploy, clean, logs, status, mongo:stats, mongo:clean, apify:tokens'"
   },
   "dependencies": {
     "apify": "^3.7.2",
@@ -16,6 +43,33 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "googleapis": "^173.0.0",
+    "mongodb": "^7.2.0",
     "mongoose": "^9.6.3"
-  }
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "twitch",
+    "youtube",
+    "tiktok",
+    "monitor"
+  ],
+  "author": "YojanSaid1050",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YojanSaid1050/Vesper"
+  },
+  "bugs": {
+    "url": "https://github.com/YojanSaid1050/Vesper/issues"
+  },
+  "homepage": "https://github.com/YojanSaid1050/Vesper#readme"
 }

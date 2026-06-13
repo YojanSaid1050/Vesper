@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const { getGeneralConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado
 
 const recentLogs = new Set();
 
@@ -16,10 +16,14 @@ module.exports = {
     if (oldState.channelId === newState.channelId) return;
     if (newState.member?.user.bot) return;
 
-    const general = getGeneralConfig(newState.guild.id);
-    const logChannel = newState.guild.channels.cache.get(general.logChannel);
+    const guildConfig = await getGuildConfig(newState.guild.id); // Añadir await
+    const logChannelId = guildConfig.general?.logChannel;
+    if (!logChannelId) return;
+
+    const logChannel = newState.guild.channels.cache.get(logChannelId);
     if (!logChannel) return;
 
+    // Joined voice channel
     if (!oldState.channelId && newState.channelId) {
       if (!createVoiceLog(`join-${newState.member.id}-${newState.channelId}`)) return;
       const embed = new EmbedBuilder()
@@ -34,6 +38,7 @@ module.exports = {
       return;
     }
 
+    // Left voice channel
     if (oldState.channelId && !newState.channelId) {
       if (!createVoiceLog(`leave-${newState.member.id}-${oldState.channelId}`)) return;
       const embed = new EmbedBuilder()
@@ -48,6 +53,7 @@ module.exports = {
       return;
     }
 
+    // Moved between voice channels
     if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
       if (!createVoiceLog(`move-${newState.member.id}-${oldState.channelId}-${newState.channelId}`)) return;
       const embed = new EmbedBuilder()

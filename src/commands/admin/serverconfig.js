@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 
 function formatChannel(id) { return id ? `<#${id}>` : '❌ No configurado'; }
 function formatRole(id) { return id ? `<@&${id}>` : '❌ No configurado'; }
@@ -11,7 +11,7 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    const config = getGuildConfig(interaction.guild.id);
+    const config = await getGuildConfig(interaction.guild.id); // Añadir await
 
     const embed = new EmbedBuilder()
       .setTitle(`⚙️ Configuración de ${interaction.guild.name}`)

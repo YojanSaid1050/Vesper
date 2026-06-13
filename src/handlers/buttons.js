@@ -1,6 +1,7 @@
 const { getGuildConfig, updateGuildSection, updateGuildConfig } = require('../database/mongoManager');
 const { mainPanel, generalPanel, botPanel, brandingPanel, tiktokPanel, twitchPanel, youtubePanel, testPanel } = require('../dashboard/panels');
-const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, EmbedBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { updateDashboard, setActivePanel, getActivePanel } = require('../dashboard/updater');
+const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { checkUser } = require('../platforms/tiktok/checks');
 const { verifyStreamer } = require('../platforms/twitch/utils');
 const { verifyChannel } = require('../platforms/youtube/utils');
@@ -15,9 +16,7 @@ const youtubeCache = new CacheManager('./data/youtube');
 function cleanTwitchGuild(guildId) {
   const data = twitchCache.load('status', {});
   for (const key of Object.keys(data)) {
-    if (key.startsWith(`${guildId}_`)) {
-      delete data[key];
-    }
+    if (key.startsWith(`${guildId}_`)) delete data[key];
   }
   twitchCache.save('status', data);
 }
@@ -26,7 +25,6 @@ function cleanTikTokGuild(guildId) {
   const live = tiktokLiveCache.load('liveStatus', {});
   delete live[guildId];
   tiktokLiveCache.save('liveStatus', live);
-
   const videos = tiktokVideosCache.load('videos', {});
   delete videos[guildId];
   tiktokVideosCache.save('videos', videos);
@@ -36,62 +34,19 @@ function cleanYouTubeGuild(guildId) {
   const liveStatus = youtubeCache.load('liveStatus', {});
   delete liveStatus[guildId];
   youtubeCache.save('liveStatus', liveStatus);
-
   const videos = youtubeCache.load('videos', {});
   delete videos[guildId];
   youtubeCache.save('videos', videos);
-
   const shorts = youtubeCache.load('shorts', {});
   delete shorts[guildId];
   youtubeCache.save('shorts', shorts);
 }
 
-async function refreshTikTok(client, guildId, mode = 'default') {
+async function getPanelMode(guildId, platform) {
   const config = await getGuildConfig(guildId);
-  const channelId = config.dashboard?.channel;
-  const messageId = config.dashboard?.message;
-  if (!channelId || !messageId) return;
-
-  const channel = await client.channels.fetch(channelId).catch(() => null);
-  if (!channel) return;
-
-  const message = await channel.messages.fetch(messageId).catch(() => null);
-  if (!message) return;
-
-  const panel = await tiktokPanel(guildId, mode);
-  await message.edit(panel);
-}
-
-async function refreshTwitch(client, guildId) {
-  const config = await getGuildConfig(guildId);
-  const channelId = config.dashboard?.channel;
-  const messageId = config.dashboard?.message;
-  if (!channelId || !messageId) return;
-
-  const channel = await client.channels.fetch(channelId).catch(() => null);
-  if (!channel) return;
-
-  const message = await channel.messages.fetch(messageId).catch(() => null);
-  if (!message) return;
-
-  const panel = await twitchPanel(guildId);
-  await message.edit(panel);
-}
-
-async function refreshYouTube(client, guildId, mode = 'default') {
-  const config = await getGuildConfig(guildId);
-  const channelId = config.dashboard?.channel;
-  const messageId = config.dashboard?.message;
-  if (!channelId || !messageId) return;
-
-  const channel = await client.channels.fetch(channelId).catch(() => null);
-  if (!channel) return;
-
-  const message = await channel.messages.fetch(messageId).catch(() => null);
-  if (!message) return;
-
-  const panel = await youtubePanel(guildId, mode);
-  await message.edit(panel);
+  if (platform === 'tiktok') return config.tiktok?.showUsers ? 'list' : 'default';
+  if (platform === 'youtube') return config.youtube?.showUsers ? 'list' : 'default';
+  return 'default';
 }
 
 async function handleButton(interaction, client) {
@@ -107,111 +62,78 @@ async function handleButton(interaction, client) {
     }
   };
 
-  // VERIFY BUTTON
-  if (customId === 'verify_void') {
-    return verifyButton(interaction);
-  }
+  if (customId === 'verify_void') return verifyButton(interaction);
 
   // DASHBOARD NAVIGATION
-  if (customId === 'dashboard_home') return safeUpdate(await mainPanel(interaction.guild.id));
-  if (customId === 'dashboard_general') return safeUpdate(await generalPanel(interaction.guild.id));
-  if (customId === 'dashboard_bot') return safeUpdate(await botPanel(interaction.guild.id));
-  if (customId === 'dashboard_branding') return safeUpdate(await brandingPanel(interaction.guild.id));
-  if (customId === 'dashboard_tiktok') return safeUpdate(await tiktokPanel(interaction.guild.id));
-  if (customId === 'dashboard_twitch') return safeUpdate(await twitchPanel(interaction.guild.id));
-  if (customId === 'dashboard_youtube') return safeUpdate(await youtubePanel(interaction.guild.id));
-  if (customId === 'dashboard_tests') return safeUpdate(await testPanel(interaction.guild.id));
+  if (customId === 'dashboard_home') {
+    await setActivePanel(interaction.guild.id, 'main');
+    return safeUpdate(await mainPanel(interaction.guild.id));
+  }
+  if (customId === 'dashboard_general') {
+    await setActivePanel(interaction.guild.id, 'general');
+    return safeUpdate(await generalPanel(interaction.guild.id));
+  }
+  if (customId === 'dashboard_bot') {
+    await setActivePanel(interaction.guild.id, 'bot');
+    return safeUpdate(await botPanel(interaction.guild.id));
+  }
+  if (customId === 'dashboard_branding') {
+    await setActivePanel(interaction.guild.id, 'branding');
+    return safeUpdate(await brandingPanel(interaction.guild.id));
+  }
+  if (customId === 'dashboard_tiktok') {
+    await setActivePanel(interaction.guild.id, 'tiktok');
+    const mode = await getPanelMode(interaction.guild.id, 'tiktok');
+    return safeUpdate(await tiktokPanel(interaction.guild.id, mode));
+  }
+  if (customId === 'dashboard_twitch') {
+    await setActivePanel(interaction.guild.id, 'twitch');
+    return safeUpdate(await twitchPanel(interaction.guild.id));
+  }
+  if (customId === 'dashboard_youtube') {
+    await setActivePanel(interaction.guild.id, 'youtube');
+    const mode = await getPanelMode(interaction.guild.id, 'youtube');
+    return safeUpdate(await youtubePanel(interaction.guild.id, mode));
+  }
+  if (customId === 'dashboard_tests') {
+    await setActivePanel(interaction.guild.id, 'tests');
+    return safeUpdate(await testPanel(interaction.guild.id));
+  }
 
   // TEST PANEL SECTION BUTTONS
-  if (customId === 'test_section_general') {
-    updateGuildSection(interaction.guild.id, 'testPanel', { activeSection: 'general' });
-    return safeUpdate(await testPanel(interaction.guild.id));
-  }
-
-  if (customId === 'test_section_tiktok') {
-    updateGuildSection(interaction.guild.id, 'testPanel', { activeSection: 'tiktok' });
-    return safeUpdate(await testPanel(interaction.guild.id));
-  }
-
-  if (customId === 'test_section_twitch') {
-    updateGuildSection(interaction.guild.id, 'testPanel', { activeSection: 'twitch' });
-    return safeUpdate(await testPanel(interaction.guild.id));
-  }
-
-  if (customId === 'test_section_youtube') {
-    updateGuildSection(interaction.guild.id, 'testPanel', { activeSection: 'youtube' });
-    return safeUpdate(await testPanel(interaction.guild.id));
-  }
-
-  if (customId === 'test_section_branding') {
-    updateGuildSection(interaction.guild.id, 'testPanel', { activeSection: 'branding' });
-    return safeUpdate(await testPanel(interaction.guild.id));
-  }
-
-  if (customId === 'test_section_test') {
-    updateGuildSection(interaction.guild.id, 'testPanel', { activeSection: 'test' });
+  const testSections = ['general', 'tiktok', 'twitch', 'youtube', 'branding', 'test'];
+  if (testSections.some(s => customId === `test_section_${s}`)) {
+    const section = customId.replace('test_section_', '');
+    await updateGuildSection(interaction.guild.id, 'testPanel', { activeSection: section });
     return safeUpdate(await testPanel(interaction.guild.id));
   }
 
   // BRANDING BUTTONS
   if (customId === 'branding_name') {
-    const modal = new ModalBuilder()
-      .setCustomId('branding_name_modal')
-      .setTitle('Editar Nombre');
-    const input = new TextInputBuilder()
-      .setCustomId('server_name')
-      .setLabel('Nombre del Bot')
-      .setRequired(true)
-      .setMaxLength(80)
-      .setStyle(TextInputStyle.Short);
+    const modal = new ModalBuilder().setCustomId('branding_name_modal').setTitle('Editar Nombre');
+    const input = new TextInputBuilder().setCustomId('server_name').setLabel('Nombre del Bot').setRequired(true).setMaxLength(80).setStyle(TextInputStyle.Short);
     modal.addComponents(new ActionRowBuilder().addComponents(input));
     return interaction.showModal(modal);
   }
 
   if (customId === 'branding_avatar') {
-    const modal = new ModalBuilder()
-      .setCustomId('branding_avatar_modal')
-      .setTitle('Editar Avatar');
-    const input = new TextInputBuilder()
-      .setCustomId('avatar_url')
-      .setLabel('URL de la Imagen')
-      .setRequired(true)
-      .setPlaceholder('https://imagen.com/avatar.png')
-      .setStyle(TextInputStyle.Short);
+    const modal = new ModalBuilder().setCustomId('branding_avatar_modal').setTitle('Editar Avatar');
+    const input = new TextInputBuilder().setCustomId('avatar_url').setLabel('URL de la Imagen').setRequired(true).setPlaceholder('https://imagen.com/avatar.png').setStyle(TextInputStyle.Short);
     modal.addComponents(new ActionRowBuilder().addComponents(input));
     return interaction.showModal(modal);
   }
 
   if (customId === 'branding_reset') {
-    updateGuildSection(interaction.guild.id, 'branding', { name: null, avatar: null });
+    await updateGuildSection(interaction.guild.id, 'branding', { name: null, avatar: null });
     return safeUpdate(await brandingPanel(interaction.guild.id));
   }
 
   // TIKTOK BUTTONS
-  if (customId === 'tiktok_add_user') {
+  if (customId === 'tiktok_add_user' || customId === 'tiktok_remove_user') {
     const modal = new ModalBuilder()
-      .setCustomId('tiktok_add_modal')
-      .setTitle('Añadir Usuario TikTok');
-    const input = new TextInputBuilder()
-      .setCustomId('username')
-      .setLabel('Usuario TikTok')
-      .setPlaceholder('@usuario')
-      .setRequired(true)
-      .setStyle(TextInputStyle.Short);
-    modal.addComponents(new ActionRowBuilder().addComponents(input));
-    return interaction.showModal(modal);
-  }
-
-  if (customId === 'tiktok_remove_user') {
-    const modal = new ModalBuilder()
-      .setCustomId('tiktok_remove_modal')
-      .setTitle('Eliminar Usuario TikTok');
-    const input = new TextInputBuilder()
-      .setCustomId('username')
-      .setLabel('Usuario TikTok')
-      .setPlaceholder('@usuario')
-      .setRequired(true)
-      .setStyle(TextInputStyle.Short);
+      .setCustomId(customId === 'tiktok_add_user' ? 'tiktok_add_modal' : 'tiktok_remove_modal')
+      .setTitle(customId === 'tiktok_add_user' ? 'Añadir Usuario TikTok' : 'Eliminar Usuario TikTok');
+    const input = new TextInputBuilder().setCustomId('username').setLabel('Usuario TikTok').setPlaceholder('@usuario').setRequired(true).setStyle(TextInputStyle.Short);
     modal.addComponents(new ActionRowBuilder().addComponents(input));
     return interaction.showModal(modal);
   }
@@ -220,7 +142,7 @@ async function handleButton(interaction, client) {
     const config = await getGuildConfig(interaction.guild.id);
     const newShow = !config.tiktok?.showUsers;
     const mode = newShow ? 'list' : 'default';
-    updateGuildSection(interaction.guild.id, 'tiktok', { showUsers: newShow });
+    await updateGuildSection(interaction.guild.id, 'tiktok', { showUsers: newShow });
     return safeUpdate(await tiktokPanel(interaction.guild.id, mode));
   }
 
@@ -228,60 +150,26 @@ async function handleButton(interaction, client) {
     const embed = new EmbedBuilder()
       .setTitle('⚠️ Eliminar todos los usuarios de TikTok')
       .setDescription('¿Estás seguro de que quieres eliminar **todos** los usuarios de TikTok?\n\nEsta acción no se puede deshacer.')
-      .setColor('#ff0000')
-      .setFooter({ text: 'Confirma para continuar' });
-
-    const confirmButton = new ButtonBuilder()
-      .setCustomId('confirm_tiktok_delete_all')
-      .setLabel('✅ Aceptar')
-      .setStyle(ButtonStyle.Danger);
-
-    const cancelButton = new ButtonBuilder()
-      .setCustomId('cancel_action')
-      .setLabel('❌ Cancelar')
-      .setStyle(ButtonStyle.Secondary);
-
+      .setColor(0xff0000);
+    const confirmButton = new ButtonBuilder().setCustomId('confirm_tiktok_delete_all').setLabel('✅ Aceptar').setStyle(ButtonStyle.Danger);
+    const cancelButton = new ButtonBuilder().setCustomId('cancel_action').setLabel('❌ Cancelar').setStyle(ButtonStyle.Secondary);
     const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
-
-    return interaction.reply({
-      embeds: [embed],
-      components: [row],
-      flags: 64
-    });
+    return interaction.reply({ embeds: [embed], components: [row], flags: 64 });
   }
 
   // TWITCH BUTTONS
-  if (customId === 'twitch_add_user') {
+  if (customId === 'twitch_add_user' || customId === 'twitch_remove_user') {
     const modal = new ModalBuilder()
-      .setCustomId('twitch_add_modal')
-      .setTitle('Añadir Usuario Twitch');
-    const input = new TextInputBuilder()
-      .setCustomId('username')
-      .setLabel('Usuario Twitch')
-      .setPlaceholder('nombre_canal')
-      .setRequired(true)
-      .setStyle(TextInputStyle.Short);
-    modal.addComponents(new ActionRowBuilder().addComponents(input));
-    return interaction.showModal(modal);
-  }
-
-  if (customId === 'twitch_remove_user') {
-    const modal = new ModalBuilder()
-      .setCustomId('twitch_remove_modal')
-      .setTitle('Eliminar Usuario Twitch');
-    const input = new TextInputBuilder()
-      .setCustomId('username')
-      .setLabel('Usuario Twitch')
-      .setPlaceholder('nombre_canal')
-      .setRequired(true)
-      .setStyle(TextInputStyle.Short);
+      .setCustomId(customId === 'twitch_add_user' ? 'twitch_add_modal' : 'twitch_remove_modal')
+      .setTitle(customId === 'twitch_add_user' ? 'Añadir Usuario Twitch' : 'Eliminar Usuario Twitch');
+    const input = new TextInputBuilder().setCustomId('username').setLabel('Usuario Twitch').setPlaceholder('nombre_canal').setRequired(true).setStyle(TextInputStyle.Short);
     modal.addComponents(new ActionRowBuilder().addComponents(input));
     return interaction.showModal(modal);
   }
 
   if (customId === 'twitch_list_users') {
     const config = await getGuildConfig(interaction.guild.id);
-    updateGuildSection(interaction.guild.id, 'twitch', { showUsers: !config.twitch?.showUsers });
+    await updateGuildSection(interaction.guild.id, 'twitch', { showUsers: !config.twitch?.showUsers });
     return safeUpdate(await twitchPanel(interaction.guild.id));
   }
 
@@ -289,53 +177,19 @@ async function handleButton(interaction, client) {
     const embed = new EmbedBuilder()
       .setTitle('⚠️ Eliminar todos los streamers de Twitch')
       .setDescription('¿Estás seguro de que quieres eliminar **todos** los streamers de Twitch?\n\nEsta acción no se puede deshacer.')
-      .setColor('#ff0000')
-      .setFooter({ text: 'Confirma para continuar' });
-
-    const confirmButton = new ButtonBuilder()
-      .setCustomId('confirm_twitch_delete_all')
-      .setLabel('✅ Aceptar')
-      .setStyle(ButtonStyle.Danger);
-
-    const cancelButton = new ButtonBuilder()
-      .setCustomId('cancel_action')
-      .setLabel('❌ Cancelar')
-      .setStyle(ButtonStyle.Secondary);
-
+      .setColor(0xff0000);
+    const confirmButton = new ButtonBuilder().setCustomId('confirm_twitch_delete_all').setLabel('✅ Aceptar').setStyle(ButtonStyle.Danger);
+    const cancelButton = new ButtonBuilder().setCustomId('cancel_action').setLabel('❌ Cancelar').setStyle(ButtonStyle.Secondary);
     const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
-
-    return interaction.reply({
-      embeds: [embed],
-      components: [row],
-      flags: 64
-    });
+    return interaction.reply({ embeds: [embed], components: [row], flags: 64 });
   }
 
   // YOUTUBE BUTTONS
-  if (customId === 'youtube_add_user') {
+  if (customId === 'youtube_add_user' || customId === 'youtube_remove_user') {
     const modal = new ModalBuilder()
-      .setCustomId('youtube_add_modal')
-      .setTitle('Añadir Canal de YouTube');
-    const input = new TextInputBuilder()
-      .setCustomId('channel_input')
-      .setLabel('URL, @handle o nombre del canal')
-      .setPlaceholder('https://youtube.com/@MrBeast')
-      .setRequired(true)
-      .setStyle(TextInputStyle.Short);
-    modal.addComponents(new ActionRowBuilder().addComponents(input));
-    return interaction.showModal(modal);
-  }
-
-  if (customId === 'youtube_remove_user') {
-    const modal = new ModalBuilder()
-      .setCustomId('youtube_remove_modal')
-      .setTitle('Eliminar Canal de YouTube');
-    const input = new TextInputBuilder()
-      .setCustomId('channel_input')
-      .setLabel('URL, @handle o nombre del canal')
-      .setPlaceholder('@MrBeast')
-      .setRequired(true)
-      .setStyle(TextInputStyle.Short);
+      .setCustomId(customId === 'youtube_add_user' ? 'youtube_add_modal' : 'youtube_remove_modal')
+      .setTitle(customId === 'youtube_add_user' ? 'Añadir Canal de YouTube' : 'Eliminar Canal de YouTube');
+    const input = new TextInputBuilder().setCustomId('channel_input').setLabel('URL, @handle o nombre del canal').setPlaceholder('https://youtube.com/@canal').setRequired(true).setStyle(TextInputStyle.Short);
     modal.addComponents(new ActionRowBuilder().addComponents(input));
     return interaction.showModal(modal);
   }
@@ -344,7 +198,7 @@ async function handleButton(interaction, client) {
     const config = await getGuildConfig(interaction.guild.id);
     const newShow = !config.youtube?.showUsers;
     const mode = newShow ? 'list' : 'default';
-    updateGuildSection(interaction.guild.id, 'youtube', { showUsers: newShow });
+    await updateGuildSection(interaction.guild.id, 'youtube', { showUsers: newShow });
     return safeUpdate(await youtubePanel(interaction.guild.id, mode));
   }
 
@@ -352,95 +206,76 @@ async function handleButton(interaction, client) {
     const embed = new EmbedBuilder()
       .setTitle('⚠️ Eliminar todos los canales de YouTube')
       .setDescription('¿Estás seguro de que quieres eliminar **todos** los canales de YouTube?\n\nEsta acción no se puede deshacer.')
-      .setColor('#ff0000')
-      .setFooter({ text: 'Confirma para continuar' });
-
-    const confirmButton = new ButtonBuilder()
-      .setCustomId('confirm_youtube_delete_all')
-      .setLabel('✅ Aceptar')
-      .setStyle(ButtonStyle.Danger);
-
-    const cancelButton = new ButtonBuilder()
-      .setCustomId('cancel_action')
-      .setLabel('❌ Cancelar')
-      .setStyle(ButtonStyle.Secondary);
-
+      .setColor(0xff0000);
+    const confirmButton = new ButtonBuilder().setCustomId('confirm_youtube_delete_all').setLabel('✅ Aceptar').setStyle(ButtonStyle.Danger);
+    const cancelButton = new ButtonBuilder().setCustomId('cancel_action').setLabel('❌ Cancelar').setStyle(ButtonStyle.Secondary);
     const row = new ActionRowBuilder().addComponents(confirmButton, cancelButton);
-
-    return interaction.reply({
-      embeds: [embed],
-      components: [row],
-      flags: 64
-    });
+    return interaction.reply({ embeds: [embed], components: [row], flags: 64 });
   }
 
-  // CONFIRM BUTTONS
-  if (customId === 'confirm_tiktok_delete_all') {
-    await interaction.deferUpdate();
-    const guildId = interaction.guild.id;
-    let config = await getGuildConfig(guildId);
-    config.tiktok.users = [];
-    await updateGuildConfig(guildId, config);
-    cleanTikTokGuild(guildId);
-    const mode = config.tiktok?.showUsers ? 'list' : 'default';
-    await refreshTikTok(interaction.client, guildId, mode);
-    return interaction.followUp({
-      content: '✅ Todos los usuarios de TikTok fueron eliminados.',
-      flags: 64
-    });
-  }
+  // CONFIRM BUTTONS - CORREGIDOS
+if (customId === 'confirm_tiktok_delete_all') {
+  await interaction.deferUpdate();
+  const guildId = interaction.guild.id;
+  let config = await getGuildConfig(guildId);
+  config.tiktok.users = [];
+  await updateGuildConfig(guildId, config);
+  cleanTikTokGuild(guildId);
+  
+  const successEmbed = new EmbedBuilder()
+    .setDescription('✅ Todos los usuarios de TikTok han sido eliminados.')
+    .setColor(0x00ff00);
+  await interaction.editReply({ embeds: [successEmbed], components: [] });
+  
+  const activePanel = await getActivePanel(guildId);
+  await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+  return;
+}
 
-  if (customId === 'confirm_twitch_delete_all') {
-    await interaction.deferUpdate();
-    const guildId = interaction.guild.id;
-    let config = await getGuildConfig(guildId);
-    config.twitch.users = [];
-    await updateGuildConfig(guildId, config);
-    cleanTwitchGuild(guildId);
-    await refreshTwitch(interaction.client, guildId);
-    return interaction.followUp({
-      content: '✅ Todos los streamers de Twitch fueron eliminados.',
-      flags: 64
-    });
-  }
+if (customId === 'confirm_twitch_delete_all') {
+  await interaction.deferUpdate();
+  const guildId = interaction.guild.id;
+  let config = await getGuildConfig(guildId);
+  config.twitch.users = [];
+  await updateGuildConfig(guildId, config);
+  cleanTwitchGuild(guildId);
+  
+  const successEmbed = new EmbedBuilder()
+    .setDescription('✅ Todos los streamers de Twitch han sido eliminados.')
+    .setColor(0x00ff00);
+  await interaction.editReply({ embeds: [successEmbed], components: [] });
+  
+  const activePanel = await getActivePanel(guildId);
+  await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+  return;
+}
 
-  if (customId === 'confirm_youtube_delete_all') {
-    await interaction.deferUpdate();
-    const guildId = interaction.guild.id;
-    let config = await getGuildConfig(guildId);
-    config.youtube.users = [];
-    await updateGuildConfig(guildId, config);
-    cleanYouTubeGuild(guildId);
-    const mode = config.youtube?.showUsers ? 'list' : 'default';
-    await refreshYouTube(interaction.client, guildId, mode);
-    return interaction.followUp({
-      content: '✅ Todos los canales de YouTube fueron eliminados.',
-      flags: 64
-    });
-  }
+if (customId === 'confirm_youtube_delete_all') {
+  await interaction.deferUpdate();
+  const guildId = interaction.guild.id;
+  let config = await getGuildConfig(guildId);
+  config.youtube.users = [];
+  await updateGuildConfig(guildId, config);
+  cleanYouTubeGuild(guildId);
+  
+  const successEmbed = new EmbedBuilder()
+    .setDescription('✅ Todos los canales de YouTube han sido eliminados.')
+    .setColor(0x00ff00);
+  await interaction.editReply({ embeds: [successEmbed], components: [] });
+  
+  const activePanel = await getActivePanel(guildId);
+  await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+  return;
+}
 
-  if (customId === 'youtube_clear_confirm') {
-    await interaction.deferUpdate();
-    const config = await getGuildConfig(interaction.guild.id);
-    updateGuildSection(interaction.guild.id, 'youtube', { ...config.youtube, users: [] });
-    cleanYouTubeGuild(interaction.guild.id);
-    const mode = config.youtube?.showUsers ? 'list' : 'default';
-    await refreshYouTube(interaction.client, interaction.guild.id, mode);
-    return interaction.update({ content: '✅ Se eliminaron todos los canales del monitoreo de YouTube.', embeds: [], components: [] });
-  }
-
-  if (customId === 'youtube_clear_cancel') {
-    return interaction.update({ content: '❌ Operación cancelada.', embeds: [], components: [] });
-  }
-
-  if (customId === 'cancel_action') {
-    const embed = new EmbedBuilder()
-      .setDescription('❌ Acción cancelada.')
-      .setColor('#ff0000');
-    return interaction.update({ embeds: [embed], components: [] });
-  }
-
-  console.log(`Botón no manejado: ${customId}`);
+if (customId === 'cancel_action') {
+  await interaction.deferUpdate();
+  const embed = new EmbedBuilder()
+    .setDescription('❌ Acción cancelada.')
+    .setColor(0xff0000);
+  await interaction.editReply({ embeds: [embed], components: [] });
+  return;
+}
 }
 
 module.exports = { handleButton };

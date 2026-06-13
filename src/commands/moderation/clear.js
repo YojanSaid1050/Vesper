@@ -19,5 +19,8 @@ module.exports = {
       .setTimestamp();
 
     await interaction.editReply({ embeds: [embed] });
+    
+    // Eliminar el mensaje de confirmación después de 5 segundos
+    setTimeout(() => interaction.deleteReply().catch(() => {}), 5000);
   }
 };

@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
+const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -25,5 +26,8 @@ module.exports = {
       await updateGuildSection(interaction.guildId, 'tiktok', { ...config.tiktok, videoChannel: channel.id });
       return interaction.editReply({ content: `✅ Canal de videos configurado: <#${channel.id}>` });
     }
+// Refrescar dashboard automáticamente
+    const activePanel = await getActivePanel(interaction.guildId);
+    await updateDashboard(interaction.client, interaction.guildId, activePanel.type, activePanel.mode);
   }
 };

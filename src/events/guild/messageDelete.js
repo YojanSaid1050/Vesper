@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const { createLog } = require('../../utils/logCache');
 
@@ -8,8 +8,11 @@ module.exports = {
   async execute(message) {
     if (!message.guild || message.author?.bot) return;
 
-    const guildConfig = getGuildConfig(message.guild.id);
-    const logChannel = message.guild.channels.cache.get(guildConfig.general?.logChannel);
+    const guildConfig = await getGuildConfig(message.guild.id); // Añadir await
+    const logChannelId = guildConfig.general?.logChannel;
+    if (!logChannelId) return;
+
+    const logChannel = message.guild.channels.cache.get(logChannelId);
     if (!logChannel) return;
 
     if (!createLog(`delete-${message.id}`)) return;
@@ -28,7 +31,7 @@ module.exports = {
         { name: '👤 Usuario', value: message.author.tag },
         { name: '🛠️ Eliminado por', value: deleter },
         { name: '📍 Canal', value: `${message.channel}` },
-        { name: '💬 Contenido', value: message.content || '*Sin texto*' }
+        { name: '💬 Contenido', value: message.content?.substring(0, 1000) || '*Sin texto*' }
       )
       .setTimestamp();
     await sendBrandedMessage(logChannel, { embeds: [embed] });

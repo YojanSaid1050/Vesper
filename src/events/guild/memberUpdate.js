@@ -1,14 +1,18 @@
 const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 
 module.exports = {
   name: Events.GuildMemberUpdate,
   async execute(oldMember, newMember) {
-    const guildConfig = getGuildConfig(newMember.guild.id);
-    const logChannel = newMember.guild.channels.cache.get(guildConfig.general?.logChannel);
+    const guildConfig = await getGuildConfig(newMember.guild.id); // Añadir await
+    const logChannelId = guildConfig.general?.logChannel;
+    if (!logChannelId) return;
+
+    const logChannel = newMember.guild.channels.cache.get(logChannelId);
     if (!logChannel) return;
 
+    // Nickname change
     if (oldMember.nickname !== newMember.nickname) {
       const embed = new EmbedBuilder()
         .setTitle('📝 Nickname Updated')
@@ -23,6 +27,7 @@ module.exports = {
       await sendBrandedMessage(logChannel, { embeds: [embed] });
     }
 
+    // Timeout changes
     if (oldMember.communicationDisabledUntilTimestamp !== newMember.communicationDisabledUntilTimestamp) {
       let executor = 'Desconocido';
       let reason = 'Sin razón';
@@ -63,6 +68,7 @@ module.exports = {
       }
     }
 
+    // Role added
     const addedRole = newMember.roles.cache.find(role => !oldMember.roles.cache.has(role.id));
     if (addedRole) {
       const embed = new EmbedBuilder()
@@ -76,6 +82,7 @@ module.exports = {
       await sendBrandedMessage(logChannel, { embeds: [embed] });
     }
 
+    // Role removed
     const removedRole = oldMember.roles.cache.find(role => !newMember.roles.cache.has(role.id));
     if (removedRole) {
       const embed = new EmbedBuilder()

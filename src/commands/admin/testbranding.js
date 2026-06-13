@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { sendBrandedMessage } = require('../../utils/webhookSender');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { liveEmbed: twitchLiveEmbed } = require('../../platforms/twitch/embeds');
 const { liveEmbed: tiktokLiveEmbed, videoEmbed: tiktokVideoEmbed } = require('../../platforms/tiktok/embeds');
 
@@ -51,7 +51,7 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 });
     const tipo = interaction.options.getString('tipo');
-    const config = getGuildConfig(interaction.guild.id);
+    const config = await getGuildConfig(interaction.guild.id); // Añadir await
     const branding = config.branding || {};
 
     let payload;

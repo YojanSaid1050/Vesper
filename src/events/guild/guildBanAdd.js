@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const { createLog } = require('../../utils/logCache');
 
@@ -8,8 +8,11 @@ module.exports = {
   async execute(ban) {
     if (!createLog(`ban-${ban.user.id}`)) return;
 
-    const guildConfig = getGuildConfig(ban.guild.id);
-    const logChannel = ban.guild.channels.cache.get(guildConfig.general?.logChannel);
+    const guildConfig = await getGuildConfig(ban.guild.id); // Añadir await
+    const logChannelId = guildConfig.general?.logChannel;
+    if (!logChannelId) return;
+
+    const logChannel = ban.guild.channels.cache.get(logChannelId);
     if (!logChannel) return;
 
     let executor = 'Desconocido';

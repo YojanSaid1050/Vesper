@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder, AuditLogEvent, ChannelType } = require('discord.js');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { createLog } = require('../../utils/logCache');
 
 module.exports = {
@@ -7,8 +7,11 @@ module.exports = {
   async execute(channel) {
     if (!createLog(`channel-create-${channel.id}`)) return;
 
-    const guildConfig = getGuildConfig(channel.guild.id);
-    const logChannel = channel.guild.channels.cache.get(guildConfig.general?.logChannel);
+    const guildConfig = await getGuildConfig(channel.guild.id); // Añadir await
+    const logChannelId = guildConfig.general?.logChannel;
+    if (!logChannelId) return;
+
+    const logChannel = channel.guild.channels.cache.get(logChannelId);
     if (!logChannel) return;
 
     const tipo = {

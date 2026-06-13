@@ -2,6 +2,7 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder
 const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 const { getChannelInfo } = require('../../platforms/youtube/utils');
 const CacheManager = require('../../core/CacheManager');
+const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 
 const youtubeCache = new CacheManager('./data/youtube');
 
@@ -26,45 +27,64 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    const config = await getGuildConfig(interaction.guildId);
-    const currentUsers = config.youtube?.users || [];
-    const currentCount = currentUsers.length;
+    try {
+      const config = await getGuildConfig(interaction.guildId);
+      const currentUsers = config.youtube?.users || [];
+      const currentCount = currentUsers.length;
 
-    if (currentCount === 0) {
-      return interaction.reply({ content: '📋 No hay canales de YouTube configurados para eliminar.', flags: 64 });
-    }
-
-    let channelNames = [];
-    for (const userId of currentUsers.slice(0, 10)) {
-      const info = await getChannelInfo(userId);
-      channelNames.push(info?.channelName || userId);
-    }
-
-    const confirmEmbed = new EmbedBuilder()
-      .setTitle('⚠️ Confirmar eliminación')
-      .setDescription(`Estás a punto de eliminar **${currentCount}** canales de la lista de monitoreo.\n\n${channelNames.map(n => `• ${n}`).join('\n')}${currentCount > 10 ? `\n\n*... y ${currentCount - 10} más*` : ''}\n\nEsta acción no se puede deshacer.`)
-      .setColor(0xFF0000);
-
-    await interaction.reply({
-      embeds: [confirmEmbed],
-      components: [new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId('youtube_clear_confirm').setLabel('Sí, eliminar todo').setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId('youtube_clear_cancel').setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
-      )],
-      flags: 64
-    });
-
-    const filter = i => i.user.id === interaction.user.id;
-    const collector = interaction.channel.createMessageComponentCollector({ filter, time: 15000, max: 1 });
-
-    collector.on('collect', async i => {
-      if (i.customId === 'youtube_clear_confirm') {
-        await updateGuildSection(interaction.guildId, 'youtube', { ...config.youtube, users: [] });
-        cleanYouTubeGuild(interaction.guildId);
-        await i.update({ content: `✅ Se eliminaron **${currentCount}** canales del monitoreo de YouTube.`, embeds: [], components: [] });
-      } else {
-        await i.update({ content: '❌ Operación cancelada.', embeds: [], components: [] });
+      if (currentCount === 0) {
+        return interaction.reply({ content: '📋 No hay canales de YouTube configurados para eliminar.', flags: 64 });
       }
-    });
+
+      let channelNames = [];
+      for (const userId of currentUsers.slice(0, 10)) {
+        try {
+          const info = await getChannelInfo(userId);
+          channelNames.push(info?.name || userId);
+        } catch (err) {
+          channelNames.push(userId);
+        }
+      }
+
+      const confirmEmbed = new EmbedBuilder()
+        .setTitle('⚠️ Confirmar eliminación')
+        .setDescription(`Estás a punto de eliminar **${currentCount}** canales de la lista de monitoreo.\n\n${channelNames.map(n => `• ${n}`).join('\n')}${currentCount > 10 ? `\n\n*... y ${currentCount - 10} más*` : ''}\n\nEsta acción no se puede deshacer.`)
+        .setColor(0xFF0000);
+
+      await interaction.reply({
+        embeds: [confirmEmbed],
+        components: [new ActionRowBuilder().addComponents(
+          new ButtonBuilder().setCustomId('youtube_clear_confirm').setLabel('Sí, eliminar todo').setStyle(ButtonStyle.Danger),
+          new ButtonBuilder().setCustomId('youtube_clear_cancel').setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
+        )],
+        flags: 64
+      });
+
+      const filter = i => i.user.id === interaction.user.id;
+      const collector = interaction.channel.createMessageComponentCollector({ filter, time: 15000, max: 1 });
+
+      collector.on('collect', async i => {
+        try {
+          if (i.customId === 'youtube_clear_confirm') {
+            await updateGuildSection(interaction.guildId, 'youtube', { ...config.youtube, users: [] });
+            cleanYouTubeGuild(interaction.guildId);
+            await i.update({ content: `✅ Se eliminaron **${currentCount}** canales del monitoreo de YouTube.`, embeds: [], components: [] });
+            
+            // Refrescar dashboard automáticamente
+            const activePanel = await getActivePanel(interaction.guildId);
+            await updateDashboard(interaction.client, interaction.guildId, activePanel.type, activePanel.mode);
+          } else {
+            await i.update({ content: '❌ Operación cancelada.', embeds: [], components: [] });
+          }
+        } catch (error) {
+          console.error('Error en confirmación youtube-clear:', error);
+          await i.update({ content: `❌ Error al eliminar: ${error.message}`, embeds: [], components: [] });
+        }
+      });
+      
+    } catch (error) {
+      console.error('Error en youtube-clear:', error);
+      await interaction.reply({ content: `❌ Error al procesar la solicitud: ${error.message}`, flags: 64 });
+    }
   }
 };

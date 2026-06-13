@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 
 function buildGoodbyePayload(member) {
@@ -7,7 +7,7 @@ function buildGoodbyePayload(member) {
     flags: 32768,
     components: [{
       type: 17,
-      accent_color: 0,
+      accent_color: 0x000000,  // ⚫ NEGRO
       spoiler: false,
       components: [
         {
@@ -35,24 +35,30 @@ async function sendGoodbye(member, canal) {
 module.exports = {
   name: Events.GuildMemberRemove,
   async execute(member) {
-    const guildConfig = getGuildConfig(member.guild.id);
+    const guildConfig = await getGuildConfig(member.guild.id); // Añadir await
     const general = guildConfig.general || {};
 
-    const goodbyeChannel = member.guild.channels.cache.get(general.goodbyeChannel);
-    if (goodbyeChannel) await sendGoodbye(member, goodbyeChannel);
+    const goodbyeChannelId = general.goodbyeChannel;
+    if (goodbyeChannelId) {
+      const goodbyeChannel = member.guild.channels.cache.get(goodbyeChannelId);
+      if (goodbyeChannel) await sendGoodbye(member, goodbyeChannel);
+    }
 
-    const logChannel = member.guild.channels.cache.get(general.logChannel);
-    if (logChannel) {
-      const embed = new EmbedBuilder()
-        .setTitle(member.user.bot ? '🤖 Bot Left' : '📤 Member Left')
-        .setColor('#ED4245')
-        .addFields(
-          { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
-          { name: '🆔 ID', value: member.id }
-        )
-        .setThumbnail(member.user.displayAvatarURL())
-        .setTimestamp();
-      await sendBrandedMessage(logChannel, { embeds: [embed] });
+    const logChannelId = general.logChannel;
+    if (logChannelId) {
+      const logChannel = member.guild.channels.cache.get(logChannelId);
+      if (logChannel) {
+        const embed = new EmbedBuilder()
+          .setTitle(member.user.bot ? '🤖 Bot Left' : '📤 Member Left')
+          .setColor('#ED4245')
+          .addFields(
+            { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
+            { name: '🆔 ID', value: member.id }
+          )
+          .setThumbnail(member.user.displayAvatarURL())
+          .setTimestamp();
+        await sendBrandedMessage(logChannel, { embeds: [embed] });
+      }
     }
   },
   sendGoodbye,

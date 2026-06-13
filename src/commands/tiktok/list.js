@@ -21,7 +21,7 @@ module.exports = {
       .setTitle('🎵 Usuarios de TikTok monitoreados')
       .setColor(0x000000)
       .addFields(
-        { name: '🎭 Usuarios vigilados', value: users.map(u => `• **${u}**`).join('\n') || 'Ninguno', inline: false },
+        { name: '🎭 Usuarios vigilados', value: users.slice(0, 25).map(u => `• **${u}**`).join('\n') + (users.length > 25 ? `\n\n*... y ${users.length - 25} más*` : '') || 'Ninguno', inline: false },
         { name: '🔴 Canal de Directos', value: liveChannel ? `<#${liveChannel}>` : '`No configurado`', inline: true },
         { name: '🎬 Canal de Videos', value: videoChannel ? `<#${videoChannel}>` : '`No configurado`', inline: true }
       )

@@ -12,11 +12,14 @@ class CacheManager {
   ensureDirectory() {
     if (!fs.existsSync(this.baseDir)) {
       fs.mkdirSync(this.baseDir, { recursive: true });
+      console.log(`📁 Directorio de caché creado: ${this.baseDir}`);
     }
   }
 
   getFilePath(key) {
-    return path.join(this.baseDir, `${key}.json`);
+    // Sanitizar key para evitar problemas con caracteres especiales
+    const sanitizedKey = key.replace(/[^a-zA-Z0-9_-]/g, '_');
+    return path.join(this.baseDir, `${sanitizedKey}.json`);
   }
 
   load(key, defaultValue = {}) {
@@ -34,7 +37,8 @@ class CacheManager {
       const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
       this.cache.set(key, data);
       return data;
-    } catch {
+    } catch (error) {
+      console.error(`Error loading cache ${key}:`, error.message);
       return defaultValue;
     }
   }
@@ -50,9 +54,13 @@ class CacheManager {
       this.cache.set(key, data);
       return true;
     } catch (error) {
-      console.error(`Error saving cache ${key}:`, error);
+      console.error(`Error saving cache ${key}:`, error.message);
       return false;
     }
+  }
+
+  has(key) {
+    return this.cache.has(key) || fs.existsSync(this.getFilePath(key));
   }
 
   delete(key) {
@@ -65,10 +73,38 @@ class CacheManager {
 
   clear() {
     this.cache.clear();
-    const files = fs.readdirSync(this.baseDir);
-    for (const file of files) {
-      fs.unlinkSync(path.join(this.baseDir, file));
+    try {
+      const files = fs.readdirSync(this.baseDir);
+      for (const file of files) {
+        fs.unlinkSync(path.join(this.baseDir, file));
+      }
+      console.log(`🗑️ Caché limpiado: ${this.baseDir}`);
+    } catch (error) {
+      console.error(`Error clearing cache:`, error.message);
     }
+  }
+
+  getStats() {
+    let fileCount = 0;
+    let fileSize = 0;
+    
+    try {
+      const files = fs.readdirSync(this.baseDir);
+      fileCount = files.length;
+      
+      for (const file of files) {
+        const stats = fs.statSync(path.join(this.baseDir, file));
+        fileSize += stats.size;
+      }
+    } catch (error) {
+      console.error(`Error getting cache stats:`, error.message);
+    }
+    
+    return {
+      memoryEntries: this.cache.size,
+      fileCount: fileCount,
+      totalSizeKB: (fileSize / 1024).toFixed(2)
+    };
   }
 }
 

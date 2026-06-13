@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { updateGuildSection, getGuildConfig } = require('../../database/guildManager');
+const { updateGuildSection, getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { mainPanel } = require('../../dashboard/panels');
 
 module.exports = {
@@ -10,7 +10,7 @@ module.exports = {
 
   async execute(interaction) {
     const guildId = interaction.guild.id;
-    const config = getGuildConfig(guildId);
+    const config = await getGuildConfig(guildId); // Añadir await
 
     if (config.dashboard?.channel && config.dashboard?.message) {
       try {
@@ -24,7 +24,7 @@ module.exports = {
 
     const message = await interaction.channel.send(await mainPanel(guildId));
 
-    updateGuildSection(guildId, 'dashboard', {
+    await updateGuildSection(guildId, 'dashboard', {
       channel: interaction.channel.id,
       message: message.id,
       enabled: true

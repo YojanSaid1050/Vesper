@@ -1,5 +1,5 @@
 const { Events, EmbedBuilder } = require('discord.js');
-const { getGuildConfig } = require('../../database/guildManager');
+const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 
 function buildWelcomePayload(member) {
@@ -7,7 +7,7 @@ function buildWelcomePayload(member) {
     flags: 32768,
     components: [{
       type: 17,
-      accent_color: 16777215,
+      accent_color: 0xFFFFFF,  // ⚪ BLANCO
       spoiler: false,
       components: [
         {
@@ -35,44 +35,53 @@ async function sendWelcome(member, canal) {
 module.exports = {
   name: Events.GuildMemberAdd,
   async execute(member) {
-    const guildConfig = getGuildConfig(member.guild.id);
+    const guildConfig = await getGuildConfig(member.guild.id); // Añadir await
     const general = guildConfig.general || {};
 
     if (member.user.bot) {
       const botRole = member.guild.roles.cache.get(general.botRole);
       if (botRole) await member.roles.add(botRole).catch(() => null);
 
-      const botLogChannel = member.guild.channels.cache.get(general.botLogChannel);
-      if (botLogChannel) {
-        const embed = new EmbedBuilder()
-          .setTitle('🤖 Bot Added')
-          .setColor('#5865F2')
-          .addFields(
-            { name: '🤖 Bot', value: member.user.tag },
-            { name: '🆔 ID', value: member.id },
-            { name: '🎭 Rol añadido', value: botRole ? `<@&${general.botRole}>` : 'No configurado' }
-          )
-          .setThumbnail(member.user.displayAvatarURL())
-          .setTimestamp();
-        await sendBrandedMessage(botLogChannel, { embeds: [embed] });
+      const botLogChannelId = general.botLogChannel;
+      if (botLogChannelId) {
+        const botLogChannel = member.guild.channels.cache.get(botLogChannelId);
+        if (botLogChannel) {
+          const embed = new EmbedBuilder()
+            .setTitle('🤖 Bot Added')
+            .setColor('#5865F2')
+            .addFields(
+              { name: '🤖 Bot', value: member.user.tag },
+              { name: '🆔 ID', value: member.id },
+              { name: '🎭 Rol añadido', value: botRole ? `<@&${general.botRole}>` : 'No configurado' }
+            )
+            .setThumbnail(member.user.displayAvatarURL())
+            .setTimestamp();
+          await sendBrandedMessage(botLogChannel, { embeds: [embed] });
+        }
       }
     }
 
-    const welcomeChannel = member.guild.channels.cache.get(general.welcomeChannel);
-    if (welcomeChannel) await sendWelcome(member, welcomeChannel);
+    const welcomeChannelId = general.welcomeChannel;
+    if (welcomeChannelId) {
+      const welcomeChannel = member.guild.channels.cache.get(welcomeChannelId);
+      if (welcomeChannel) await sendWelcome(member, welcomeChannel);
+    }
 
-    const logChannel = member.guild.channels.cache.get(general.logChannel);
-    if (logChannel) {
-      const embed = new EmbedBuilder()
-        .setTitle(member.user.bot ? '🤖 Bot Joined' : '📥 Member Joined')
-        .setColor(member.user.bot ? '#5865F2' : '#57F287')
-        .addFields(
-          { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
-          { name: '🆔 ID', value: member.id }
-        )
-        .setThumbnail(member.user.displayAvatarURL())
-        .setTimestamp();
-      await sendBrandedMessage(logChannel, { embeds: [embed] });
+    const logChannelId = general.logChannel;
+    if (logChannelId) {
+      const logChannel = member.guild.channels.cache.get(logChannelId);
+      if (logChannel) {
+        const embed = new EmbedBuilder()
+          .setTitle(member.user.bot ? '🤖 Bot Joined' : '📥 Member Joined')
+          .setColor(member.user.bot ? '#5865F2' : '#57F287')
+          .addFields(
+            { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
+            { name: '🆔 ID', value: member.id }
+          )
+          .setThumbnail(member.user.displayAvatarURL())
+          .setTimestamp();
+        await sendBrandedMessage(logChannel, { embeds: [embed] });
+      }
     }
   },
   sendWelcome,
