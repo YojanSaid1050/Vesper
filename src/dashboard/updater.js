@@ -15,6 +15,8 @@ const {
 const activePanels = new Map();
 
 async function getPanelForGuild(guildId, panelType = 'main', mode = 'default') {
+  console.log(`[DEBUG] getPanelForGuild: guild=${guildId}, type=${panelType}, mode=${mode}`);
+  
   switch (panelType) {
     case 'main':
       return await mainPanel(guildId);
@@ -39,6 +41,8 @@ async function getPanelForGuild(guildId, panelType = 'main', mode = 'default') {
 
 async function updateDashboard(client, guildId = null, panelType = null, mode = 'default') {
   try {
+    console.log(`[DEBUG] updateDashboard llamado: guildId=${guildId}, panelType=${panelType}, mode=${mode}`);
+    
     let guildsToUpdate = [];
     
     if (guildId) {
@@ -53,6 +57,8 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
           dashboard: config.dashboard,
           currentPanel: currentPanel
         });
+      } else {
+        console.log(`[DEBUG] Guild ${guildId} no tiene dashboard configurado`);
       }
     } else {
       const guildsConfig = await getAllGuildConfigs();
@@ -65,12 +71,15 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
         .filter(g => g.dashboard?.channel && g.dashboard?.message);
     }
     
+    console.log(`[DEBUG] Guilds a actualizar: ${guildsToUpdate.length}`);
+    
     let updated = 0, failed = 0, cleaned = 0;
 
     for (const guild of guildsToUpdate) {
       try {
         const channel = await client.channels.fetch(guild.dashboard.channel).catch(() => null);
         if (!channel) {
+          console.log(`[DEBUG] Canal ${guild.dashboard.channel} no encontrado, limpiando...`);
           await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
           continue;
@@ -78,6 +87,7 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
 
         const message = await channel.messages.fetch(guild.dashboard.message).catch(() => null);
         if (!message) {
+          console.log(`[DEBUG] Mensaje ${guild.dashboard.message} no encontrado, limpiando...`);
           await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
           continue;
@@ -85,8 +95,10 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
 
         const panel = await getPanelForGuild(guild.guildId, guild.currentPanel.type, guild.currentPanel.mode);
         await message.edit(panel);
+        console.log(`[DEBUG] ✅ Dashboard actualizado para guild ${guild.guildId}`);
         updated++;
       } catch (err) {
+        console.error(`[DEBUG] Error actualizando guild ${guild.guildId}:`, err.message);
         failed++;
         if (err.code === 10008 || err.code === 10003) {
           await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
@@ -95,12 +107,7 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
       }
     }
 
-    if (guildId && (updated > 0 || cleaned > 0)) {
-      console.log(`📊 Dashboard de guild ${guildId} actualizado | Éxito: ${updated}`);
-    } else if (updated > 0 || cleaned > 0) {
-      console.log(`📊 Dashboards actualizados: ${updated} | Limpiados: ${cleaned}`);
-    }
-    
+    console.log(`[DEBUG] Resultado: updated=${updated}, failed=${failed}, cleaned=${cleaned}`);
     return { updated, failed, cleaned };
   } catch (error) {
     console.error('❌ Error en updateDashboard:', error);
@@ -109,6 +116,7 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
 }
 
 async function setActivePanel(guildId, panelType, mode = 'default') {
+  console.log(`[DEBUG] setActivePanel: guild=${guildId}, type=${panelType}, mode=${mode}`);
   activePanels.set(guildId, { type: panelType, mode });
   await updateGuildSection(guildId, 'dashboard', { currentPanel: panelType, currentMode: mode });
 }
@@ -131,6 +139,7 @@ async function getActivePanel(guildId) {
 
 async function refreshPanelAfterChange(client, guildId, changedSection) {
   const activePanel = await getActivePanel(guildId);
+  console.log(`[DEBUG] refreshPanelAfterChange: guild=${guildId}, changedSection=${changedSection}, activePanel=${activePanel.type}`);
   
   if ((changedSection === 'tiktok' && activePanel.type === 'tiktok') ||
       (changedSection === 'twitch' && activePanel.type === 'twitch') ||
@@ -138,6 +147,8 @@ async function refreshPanelAfterChange(client, guildId, changedSection) {
       (changedSection === 'branding' && activePanel.type === 'branding') ||
       (changedSection === 'general' && (activePanel.type === 'general' || activePanel.type === 'bot'))) {
     await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+  } else {
+    console.log(`[DEBUG] No se actualiza porque el panel activo (${activePanel.type}) no coincide con ${changedSection}`);
   }
 }
 
