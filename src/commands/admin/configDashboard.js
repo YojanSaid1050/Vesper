@@ -1,6 +1,5 @@
-// src/commands/admin/configDashboard.js
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { updateGuildSection, getGuildConfig } = require('../../database/mongoManager');
+const { updateGuildSection, getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { mainPanel } = require('../../dashboard/panels');
 
 module.exports = {
@@ -10,40 +9,27 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: 64 });
-    
-    try {
-      const guildId = interaction.guild.id;
-      const config = await getGuildConfig(guildId);
+    const guildId = interaction.guild.id;
+    const config = await getGuildConfig(guildId); // Añadir await
 
-      if (config.dashboard?.channel && config.dashboard?.message) {
-        try {
-          const oldChannel = await interaction.guild.channels.fetch(config.dashboard.channel);
-          if (oldChannel) {
-            const oldMessage = await oldChannel.messages.fetch(config.dashboard.message);
-            if (oldMessage) await oldMessage.delete();
-          }
-        } catch (err) {
-          console.log('Error eliminando dashboard anterior:', err.message);
+    if (config.dashboard?.channel && config.dashboard?.message) {
+      try {
+        const oldChannel = await interaction.guild.channels.fetch(config.dashboard.channel);
+        if (oldChannel) {
+          const oldMessage = await oldChannel.messages.fetch(config.dashboard.message);
+          if (oldMessage) await oldMessage.delete();
         }
-      }
-
-      const panel = await mainPanel(guildId);
-      const message = await interaction.channel.send(panel);
-
-      await updateGuildSection(guildId, 'dashboard', {
-        channel: interaction.channel.id,
-        message: message.id,
-        enabled: true,
-        currentPanel: 'main',
-        currentMode: 'default'
-      });
-
-      await interaction.editReply({ content: '✅ Dashboard creado correctamente.' });
-      
-    } catch (error) {
-      console.error('Error en config-dashboard:', error);
-      await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      } catch {}
     }
+
+    const message = await interaction.channel.send(await mainPanel(guildId));
+
+    await updateGuildSection(guildId, 'dashboard', {
+      channel: interaction.channel.id,
+      message: message.id,
+      enabled: true
+    });
+
+    await interaction.reply({ content: '✅ Dashboard creado correctamente.', flags: 64 });
   }
 };
