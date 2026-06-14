@@ -1,3 +1,4 @@
+// src/handlers/modals.js
 const { updateGuildSection, getGuildConfig, updateGuildConfig } = require('../database/mongoManager');
 const { brandingPanel, tiktokPanel, twitchPanel, youtubePanel } = require('../dashboard/panels');
 const { updateDashboard, getActivePanel } = require('../dashboard/updater');
@@ -12,6 +13,37 @@ const twitchCache = new CacheManager('./data/twitch');
 const tiktokLiveCache = new CacheManager('./data/tiktok');
 const tiktokVideosCache = new CacheManager('./data/tiktok');
 const youtubeCache = new CacheManager('./data/youtube');
+
+// Función para actualizar el dashboard usando webhook
+async function updateDashboardWithWebhook(client, guildId, channel, messageId, panel) {
+  try {
+    const hooks = await channel.fetchWebhooks().catch(() => []);
+    let webhook = hooks.find(hook => hook.owner?.id === client.user.id);
+    
+    if (!webhook) {
+      webhook = await channel.createWebhook({
+        name: 'Vesper Dashboard',
+        reason: 'Dashboard update webhook'
+      }).catch(() => null);
+    }
+    
+    if (webhook) {
+      const config = await getGuildConfig(guildId);
+      const branding = config.branding || {};
+      
+      await webhook.editMessage(messageId, {
+        ...panel,
+        username: branding.name || client.user.username,
+        avatarURL: branding.avatar || client.user.displayAvatarURL()
+      });
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error updating dashboard with webhook:', error);
+    return false;
+  }
+}
 
 // Función para responder al modal y procesar en segundo plano
 async function processModalAsync(interaction, client, callback) {
@@ -36,7 +68,15 @@ async function processModalAsync(interaction, client, callback) {
       await interaction.followUp(followUp);
       
       const activePanel = await getActivePanel(interaction.guild.id);
-      await updateDashboard(client, interaction.guild.id, activePanel.type, activePanel.mode);
+      const config = await getGuildConfig(interaction.guild.id);
+      
+      if (config.dashboard?.channel && config.dashboard?.message) {
+        const channel = await client.channels.fetch(config.dashboard.channel).catch(() => null);
+        if (channel) {
+          const panel = await getPanelForType(interaction.guild.id, activePanel.type, activePanel.mode);
+          await updateDashboardWithWebhook(client, interaction.guild.id, channel, config.dashboard.message, panel);
+        }
+      }
       
     } catch (error) {
       console.error('Error en procesamiento asíncrono:', error);
@@ -46,6 +86,23 @@ async function processModalAsync(interaction, client, callback) {
       });
     }
   }, 100);
+}
+
+// Función auxiliar para obtener el panel según el tipo
+async function getPanelForType(guildId, type, mode) {
+  const { mainPanel, generalPanel, botPanel, brandingPanel, tiktokPanel, twitchPanel, youtubePanel, testPanel } = require('../dashboard/panels');
+  
+  switch (type) {
+    case 'main': return await mainPanel(guildId);
+    case 'general': return await generalPanel(guildId);
+    case 'bot': return await botPanel(guildId);
+    case 'branding': return await brandingPanel(guildId);
+    case 'tiktok': return await tiktokPanel(guildId, mode);
+    case 'twitch': return await twitchPanel(guildId);
+    case 'youtube': return await youtubePanel(guildId, mode);
+    case 'tests': return await testPanel(guildId);
+    default: return await mainPanel(guildId);
+  }
 }
 
 async function isValidImageUrl(url) {
@@ -68,10 +125,8 @@ async function isValidImageUrl(url) {
 // Función para normalizar arrays según la plataforma
 function normalizeUserArray(users, platform = 'general') {
   if (platform === 'youtube') {
-    // Los IDs de YouTube son case-sensitive, mantener original
     return [...new Set(users)];
   }
-  // Para TikTok y Twitch, los usernames no son case-sensitive
   return [...new Set(users.map(u => u.toLowerCase()))];
 }
 
@@ -152,7 +207,15 @@ async function handleModal(interaction, client) {
       flags: 64 
     });
     const activePanel = await getActivePanel(guildId);
-    await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+    const config = await getGuildConfig(guildId);
+    
+    if (config.dashboard?.channel && config.dashboard?.message) {
+      const channel = await client.channels.fetch(config.dashboard.channel).catch(() => null);
+      if (channel) {
+        const panel = await getPanelForType(guildId, activePanel.type, activePanel.mode);
+        await updateDashboardWithWebhook(client, guildId, channel, config.dashboard.message, panel);
+      }
+    }
     return;
   }
 
@@ -184,7 +247,15 @@ async function handleModal(interaction, client) {
     });
     
     const activePanel = await getActivePanel(guildId);
-    await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+    const config = await getGuildConfig(guildId);
+    
+    if (config.dashboard?.channel && config.dashboard?.message) {
+      const channel = await client.channels.fetch(config.dashboard.channel).catch(() => null);
+      if (channel) {
+        const panel = await getPanelForType(guildId, activePanel.type, activePanel.mode);
+        await updateDashboardWithWebhook(client, guildId, channel, config.dashboard.message, panel);
+      }
+    }
     return;
   }
 
@@ -335,7 +406,7 @@ async function handleModal(interaction, client) {
     return;
   }
 
-  // YouTube Add - CORREGIDO
+  // YouTube Add
   if (interaction.customId === 'youtube_add_modal') {
     const input = interaction.fields.getTextInputValue('channel_input').trim();
     
@@ -353,10 +424,8 @@ async function handleModal(interaction, client) {
       
       let config = await getGuildConfig(guildId);
       if (!config.youtube) config.youtube = { users: [] };
-      // YouTube: NO convertir a minúsculas, mantener ID original case-sensitive
       config.youtube.users = normalizeUserArray(config.youtube.users, 'youtube');
       
-      // Comparación case-sensitive para YouTube IDs
       const channelId = channel.id;
       const exists = config.youtube.users.some(id => id === channelId);
       
@@ -405,7 +474,6 @@ async function handleModal(interaction, client) {
       let foundChannelId = null;
       let foundChannelName = null;
       
-      // Buscar por ID exacto o por nombre/handle
       for (const channelId of config.youtube.users) {
         const info = await verifyChannel(channelId);
         if (info.exists) {

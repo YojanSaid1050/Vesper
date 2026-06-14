@@ -1,5 +1,6 @@
 // src/dashboard/updater.js
 const { getAllGuildConfigs, updateGuildSection, getGuildConfig } = require('../database/mongoManager');
+const { sendBrandedMessage } = require('../utils/webhookSender');
 const { 
   mainPanel, 
   generalPanel, 
@@ -18,15 +19,24 @@ async function getPanelForGuild(guildId, panelType = 'main', mode = 'default') {
   console.log(`[DEBUG] getPanelForGuild: guild=${guildId}, type=${panelType}, mode=${mode}`);
   
   switch (panelType) {
-    case 'main': return await mainPanel(guildId);
-    case 'general': return await generalPanel(guildId);
-    case 'bot': return await botPanel(guildId);
-    case 'branding': return await brandingPanel(guildId);
-    case 'tiktok': return await tiktokPanel(guildId, mode);
-    case 'twitch': return await twitchPanel(guildId);
-    case 'youtube': return await youtubePanel(guildId, mode);
-    case 'tests': return await testPanel(guildId);
-    default: return await mainPanel(guildId);
+    case 'main':
+      return await mainPanel(guildId);
+    case 'general':
+      return await generalPanel(guildId);
+    case 'bot':
+      return await botPanel(guildId);
+    case 'branding':
+      return await brandingPanel(guildId);
+    case 'tiktok':
+      return await tiktokPanel(guildId, mode);
+    case 'twitch':
+      return await twitchPanel(guildId);
+    case 'youtube':
+      return await youtubePanel(guildId, mode);
+    case 'tests':
+      return await testPanel(guildId);
+    default:
+      return await mainPanel(guildId);
   }
 }
 
@@ -82,14 +92,51 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
           continue;
         }
 
+        // Obtener el panel
         const panel = await getPanelForGuild(guild.guildId, guild.currentPanel.type, guild.currentPanel.mode);
-        await message.edit(panel);
-        console.log(`[DEBUG] ✅ Dashboard actualizado para guild ${guild.guildId}`);
-        updated++;
+        
+        // Obtener branding para el webhook
+        const config = await getGuildConfig(guild.guildId);
+        const branding = config.branding || {};
+        
+        // EDITAR usando sendBrandedMessage (webhook) en lugar de message.edit
+        // Para editar un mensaje existente con webhook, necesitamos el webhook
+        const hooks = await channel.fetchWebhooks().catch(() => []);
+        let webhook = hooks.find(hook => hook.owner?.id === client.user.id);
+        
+        if (webhook) {
+          // Editar usando webhook
+          await webhook.editMessage(guild.dashboard.message, {
+            ...panel,
+            username: branding.name || client.user.username,
+            avatarURL: branding.avatar || client.user.displayAvatarURL()
+          });
+          console.log(`[DEBUG] ✅ Dashboard actualizado con webhook para guild ${guild.guildId}`);
+          updated++;
+        } else {
+          // Fallback: intentar crear un webhook nuevo
+          webhook = await channel.createWebhook({
+            name: 'Vesper Dashboard',
+            reason: 'Dashboard update webhook'
+          }).catch(() => null);
+          
+          if (webhook) {
+            await webhook.editMessage(guild.dashboard.message, {
+              ...panel,
+              username: branding.name || client.user.username,
+              avatarURL: branding.avatar || client.user.displayAvatarURL()
+            });
+            updated++;
+          } else {
+            // Último fallback: edición normal (puede fallar con type 17)
+            await message.edit(panel);
+            updated++;
+          }
+        }
       } catch (err) {
         console.error(`[DEBUG] Error actualizando guild ${guild.guildId}:`, err.message);
         failed++;
-        if (err.code === 10008 || err.code === 10003 || err.code === 50035) {
+        if (err.code === 10008 || err.code === 10003) {
           await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
         }
@@ -111,10 +158,15 @@ async function setActivePanel(guildId, panelType, mode = 'default') {
 }
 
 async function getActivePanel(guildId) {
-  if (activePanels.has(guildId)) return activePanels.get(guildId);
+  if (activePanels.has(guildId)) {
+    return activePanels.get(guildId);
+  }
   const config = await getGuildConfig(guildId);
   if (config?.dashboard?.currentPanel) {
-    const panelData = { type: config.dashboard.currentPanel, mode: config.dashboard.currentMode || 'default' };
+    const panelData = { 
+      type: config.dashboard.currentPanel, 
+      mode: config.dashboard.currentMode || 'default' 
+    };
     activePanels.set(guildId, panelData);
     return panelData;
   }
@@ -125,15 +177,11 @@ async function refreshPanelAfterChange(client, guildId, changedSection) {
   const activePanel = await getActivePanel(guildId);
   console.log(`[DEBUG] refreshPanelAfterChange: guild=${guildId}, changedSection=${changedSection}, activePanel=${activePanel.type}`);
   
-  const shouldRefresh = (
-    (changedSection === 'tiktok' && activePanel.type === 'tiktok') ||
-    (changedSection === 'twitch' && activePanel.type === 'twitch') ||
-    (changedSection === 'youtube' && activePanel.type === 'youtube') ||
-    (changedSection === 'branding' && activePanel.type === 'branding') ||
-    (changedSection === 'general' && (activePanel.type === 'general' || activePanel.type === 'bot'))
-  );
-  
-  if (shouldRefresh) {
+  if ((changedSection === 'tiktok' && activePanel.type === 'tiktok') ||
+      (changedSection === 'twitch' && activePanel.type === 'twitch') ||
+      (changedSection === 'youtube' && activePanel.type === 'youtube') ||
+      (changedSection === 'branding' && activePanel.type === 'branding') ||
+      (changedSection === 'general' && (activePanel.type === 'general' || activePanel.type === 'bot'))) {
     await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
   }
 }

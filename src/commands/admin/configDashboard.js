@@ -2,7 +2,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { updateGuildSection, getGuildConfig } = require('../../database/mongoManager');
 const { mainPanel } = require('../../dashboard/panels');
-const { sendBrandedMessage } = require('../../utils/webhookSender'); // <-- USAR WEBHOOK
+const { sendBrandedMessage } = require('../../utils/webhookSender');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -25,13 +25,15 @@ module.exports = {
             const oldMessage = await oldChannel.messages.fetch(config.dashboard.message);
             if (oldMessage) await oldMessage.delete();
           }
-        } catch (err) {}
+        } catch (err) {
+          console.log('Error eliminando dashboard anterior:', err.message);
+        }
       }
 
-      // Obtener el panel con formato type 17
+      // Obtener el panel (con formato type 17)
       const panelData = await mainPanel(guildId);
       
-      // ENVIAR COMO WEBHOOK (NO como mensaje normal)
+      // ENVIAR COMO WEBHOOK (esto permite el formato type 17)
       const message = await sendBrandedMessage(interaction.channel, panelData);
 
       await updateGuildSection(guildId, 'dashboard', {
