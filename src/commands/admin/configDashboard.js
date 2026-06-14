@@ -2,7 +2,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { updateGuildSection, getGuildConfig } = require('../../database/mongoManager');
 const { mainPanel } = require('../../dashboard/panels');
-const { getOrCreateWebhook, clearWebhookCache } = require('../../dashboard/updater');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -30,30 +29,9 @@ module.exports = {
         }
       }
 
-      // Limpiar caché de webhook para este canal
-      clearWebhookCache(guildId);
-
-      // Obtener el panel (con formato type 17)
-      const panelData = await mainPanel(guildId);
-      
-      // Obtener o crear webhook
-      const webhook = await getOrCreateWebhook(interaction.channel);
-      
-      if (!webhook) {
-        throw new Error('No se pudo crear/obtener el webhook');
-      }
-
-      // Obtener branding
-      const branding = config.branding || {};
-      
-      // Enviar el mensaje usando el webhook (esto permite type 17)
-      const webhookOptions = {
-        ...panelData,
-        username: branding.name || interaction.client.user.username,
-        avatarURL: branding.avatar || interaction.client.user.displayAvatarURL()
-      };
-      
-      const message = await webhook.send(webhookOptions);
+      // Enviar el panel usando el nuevo formato (embeds + components)
+      const panel = await mainPanel(guildId);
+      const message = await interaction.channel.send(panel);
 
       await updateGuildSection(guildId, 'dashboard', {
         channel: interaction.channel.id,

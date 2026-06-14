@@ -1,5 +1,4 @@
 // src/dashboard/updater.js
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getAllGuildConfigs, updateGuildSection, getGuildConfig } = require('../database/mongoManager');
 const { 
   mainPanel, 
@@ -15,78 +14,19 @@ const {
 // Mapa para almacenar el panel activo de cada guild
 const activePanels = new Map();
 
-// Cache de webhooks por canal para evitar crear muchos
-const webhookCache = new Map();
-const WEBHOOK_CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
-
-async function getOrCreateWebhook(channel) {
-  const cacheKey = `${channel.guild.id}_${channel.id}`;
-  const cached = webhookCache.get(cacheKey);
-  
-  if (cached && Date.now() - cached.timestamp < WEBHOOK_CACHE_DURATION) {
-    return cached.webhook;
-  }
-  
-  try {
-    const hooks = await channel.fetchWebhooks().catch(() => []);
-    let webhook = hooks.find(hook => hook.owner?.id === channel.client.user.id);
-    
-    if (!webhook) {
-      webhook = await channel.createWebhook({
-        name: 'Vesper Dashboard',
-        reason: 'Dashboard auto-created webhook for branded messages'
-      }).catch(() => null);
-    }
-    
-    if (webhook) {
-      webhookCache.set(cacheKey, {
-        webhook: webhook,
-        timestamp: Date.now()
-      });
-    }
-    
-    return webhook;
-  } catch (error) {
-    console.error(`[Webhook] Error getting/creating webhook:`, error.message);
-    return null;
-  }
-}
-
-function clearWebhookCache(guildId = null) {
-  if (guildId) {
-    for (const [key, value] of webhookCache.entries()) {
-      if (key.startsWith(guildId)) {
-        webhookCache.delete(key);
-      }
-    }
-  } else {
-    webhookCache.clear();
-  }
-  console.log(`🗑️ Webhook cache cleared${guildId ? ` for guild ${guildId}` : ''}`);
-}
-
 async function getPanelForGuild(guildId, panelType = 'main', mode = 'default') {
   console.log(`[DEBUG] getPanelForGuild: guild=${guildId}, type=${panelType}, mode=${mode}`);
   
   switch (panelType) {
-    case 'main':
-      return await mainPanel(guildId);
-    case 'general':
-      return await generalPanel(guildId);
-    case 'bot':
-      return await botPanel(guildId);
-    case 'branding':
-      return await brandingPanel(guildId);
-    case 'tiktok':
-      return await tiktokPanel(guildId, mode);
-    case 'twitch':
-      return await twitchPanel(guildId);
-    case 'youtube':
-      return await youtubePanel(guildId, mode);
-    case 'tests':
-      return await testPanel(guildId);
-    default:
-      return await mainPanel(guildId);
+    case 'main': return await mainPanel(guildId);
+    case 'general': return await generalPanel(guildId);
+    case 'bot': return await botPanel(guildId);
+    case 'branding': return await brandingPanel(guildId);
+    case 'tiktok': return await tiktokPanel(guildId, mode);
+    case 'twitch': return await twitchPanel(guildId);
+    case 'youtube': return await youtubePanel(guildId, mode);
+    case 'tests': return await testPanel(guildId);
+    default: return await mainPanel(guildId);
   }
 }
 
@@ -108,8 +48,6 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
           dashboard: config.dashboard,
           currentPanel: currentPanel
         });
-      } else {
-        console.log(`[DEBUG] Guild ${guildId} no tiene dashboard configurado`);
       }
     } else {
       const guildsConfig = await getAllGuildConfigs();
@@ -130,54 +68,28 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
       try {
         const channel = await client.channels.fetch(guild.dashboard.channel).catch(() => null);
         if (!channel) {
-          console.log(`[DEBUG] Canal ${guild.dashboard.channel} no encontrado, limpiando...`);
+          console.log(`[DEBUG] Canal no encontrado, limpiando...`);
           await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
           continue;
         }
 
-        // Obtener el panel (formato type 17)
-        const panel = await getPanelForGuild(guild.guildId, guild.currentPanel.type, guild.currentPanel.mode);
-        
-        // Obtener branding para el webhook
-        const config = await getGuildConfig(guild.guildId);
-        const branding = config.branding || {};
-        
-        // Intentar usar webhook para editar (permite type 17)
-        const webhook = await getOrCreateWebhook(channel);
-        
-        if (webhook) {
-          // Usar webhook para editar el mensaje
-          const webhookOptions = {
-            ...panel,
-            username: branding.name || client.user.username,
-            avatarURL: branding.avatar || client.user.displayAvatarURL()
-          };
-          
-          // webhook.editMessage permite actualizar mensajes existentes
-          await webhook.editMessage(guild.dashboard.message, webhookOptions);
-          console.log(`[DEBUG] ✅ Dashboard actualizado con webhook para guild ${guild.guildId}`);
-          updated++;
-        } else {
-          // Fallback: intentar editar mensaje normal (puede fallar con type 17)
-          console.log(`[DEBUG] No se pudo obtener webhook, intentando edición normal...`);
-          const message = await channel.messages.fetch(guild.dashboard.message).catch(() => null);
-          if (message) {
-            await message.edit(panel);
-            updated++;
-          } else {
-            throw new Error('Message not found');
-          }
+        const message = await channel.messages.fetch(guild.dashboard.message).catch(() => null);
+        if (!message) {
+          console.log(`[DEBUG] Mensaje no encontrado, limpiando...`);
+          await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
+          cleaned++;
+          continue;
         }
+
+        const panel = await getPanelForGuild(guild.guildId, guild.currentPanel.type, guild.currentPanel.mode);
+        await message.edit(panel);
+        console.log(`[DEBUG] ✅ Dashboard actualizado para guild ${guild.guildId}`);
+        updated++;
       } catch (err) {
         console.error(`[DEBUG] Error actualizando guild ${guild.guildId}:`, err.message);
         failed++;
-        // Si el error es por formato inválido, limpiar el dashboard
-        if (err.code === 50035 || err.message?.includes('type must be one of')) {
-          console.log(`[DEBUG] Error de formato, limpiando dashboard...`);
-          await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
-          cleaned++;
-        } else if (err.code === 10008 || err.code === 10003) {
+        if (err.code === 10008 || err.code === 10003 || err.code === 50035) {
           await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
         }
@@ -199,15 +111,10 @@ async function setActivePanel(guildId, panelType, mode = 'default') {
 }
 
 async function getActivePanel(guildId) {
-  if (activePanels.has(guildId)) {
-    return activePanels.get(guildId);
-  }
+  if (activePanels.has(guildId)) return activePanels.get(guildId);
   const config = await getGuildConfig(guildId);
   if (config?.dashboard?.currentPanel) {
-    const panelData = { 
-      type: config.dashboard.currentPanel, 
-      mode: config.dashboard.currentMode || 'default' 
-    };
+    const panelData = { type: config.dashboard.currentPanel, mode: config.dashboard.currentMode || 'default' };
     activePanels.set(guildId, panelData);
     return panelData;
   }
@@ -218,22 +125,17 @@ async function refreshPanelAfterChange(client, guildId, changedSection) {
   const activePanel = await getActivePanel(guildId);
   console.log(`[DEBUG] refreshPanelAfterChange: guild=${guildId}, changedSection=${changedSection}, activePanel=${activePanel.type}`);
   
-  if ((changedSection === 'tiktok' && activePanel.type === 'tiktok') ||
-      (changedSection === 'twitch' && activePanel.type === 'twitch') ||
-      (changedSection === 'youtube' && activePanel.type === 'youtube') ||
-      (changedSection === 'branding' && activePanel.type === 'branding') ||
-      (changedSection === 'general' && (activePanel.type === 'general' || activePanel.type === 'bot'))) {
+  const shouldRefresh = (
+    (changedSection === 'tiktok' && activePanel.type === 'tiktok') ||
+    (changedSection === 'twitch' && activePanel.type === 'twitch') ||
+    (changedSection === 'youtube' && activePanel.type === 'youtube') ||
+    (changedSection === 'branding' && activePanel.type === 'branding') ||
+    (changedSection === 'general' && (activePanel.type === 'general' || activePanel.type === 'bot'))
+  );
+  
+  if (shouldRefresh) {
     await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
-  } else {
-    console.log(`[DEBUG] No se actualiza porque el panel activo (${activePanel.type}) no coincide con ${changedSection}`);
   }
 }
 
-module.exports = { 
-  updateDashboard, 
-  setActivePanel, 
-  getActivePanel, 
-  refreshPanelAfterChange,
-  clearWebhookCache,  // Exportar por si se necesita
-  getOrCreateWebhook  // Exportar para uso externo
-};
+module.exports = { updateDashboard, setActivePanel, getActivePanel, refreshPanelAfterChange };
