@@ -31,6 +31,8 @@ module.exports = {
 
       // Crear nuevo dashboard usando mainPanel
       const panel = await mainPanel(guildId);
+      
+      // Enviar el mensaje con el panel
       const message = await interaction.channel.send(panel);
 
       // Guardar en base de datos
