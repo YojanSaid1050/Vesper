@@ -1,38 +1,6 @@
-// src/handlers/selects.js
 const { updateGuildSection, getGuildConfig } = require('../database/mongoManager');
 const { generalPanel, botPanel, tiktokPanel, twitchPanel, youtubePanel } = require('../dashboard/panels');
 const { updateDashboard, getActivePanel } = require('../dashboard/updater');
-
-// Función para actualizar el dashboard usando webhook
-async function updateDashboardWithWebhook(client, guildId, channel, messageId, panel) {
-  try {
-    const hooks = await channel.fetchWebhooks().catch(() => []);
-    let webhook = hooks.find(hook => hook.owner?.id === client.user.id);
-    
-    if (!webhook) {
-      webhook = await channel.createWebhook({
-        name: 'Vesper Dashboard',
-        reason: 'Dashboard update webhook'
-      }).catch(() => null);
-    }
-    
-    if (webhook) {
-      const config = await getGuildConfig(guildId);
-      const branding = config.branding || {};
-      
-      await webhook.editMessage(messageId, {
-        ...panel,
-        username: branding.name || client.user.username,
-        avatarURL: branding.avatar || client.user.displayAvatarURL()
-      });
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error('Error updating dashboard with webhook:', error);
-    return false;
-  }
-}
 
 async function getPanelMode(guildId, platform) {
   const config = await getGuildConfig(guildId);
@@ -73,21 +41,7 @@ async function handleSelect(interaction, client) {
         break;
     }
     
-    // Obtener configuración del dashboard
-    const config = await getGuildConfig(guildId);
-    
-    if (config.dashboard?.channel && config.dashboard?.message) {
-      const channel = await client.channels.fetch(config.dashboard.channel).catch(() => null);
-      if (channel) {
-        // Actualizar usando webhook
-        await updateDashboardWithWebhook(client, guildId, channel, config.dashboard.message, updatedPanel);
-      } else {
-        // Fallback a editReply
-        await interaction.editReply(updatedPanel);
-      }
-    } else {
-      await interaction.editReply(updatedPanel);
-    }
+    await interaction.editReply(updatedPanel);
     
     const currentPanel = await getActivePanel(guildId);
     await updateDashboard(client, guildId, currentPanel.type, currentPanel.mode);

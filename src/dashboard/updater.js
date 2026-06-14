@@ -1,6 +1,5 @@
 // src/dashboard/updater.js
 const { getAllGuildConfigs, updateGuildSection, getGuildConfig } = require('../database/mongoManager');
-const { sendBrandedMessage } = require('../utils/webhookSender');
 const { 
   mainPanel, 
   generalPanel, 
@@ -58,6 +57,8 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
           dashboard: config.dashboard,
           currentPanel: currentPanel
         });
+      } else {
+        console.log(`[DEBUG] Guild ${guildId} no tiene dashboard configurado`);
       }
     } else {
       const guildsConfig = await getAllGuildConfigs();
@@ -78,7 +79,7 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
       try {
         const channel = await client.channels.fetch(guild.dashboard.channel).catch(() => null);
         if (!channel) {
-          console.log(`[DEBUG] Canal no encontrado, limpiando...`);
+          console.log(`[DEBUG] Canal ${guild.dashboard.channel} no encontrado, limpiando...`);
           await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
           continue;
@@ -86,53 +87,18 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
 
         const message = await channel.messages.fetch(guild.dashboard.message).catch(() => null);
         if (!message) {
-          console.log(`[DEBUG] Mensaje no encontrado, limpiando...`);
+          console.log(`[DEBUG] Mensaje ${guild.dashboard.message} no encontrado, limpiando...`);
           await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
           continue;
         }
 
-        // Obtener el panel
         const panel = await getPanelForGuild(guild.guildId, guild.currentPanel.type, guild.currentPanel.mode);
         
-        // Obtener branding para el webhook
-        const config = await getGuildConfig(guild.guildId);
-        const branding = config.branding || {};
-        
-        // EDITAR usando sendBrandedMessage (webhook) en lugar de message.edit
-        // Para editar un mensaje existente con webhook, necesitamos el webhook
-        const hooks = await channel.fetchWebhooks().catch(() => []);
-        let webhook = hooks.find(hook => hook.owner?.id === client.user.id);
-        
-        if (webhook) {
-          // Editar usando webhook
-          await webhook.editMessage(guild.dashboard.message, {
-            ...panel,
-            username: branding.name || client.user.username,
-            avatarURL: branding.avatar || client.user.displayAvatarURL()
-          });
-          console.log(`[DEBUG] ✅ Dashboard actualizado con webhook para guild ${guild.guildId}`);
-          updated++;
-        } else {
-          // Fallback: intentar crear un webhook nuevo
-          webhook = await channel.createWebhook({
-            name: 'Vesper Dashboard',
-            reason: 'Dashboard update webhook'
-          }).catch(() => null);
-          
-          if (webhook) {
-            await webhook.editMessage(guild.dashboard.message, {
-              ...panel,
-              username: branding.name || client.user.username,
-              avatarURL: branding.avatar || client.user.displayAvatarURL()
-            });
-            updated++;
-          } else {
-            // Último fallback: edición normal (puede fallar con type 17)
-            await message.edit(panel);
-            updated++;
-          }
-        }
+        // EDITAR EL MENSAJE DIRECTAMENTE (como funciona en sendroles)
+        await message.edit(panel);
+        console.log(`[DEBUG] ✅ Dashboard actualizado para guild ${guild.guildId}`);
+        updated++;
       } catch (err) {
         console.error(`[DEBUG] Error actualizando guild ${guild.guildId}:`, err.message);
         failed++;
@@ -183,6 +149,8 @@ async function refreshPanelAfterChange(client, guildId, changedSection) {
       (changedSection === 'branding' && activePanel.type === 'branding') ||
       (changedSection === 'general' && (activePanel.type === 'general' || activePanel.type === 'bot'))) {
     await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+  } else {
+    console.log(`[DEBUG] No se actualiza porque el panel activo (${activePanel.type}) no coincide con ${changedSection}`);
   }
 }
 

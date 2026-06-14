@@ -2,7 +2,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { updateGuildSection, getGuildConfig } = require('../../database/mongoManager');
 const { mainPanel } = require('../../dashboard/panels');
-const { sendBrandedMessage } = require('../../utils/webhookSender');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -17,7 +16,7 @@ module.exports = {
       const guildId = interaction.guild.id;
       const config = await getGuildConfig(guildId);
 
-      // Eliminar dashboard anterior
+      // Eliminar dashboard anterior si existe
       if (config.dashboard?.channel && config.dashboard?.message) {
         try {
           const oldChannel = await interaction.guild.channels.fetch(config.dashboard.channel);
@@ -33,8 +32,12 @@ module.exports = {
       // Obtener el panel (con formato type 17)
       const panelData = await mainPanel(guildId);
       
-      // ENVIAR COMO WEBHOOK (esto permite el formato type 17)
-      const message = await sendBrandedMessage(interaction.channel, panelData);
+      // ENVIAR COMO MENSAJE NORMAL DEL BOT (como en sendroles)
+      // flags: 32768 = mensaje visible para todos (no efímero)
+      const message = await interaction.channel.send({
+        ...panelData,
+        flags: 32768
+      });
 
       await updateGuildSection(guildId, 'dashboard', {
         channel: interaction.channel.id,
