@@ -14,9 +14,8 @@ module.exports = {
     
     try {
       const guildId = interaction.guild.id;
-      
-      // Eliminar dashboard anterior si existe
       const config = await getGuildConfig(guildId);
+
       if (config.dashboard?.channel && config.dashboard?.message) {
         try {
           const oldChannel = await interaction.guild.channels.fetch(config.dashboard.channel);
@@ -29,13 +28,9 @@ module.exports = {
         }
       }
 
-      // Crear nuevo dashboard usando mainPanel
       const panel = await mainPanel(guildId);
-      
-      // Enviar el mensaje con el panel
       const message = await interaction.channel.send(panel);
 
-      // Guardar en base de datos
       await updateGuildSection(guildId, 'dashboard', {
         channel: interaction.channel.id,
         message: message.id,
