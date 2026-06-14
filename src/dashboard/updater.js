@@ -1,3 +1,4 @@
+// src/dashboard/updater.js
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getAllGuildConfigs, updateGuildSection, getGuildConfig } = require('../database/mongoManager');
 const { 
@@ -13,6 +14,56 @@ const {
 
 // Mapa para almacenar el panel activo de cada guild
 const activePanels = new Map();
+
+// Cache de webhooks por canal para evitar crear muchos
+const webhookCache = new Map();
+const WEBHOOK_CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+
+async function getOrCreateWebhook(channel) {
+  const cacheKey = `${channel.guild.id}_${channel.id}`;
+  const cached = webhookCache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.timestamp < WEBHOOK_CACHE_DURATION) {
+    return cached.webhook;
+  }
+  
+  try {
+    const hooks = await channel.fetchWebhooks().catch(() => []);
+    let webhook = hooks.find(hook => hook.owner?.id === channel.client.user.id);
+    
+    if (!webhook) {
+      webhook = await channel.createWebhook({
+        name: 'Vesper Dashboard',
+        reason: 'Dashboard auto-created webhook for branded messages'
+      }).catch(() => null);
+    }
+    
+    if (webhook) {
+      webhookCache.set(cacheKey, {
+        webhook: webhook,
+        timestamp: Date.now()
+      });
+    }
+    
+    return webhook;
+  } catch (error) {
+    console.error(`[Webhook] Error getting/creating webhook:`, error.message);
+    return null;
+  }
+}
+
+function clearWebhookCache(guildId = null) {
+  if (guildId) {
+    for (const [key, value] of webhookCache.entries()) {
+      if (key.startsWith(guildId)) {
+        webhookCache.delete(key);
+      }
+    }
+  } else {
+    webhookCache.clear();
+  }
+  console.log(`🗑️ Webhook cache cleared${guildId ? ` for guild ${guildId}` : ''}`);
+}
 
 async function getPanelForGuild(guildId, panelType = 'main', mode = 'default') {
   console.log(`[DEBUG] getPanelForGuild: guild=${guildId}, type=${panelType}, mode=${mode}`);
@@ -85,22 +136,48 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
           continue;
         }
 
-        const message = await channel.messages.fetch(guild.dashboard.message).catch(() => null);
-        if (!message) {
-          console.log(`[DEBUG] Mensaje ${guild.dashboard.message} no encontrado, limpiando...`);
-          await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
-          cleaned++;
-          continue;
-        }
-
+        // Obtener el panel (formato type 17)
         const panel = await getPanelForGuild(guild.guildId, guild.currentPanel.type, guild.currentPanel.mode);
-        await message.edit(panel);
-        console.log(`[DEBUG] ✅ Dashboard actualizado para guild ${guild.guildId}`);
-        updated++;
+        
+        // Obtener branding para el webhook
+        const config = await getGuildConfig(guild.guildId);
+        const branding = config.branding || {};
+        
+        // Intentar usar webhook para editar (permite type 17)
+        const webhook = await getOrCreateWebhook(channel);
+        
+        if (webhook) {
+          // Usar webhook para editar el mensaje
+          const webhookOptions = {
+            ...panel,
+            username: branding.name || client.user.username,
+            avatarURL: branding.avatar || client.user.displayAvatarURL()
+          };
+          
+          // webhook.editMessage permite actualizar mensajes existentes
+          await webhook.editMessage(guild.dashboard.message, webhookOptions);
+          console.log(`[DEBUG] ✅ Dashboard actualizado con webhook para guild ${guild.guildId}`);
+          updated++;
+        } else {
+          // Fallback: intentar editar mensaje normal (puede fallar con type 17)
+          console.log(`[DEBUG] No se pudo obtener webhook, intentando edición normal...`);
+          const message = await channel.messages.fetch(guild.dashboard.message).catch(() => null);
+          if (message) {
+            await message.edit(panel);
+            updated++;
+          } else {
+            throw new Error('Message not found');
+          }
+        }
       } catch (err) {
         console.error(`[DEBUG] Error actualizando guild ${guild.guildId}:`, err.message);
         failed++;
-        if (err.code === 10008 || err.code === 10003) {
+        // Si el error es por formato inválido, limpiar el dashboard
+        if (err.code === 50035 || err.message?.includes('type must be one of')) {
+          console.log(`[DEBUG] Error de formato, limpiando dashboard...`);
+          await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
+          cleaned++;
+        } else if (err.code === 10008 || err.code === 10003) {
           await updateGuildSection(guild.guildId, 'dashboard', { channel: null, message: null });
           cleaned++;
         }
@@ -152,4 +229,11 @@ async function refreshPanelAfterChange(client, guildId, changedSection) {
   }
 }
 
-module.exports = { updateDashboard, setActivePanel, getActivePanel, refreshPanelAfterChange };
+module.exports = { 
+  updateDashboard, 
+  setActivePanel, 
+  getActivePanel, 
+  refreshPanelAfterChange,
+  clearWebhookCache,  // Exportar por si se necesita
+  getOrCreateWebhook  // Exportar para uso externo
+};

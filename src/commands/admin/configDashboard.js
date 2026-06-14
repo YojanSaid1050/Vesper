@@ -1,7 +1,8 @@
 // src/commands/admin/configDashboard.js
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { updateGuildSection, getGuildConfig } = require('../../database/mongoManager');
 const { mainPanel } = require('../../dashboard/panels');
+const { getOrCreateWebhook, clearWebhookCache } = require('../../dashboard/updater');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -16,7 +17,7 @@ module.exports = {
       const guildId = interaction.guild.id;
       const config = await getGuildConfig(guildId);
 
-      // Eliminar dashboard anterior si existe
+      // Eliminar dashboard anterior
       if (config.dashboard?.channel && config.dashboard?.message) {
         try {
           const oldChannel = await interaction.guild.channels.fetch(config.dashboard.channel);
@@ -29,14 +30,31 @@ module.exports = {
         }
       }
 
-      // Obtener el panel con formato type 17
+      // Limpiar caché de webhook para este canal
+      clearWebhookCache(guildId);
+
+      // Obtener el panel (con formato type 17)
       const panelData = await mainPanel(guildId);
       
-      // Método FORZADO para enviar mensaje con type 17
-      // Usamos la API REST directamente para evitar validaciones de discord.js
-      const message = await sendRawComponentMessage(interaction.channel, panelData);
+      // Obtener o crear webhook
+      const webhook = await getOrCreateWebhook(interaction.channel);
+      
+      if (!webhook) {
+        throw new Error('No se pudo crear/obtener el webhook');
+      }
 
-      // Guardar en base de datos
+      // Obtener branding
+      const branding = config.branding || {};
+      
+      // Enviar el mensaje usando el webhook (esto permite type 17)
+      const webhookOptions = {
+        ...panelData,
+        username: branding.name || interaction.client.user.username,
+        avatarURL: branding.avatar || interaction.client.user.displayAvatarURL()
+      };
+      
+      const message = await webhook.send(webhookOptions);
+
       await updateGuildSection(guildId, 'dashboard', {
         channel: interaction.channel.id,
         message: message.id,
@@ -49,59 +67,7 @@ module.exports = {
       
     } catch (error) {
       console.error('Error en config-dashboard:', error);
-      
-      // Mensaje de error más descriptivo
-      let errorMessage = `❌ Error: ${error.message}`;
-      if (error.message.includes('type must be one of')) {
-        errorMessage += '\n\n⚠️ **Nota:** El formato de mensaje que estás usando (type 17) ya no es compatible con la versión actual de Discord.\n';
-        errorMessage += 'Se recomienda actualizar los paneles al formato estándar usando EmbedBuilder.';
-      }
-      
-      await interaction.editReply({ content: errorMessage });
+      await interaction.editReply({ content: `❌ Error: ${error.message}` });
     }
   }
 };
-
-/**
- * Función para enviar un mensaje con formato raw (type 17)
- * Usa la API REST directamente para evitar las validaciones de discord.js
- */
-async function sendRawComponentMessage(channel, panelData) {
-  const { token } = channel.client;
-  
-  // Construir el payload exactamente como lo espera la API de Discord
-  const payload = {
-    ...panelData,
-    // Asegurar que el mensaje no sea efímero si no se especifica
-    flags: panelData.flags || 0
-  };
-  
-  // Si panelData ya tiene la estructura completa, la usamos directamente
-  // La API de Discord AÚN acepta type 17 en algunos endpoints (por ahora)
-  try {
-    // Intentar método normal primero
-    return await channel.send(panelData);
-  } catch (error) {
-    if (error.code === 50035) { // Invalid Form Body
-      console.warn('⚠️ El formato type 17 falló en el método normal, intentando vía REST...');
-      
-      // Método alternativo: Enviar como mensaje normal pero con raw payload
-      const response = await channel.client.rest.post(
-        `/channels/${channel.id}/messages`,
-        {
-          body: payload,
-          auth: false
-        }
-      );
-      
-      // Devolver un objeto similar a Message
-      return {
-        id: response.id,
-        delete: async () => {
-          await channel.client.rest.delete(`/channels/${channel.id}/messages/${response.id}`);
-        }
-      };
-    }
-    throw error;
-  }
-}
