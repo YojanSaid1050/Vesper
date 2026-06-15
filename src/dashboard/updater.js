@@ -117,34 +117,27 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
 }
 
 // ==================================================
-// FUNCIÓN ESPECÍFICA PARA ACTUALIZAR EL PANEL DE BRANDING
+// FUNCIÓN PARA ACTUALIZAR EL DASHBOARD DIRECTAMENTE
 // ==================================================
-async function updateBrandingPanel(client, guildId) {
+async function updateDashboardDirectly(client, guildId) {
   try {
     const config = await getGuildConfig(guildId);
-    if (!config.dashboard?.channel || !config.dashboard?.message) {
-      console.log(`[Branding] No hay dashboard para guild ${guildId}`);
-      return false;
-    }
+    if (!config.dashboard?.channel || !config.dashboard?.message) return false;
     
     const channel = await client.channels.fetch(config.dashboard.channel);
-    if (!channel) {
-      console.log(`[Branding] Canal no encontrado para guild ${guildId}`);
-      return false;
-    }
+    if (!channel) return false;
     
     const message = await channel.messages.fetch(config.dashboard.message);
-    if (!message) {
-      console.log(`[Branding] Mensaje no encontrado para guild ${guildId}`);
-      return false;
-    }
+    if (!message) return false;
     
-    const panel = await brandingPanel(guildId);
+    const activePanel = await getActivePanel(guildId);
+    const panel = await getPanelForGuild(guildId, activePanel.type, activePanel.mode);
+    
     await message.edit(panel);
-    console.log(`[Branding] Panel actualizado para guild ${guildId}`);
+    console.log(`[Dashboard] Actualizado directamente para guild ${guildId}, panel: ${activePanel.type}`);
     return true;
   } catch (error) {
-    console.error(`[Branding] Error actualizando panel:`, error);
+    console.error(`[Dashboard] Error actualizando directamente:`, error);
     return false;
   }
 }
@@ -192,5 +185,5 @@ module.exports = {
   getActivePanel, 
   refreshPanelAfterChange,
   getPanelForGuild,
-  updateBrandingPanel  // NUEVA función exportada
+  updateDashboardDirectly
 };

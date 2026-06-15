@@ -1,7 +1,7 @@
 // src/handlers/modals.js
 const { updateGuildSection, getGuildConfig, updateGuildConfig } = require('../database/mongoManager');
 const { brandingPanel, tiktokPanel, twitchPanel, youtubePanel } = require('../dashboard/panels');
-const { updateDashboard, getActivePanel, updateBrandingPanel } = require('../dashboard/updater'); // ← AÑADIR updateBrandingPanel
+const { updateDashboard, getActivePanel } = require('../dashboard/updater');
 const { checkUser } = require('../platforms/tiktok/checks');
 const { verifyStreamer } = require('../platforms/twitch/utils');
 const { verifyChannel } = require('../platforms/youtube/utils');
@@ -14,28 +14,40 @@ const tiktokLiveCache = new CacheManager('./data/tiktok');
 const tiktokVideosCache = new CacheManager('./data/tiktok');
 const youtubeCache = new CacheManager('./data/youtube');
 
-// Función para actualizar el dashboard directamente si es necesario
-async function refreshDashboardIfNeeded(client, guildId, panelType, updatedPanel = null) {
-  const config = await getGuildConfig(guildId);
-  if (!config.dashboard?.channel || !config.dashboard?.message) return;
-  
+// ==================================================
+// FUNCIÓN PARA ACTUALIZAR EL DASHBOARD DIRECTAMENTE (como safeUpdate pero para modales)
+// ==================================================
+async function updateDashboardDirectly(client, guildId) {
   try {
+    const config = await getGuildConfig(guildId);
+    if (!config.dashboard?.channel || !config.dashboard?.message) return false;
+    
     const channel = await client.channels.fetch(config.dashboard.channel);
-    if (!channel) return;
+    if (!channel) return false;
     
     const message = await channel.messages.fetch(config.dashboard.message);
-    if (!message) return;
+    if (!message) return false;
     
-    if (updatedPanel) {
-      await message.edit(updatedPanel);
-    } else {
-      const { getPanelForGuild } = require('../dashboard/updater');
-      const panel = await getPanelForGuild(guildId, panelType);
-      await message.edit(panel);
-    }
-  } catch (err) {
-    console.error('Error refreshing dashboard:', err);
+    // Obtener el panel activo actual
+    const activePanel = await getActivePanel(guildId);
+    const { getPanelForGuild } = require('../dashboard/updater');
+    const panel = await getPanelForGuild(guildId, activePanel.type, activePanel.mode);
+    
+    await message.edit(panel);
+    console.log(`[Dashboard] Actualizado directamente para guild ${guildId}, panel: ${activePanel.type}`);
+    return true;
+  } catch (error) {
+    console.error(`[Dashboard] Error actualizando directamente:`, error);
+    return false;
   }
+}
+
+// Función para actualizar el dashboard después de un modal
+async function refreshAfterModal(client, guildId) {
+  // Esperar un momento para que la BD se actualice
+  setTimeout(async () => {
+    await updateDashboardDirectly(client, guildId);
+  }, 500);
 }
 
 // Función para responder al modal y procesar en segundo plano
@@ -61,8 +73,7 @@ async function processModalAsync(interaction, client, callback) {
       await interaction.followUp(followUp);
       
       // Actualizar dashboard después de la operación
-      const activePanel = await getActivePanel(interaction.guild.id);
-      await refreshDashboardIfNeeded(client, interaction.guild.id, activePanel.type);
+      await updateDashboardDirectly(client, interaction.guild.id);
       
     } catch (error) {
       console.error('Error en procesamiento asíncrono:', error);
@@ -178,8 +189,8 @@ async function handleModal(interaction, client) {
       flags: 64 
     });
     
-    // ACTUALIZAR DASHBOARD DE BRANDING DIRECTAMENTE
-    await updateBrandingPanel(client, guildId);
+    // Actualizar dashboard directamente después del cambio
+    await updateDashboardDirectly(client, guildId);
     return;
   }
 
@@ -212,8 +223,8 @@ async function handleModal(interaction, client) {
       flags: 64 
     });
     
-    // ACTUALIZAR DASHBOARD DE BRANDING DIRECTAMENTE
-    await updateBrandingPanel(client, guildId);
+    // Actualizar dashboard directamente después del cambio
+    await updateDashboardDirectly(client, guildId);
     return;
   }
 
