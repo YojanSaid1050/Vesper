@@ -1,3 +1,4 @@
+// src/handlers/modals.js
 const { updateGuildSection, getGuildConfig, updateGuildConfig } = require('../database/mongoManager');
 const { brandingPanel, tiktokPanel, twitchPanel, youtubePanel } = require('../dashboard/panels');
 const { updateDashboard, getActivePanel } = require('../dashboard/updater');
@@ -12,6 +13,30 @@ const twitchCache = new CacheManager('./data/twitch');
 const tiktokLiveCache = new CacheManager('./data/tiktok');
 const tiktokVideosCache = new CacheManager('./data/tiktok');
 const youtubeCache = new CacheManager('./data/youtube');
+
+// Función para actualizar el dashboard directamente si es necesario
+async function refreshDashboardIfNeeded(client, guildId, panelType, updatedPanel = null) {
+  const config = await getGuildConfig(guildId);
+  if (!config.dashboard?.channel || !config.dashboard?.message) return;
+  
+  try {
+    const channel = await client.channels.fetch(config.dashboard.channel);
+    if (!channel) return;
+    
+    const message = await channel.messages.fetch(config.dashboard.message);
+    if (!message) return;
+    
+    if (updatedPanel) {
+      await message.edit(updatedPanel);
+    } else {
+      const { getPanelForGuild } = require('../dashboard/updater');
+      const panel = await getPanelForGuild(guildId, panelType);
+      await message.edit(panel);
+    }
+  } catch (err) {
+    console.error('Error refreshing dashboard:', err);
+  }
+}
 
 // Función para responder al modal y procesar en segundo plano
 async function processModalAsync(interaction, client, callback) {
@@ -35,8 +60,9 @@ async function processModalAsync(interaction, client, callback) {
       
       await interaction.followUp(followUp);
       
+      // Actualizar dashboard después de la operación
       const activePanel = await getActivePanel(interaction.guild.id);
-      await updateDashboard(client, interaction.guild.id, activePanel.type, activePanel.mode);
+      await refreshDashboardIfNeeded(client, interaction.guild.id, activePanel.type);
       
     } catch (error) {
       console.error('Error en procesamiento asíncrono:', error);
@@ -68,10 +94,8 @@ async function isValidImageUrl(url) {
 // Función para normalizar arrays según la plataforma
 function normalizeUserArray(users, platform = 'general') {
   if (platform === 'youtube') {
-    // Los IDs de YouTube son case-sensitive, mantener original
     return [...new Set(users)];
   }
-  // Para TikTok y Twitch, los usernames no son case-sensitive
   return [...new Set(users.map(u => u.toLowerCase()))];
 }
 
@@ -140,7 +164,9 @@ async function handleModal(interaction, client) {
 
   const guildId = interaction.guild.id;
   
-  // Branding Name (solo para webhooks, NO cambia el bot)
+  // ==================================================
+  // BRANDING NAME
+  // ==================================================
   if (interaction.customId === 'branding_name_modal') {
     const name = interaction.fields.getTextInputValue('server_name')?.trim();
     if (name) {
@@ -151,12 +177,19 @@ async function handleModal(interaction, client) {
       content: `✅ Nombre de webhooks actualizado a: **${name}**\n\n> ⚠️ **Nota:** Esto NO cambia el nombre del bot principal.`, 
       flags: 64 
     });
+    
     const activePanel = await getActivePanel(guildId);
-    await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+    if (activePanel.type === 'branding') {
+      await refreshDashboardIfNeeded(client, guildId, 'branding', await brandingPanel(guildId));
+    } else {
+      await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+    }
     return;
   }
 
-  // Branding Avatar (solo para webhooks, NO cambia el bot)
+  // ==================================================
+  // BRANDING AVATAR
+  // ==================================================
   if (interaction.customId === 'branding_avatar_modal') {
     const avatar = interaction.fields.getTextInputValue('avatar_url')?.trim();
     
@@ -184,11 +217,17 @@ async function handleModal(interaction, client) {
     });
     
     const activePanel = await getActivePanel(guildId);
-    await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+    if (activePanel.type === 'branding') {
+      await refreshDashboardIfNeeded(client, guildId, 'branding', await brandingPanel(guildId));
+    } else {
+      await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
+    }
     return;
   }
 
-  // TikTok Add
+  // ==================================================
+  // TIKTOK ADD
+  // ==================================================
   if (interaction.customId === 'tiktok_add_modal') {
     const username = interaction.fields.getTextInputValue('username').replace('@', '').trim().toLowerCase();
     
@@ -232,7 +271,9 @@ async function handleModal(interaction, client) {
     return;
   }
 
-  // TikTok Remove
+  // ==================================================
+  // TIKTOK REMOVE
+  // ==================================================
   if (interaction.customId === 'tiktok_remove_modal') {
     const username = interaction.fields.getTextInputValue('username').replace('@', '').trim().toLowerCase();
     
@@ -262,7 +303,9 @@ async function handleModal(interaction, client) {
     return;
   }
 
-  // Twitch Add
+  // ==================================================
+  // TWITCH ADD
+  // ==================================================
   if (interaction.customId === 'twitch_add_modal') {
     const username = interaction.fields.getTextInputValue('username').replace('@', '').trim().toLowerCase();
     
@@ -306,7 +349,9 @@ async function handleModal(interaction, client) {
     return;
   }
 
-  // Twitch Remove
+  // ==================================================
+  // TWITCH REMOVE
+  // ==================================================
   if (interaction.customId === 'twitch_remove_modal') {
     const username = interaction.fields.getTextInputValue('username').replace('@', '').trim().toLowerCase();
     
@@ -335,7 +380,9 @@ async function handleModal(interaction, client) {
     return;
   }
 
-  // YouTube Add - CORREGIDO
+  // ==================================================
+  // YOUTUBE ADD
+  // ==================================================
   if (interaction.customId === 'youtube_add_modal') {
     const input = interaction.fields.getTextInputValue('channel_input').trim();
     
@@ -353,10 +400,8 @@ async function handleModal(interaction, client) {
       
       let config = await getGuildConfig(guildId);
       if (!config.youtube) config.youtube = { users: [] };
-      // YouTube: NO convertir a minúsculas, mantener ID original case-sensitive
       config.youtube.users = normalizeUserArray(config.youtube.users, 'youtube');
       
-      // Comparación case-sensitive para YouTube IDs
       const channelId = channel.id;
       const exists = config.youtube.users.some(id => id === channelId);
       
@@ -388,52 +433,54 @@ async function handleModal(interaction, client) {
     return;
   }
 
-  // YouTube Remove
-if (interaction.customId === 'youtube_remove_modal') {
-  const input = interaction.fields.getTextInputValue('channel_input').trim();
-  
-  if (!input) {
-    await interaction.reply({ content: '❌ Nombre de canal inválido.', flags: 64 });
-    return;
-  }
-  
-  await processModalAsync(interaction, client, async () => {
-    let config = await getGuildConfig(guildId);
-    if (!config.youtube) config.youtube = { users: [] };
-    config.youtube.users = normalizeUserArray(config.youtube.users, 'youtube');
+  // ==================================================
+  // YOUTUBE REMOVE
+  // ==================================================
+  if (interaction.customId === 'youtube_remove_modal') {
+    const input = interaction.fields.getTextInputValue('channel_input').trim();
     
-    let foundChannelId = null;
-    let foundChannelName = null;
+    if (!input) {
+      await interaction.reply({ content: '❌ Nombre de canal inválido.', flags: 64 });
+      return;
+    }
     
-    for (const channelId of config.youtube.users) {
-      const info = await verifyChannel(channelId);
-      if (info.exists) {
-        const inputLower = input.toLowerCase();
-        const handleLower = info.handle?.toLowerCase();
-        const nameLower = info.name?.toLowerCase();
-        
-        if (channelId === input || handleLower === inputLower || nameLower === inputLower) {
-          foundChannelId = channelId;
-          foundChannelName = info.name;
-          break;
+    await processModalAsync(interaction, client, async () => {
+      let config = await getGuildConfig(guildId);
+      if (!config.youtube) config.youtube = { users: [] };
+      config.youtube.users = normalizeUserArray(config.youtube.users, 'youtube');
+      
+      let foundChannelId = null;
+      let foundChannelName = null;
+      
+      for (const channelId of config.youtube.users) {
+        const info = await verifyChannel(channelId);
+        if (info.exists) {
+          const inputLower = input.toLowerCase();
+          const handleLower = info.handle?.toLowerCase();
+          const nameLower = info.name?.toLowerCase();
+          
+          if (channelId === input || handleLower === inputLower || nameLower === inputLower) {
+            foundChannelId = channelId;
+            foundChannelName = info.name;
+            break;
+          }
         }
       }
-    }
-    
-    if (!foundChannelId) {
-      return { message: `❌ No se encontró el canal **${input}** en la lista de monitoreo.\n\nUsa /youtube-list para ver los canales actuales.` };
-    }
-    
-    config.youtube.users = config.youtube.users.filter(u => u !== foundChannelId);
-    await updateGuildConfig(guildId, config);
-    
-    const { cleanYouTubeChannelCache } = require('../platforms/youtube/monitors');
-    cleanYouTubeChannelCache(guildId, foundChannelId);  // ✅ Solo borra la caché del canal eliminado
-    
-    return { message: `✅ **${foundChannelName || foundChannelId}** eliminado de la lista de monitoreo.\n\n📋 Canales restantes: ${config.youtube.users.length}` };
-  });
-  return;
-}
+      
+      if (!foundChannelId) {
+        return { message: `❌ No se encontró el canal **${input}** en la lista de monitoreo.\n\nUsa /youtube-list para ver los canales actuales.` };
+      }
+      
+      config.youtube.users = config.youtube.users.filter(u => u !== foundChannelId);
+      await updateGuildConfig(guildId, config);
+      
+      const { cleanYouTubeChannelCache } = require('../platforms/youtube/monitors');
+      cleanYouTubeChannelCache(guildId, foundChannelId);
+      
+      return { message: `✅ **${foundChannelName || foundChannelId}** eliminado de la lista de monitoreo.\n\n📋 Canales restantes: ${config.youtube.users.length}` };
+    });
+    return;
+  }
 }
 
 module.exports = { handleModal };

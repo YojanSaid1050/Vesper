@@ -132,7 +132,12 @@ async function handleButton(interaction, client) {
 
   if (customId === 'branding_reset') {
     await updateGuildSection(interaction.guild.id, 'branding', { name: null, avatar: null });
-    return safeUpdate(await brandingPanel(interaction.guild.id));
+    await safeUpdate(interaction, await brandingPanel(interaction.guild.id));
+    
+    // Actualizar dashboard en segundo plano
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
 
   // ==================================================
@@ -140,15 +145,27 @@ async function handleButton(interaction, client) {
   // ==================================================
   if (customId === 'general_clear_welcome') {
     await updateGuildSection(interaction.guild.id, 'general', { welcomeChannel: null });
-    return safeUpdate(await generalPanel(interaction.guild.id));
+    await safeUpdate(interaction, await generalPanel(interaction.guild.id));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
   if (customId === 'general_clear_goodbye') {
     await updateGuildSection(interaction.guild.id, 'general', { goodbyeChannel: null });
-    return safeUpdate(await generalPanel(interaction.guild.id));
+    await safeUpdate(interaction, await generalPanel(interaction.guild.id));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
   if (customId === 'general_clear_log') {
     await updateGuildSection(interaction.guild.id, 'general', { logChannel: null });
-    return safeUpdate(await generalPanel(interaction.guild.id));
+    await safeUpdate(interaction, await generalPanel(interaction.guild.id));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
 
   // ==================================================
@@ -156,11 +173,19 @@ async function handleButton(interaction, client) {
   // ==================================================
   if (customId === 'bot_clear_role') {
     await updateGuildSection(interaction.guild.id, 'general', { botRole: null });
-    return safeUpdate(await botPanel(interaction.guild.id));
+    await safeUpdate(interaction, await botPanel(interaction.guild.id));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
   if (customId === 'bot_clear_log_channel') {
     await updateGuildSection(interaction.guild.id, 'general', { botLogChannel: null });
-    return safeUpdate(await botPanel(interaction.guild.id));
+    await safeUpdate(interaction, await botPanel(interaction.guild.id));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
 
   // ==================================================
@@ -169,17 +194,29 @@ async function handleButton(interaction, client) {
   if (customId === 'tiktok_clear_live_channel') {
     await updateGuildSection(interaction.guild.id, 'tiktok', { liveChannel: null });
     const mode = await getPanelMode(interaction.guild.id, 'tiktok');
-    return safeUpdate(await tiktokPanel(interaction.guild.id, mode));
+    await safeUpdate(interaction, await tiktokPanel(interaction.guild.id, mode));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
   if (customId === 'tiktok_clear_video_channel') {
     await updateGuildSection(interaction.guild.id, 'tiktok', { videoChannel: null });
     const mode = await getPanelMode(interaction.guild.id, 'tiktok');
-    return safeUpdate(await tiktokPanel(interaction.guild.id, mode));
+    await safeUpdate(interaction, await tiktokPanel(interaction.guild.id, mode));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
   if (customId === 'tiktok_clear_ping_role') {
     await updateGuildSection(interaction.guild.id, 'tiktok', { pingRole: null });
     const mode = await getPanelMode(interaction.guild.id, 'tiktok');
-    return safeUpdate(await tiktokPanel(interaction.guild.id, mode));
+    await safeUpdate(interaction, await tiktokPanel(interaction.guild.id, mode));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
 
   // ==================================================
@@ -187,11 +224,19 @@ async function handleButton(interaction, client) {
   // ==================================================
   if (customId === 'twitch_clear_live_channel') {
     await updateGuildSection(interaction.guild.id, 'twitch', { liveChannel: null });
-    return safeUpdate(await twitchPanel(interaction.guild.id));
+    await safeUpdate(interaction, await twitchPanel(interaction.guild.id));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
   if (customId === 'twitch_clear_ping_role') {
     await updateGuildSection(interaction.guild.id, 'twitch', { pingRole: null });
-    return safeUpdate(await twitchPanel(interaction.guild.id));
+    await safeUpdate(interaction, await twitchPanel(interaction.guild.id));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
 
   // ==================================================
@@ -200,22 +245,38 @@ async function handleButton(interaction, client) {
   if (customId === 'youtube_clear_live_channel') {
     await updateGuildSection(interaction.guild.id, 'youtube', { liveChannel: null });
     const mode = await getPanelMode(interaction.guild.id, 'youtube');
-    return safeUpdate(await youtubePanel(interaction.guild.id, mode));
+    await safeUpdate(interaction, await youtubePanel(interaction.guild.id, mode));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
   if (customId === 'youtube_clear_video_channel') {
     await updateGuildSection(interaction.guild.id, 'youtube', { videoChannel: null });
     const mode = await getPanelMode(interaction.guild.id, 'youtube');
-    return safeUpdate(await youtubePanel(interaction.guild.id, mode));
+    await safeUpdate(interaction, await youtubePanel(interaction.guild.id, mode));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
   if (customId === 'youtube_clear_short_channel') {
     await updateGuildSection(interaction.guild.id, 'youtube', { shortChannel: null });
     const mode = await getPanelMode(interaction.guild.id, 'youtube');
-    return safeUpdate(await youtubePanel(interaction.guild.id, mode));
+    await safeUpdate(interaction, await youtubePanel(interaction.guild.id, mode));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
   if (customId === 'youtube_clear_ping_role') {
     await updateGuildSection(interaction.guild.id, 'youtube', { pingRole: null });
     const mode = await getPanelMode(interaction.guild.id, 'youtube');
-    return safeUpdate(await youtubePanel(interaction.guild.id, mode));
+    await safeUpdate(interaction, await youtubePanel(interaction.guild.id, mode));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
 
   // ==================================================
@@ -235,7 +296,11 @@ async function handleButton(interaction, client) {
     const newShow = !config.tiktok?.showUsers;
     const mode = newShow ? 'list' : 'default';
     await updateGuildSection(interaction.guild.id, 'tiktok', { showUsers: newShow });
-    return safeUpdate(await tiktokPanel(interaction.guild.id, mode));
+    await safeUpdate(interaction, await tiktokPanel(interaction.guild.id, mode));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
 
   if (customId === 'tiktok_clear_all_users') {
@@ -264,7 +329,11 @@ async function handleButton(interaction, client) {
   if (customId === 'twitch_list_users') {
     const config = await getGuildConfig(interaction.guild.id);
     await updateGuildSection(interaction.guild.id, 'twitch', { showUsers: !config.twitch?.showUsers });
-    return safeUpdate(await twitchPanel(interaction.guild.id));
+    await safeUpdate(interaction, await twitchPanel(interaction.guild.id));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
 
   if (customId === 'twitch_clear_all_users') {
@@ -295,7 +364,11 @@ async function handleButton(interaction, client) {
     const newShow = !config.youtube?.showUsers;
     const mode = newShow ? 'list' : 'default';
     await updateGuildSection(interaction.guild.id, 'youtube', { showUsers: newShow });
-    return safeUpdate(await youtubePanel(interaction.guild.id, mode));
+    await safeUpdate(interaction, await youtubePanel(interaction.guild.id, mode));
+    
+    const activePanel = await getActivePanel(interaction.guild.id);
+    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    return;
   }
 
   if (customId === 'youtube_clear_all_users') {
