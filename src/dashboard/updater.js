@@ -95,7 +95,6 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
 
         const panel = await getPanelForGuild(guild.guildId, guild.currentPanel.type, guild.currentPanel.mode);
         
-        // EDITAR EL MENSAJE DIRECTAMENTE (como funciona en sendroles)
         await message.edit(panel);
         console.log(`[DEBUG] ✅ Dashboard actualizado para guild ${guild.guildId}`);
         updated++;
@@ -114,6 +113,39 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
   } catch (error) {
     console.error('❌ Error en updateDashboard:', error);
     return { updated: 0, failed: 1, cleaned: 0 };
+  }
+}
+
+// ==================================================
+// FUNCIÓN ESPECÍFICA PARA ACTUALIZAR EL PANEL DE BRANDING
+// ==================================================
+async function updateBrandingPanel(client, guildId) {
+  try {
+    const config = await getGuildConfig(guildId);
+    if (!config.dashboard?.channel || !config.dashboard?.message) {
+      console.log(`[Branding] No hay dashboard para guild ${guildId}`);
+      return false;
+    }
+    
+    const channel = await client.channels.fetch(config.dashboard.channel);
+    if (!channel) {
+      console.log(`[Branding] Canal no encontrado para guild ${guildId}`);
+      return false;
+    }
+    
+    const message = await channel.messages.fetch(config.dashboard.message);
+    if (!message) {
+      console.log(`[Branding] Mensaje no encontrado para guild ${guildId}`);
+      return false;
+    }
+    
+    const panel = await brandingPanel(guildId);
+    await message.edit(panel);
+    console.log(`[Branding] Panel actualizado para guild ${guildId}`);
+    return true;
+  } catch (error) {
+    console.error(`[Branding] Error actualizando panel:`, error);
+    return false;
   }
 }
 
@@ -154,4 +186,11 @@ async function refreshPanelAfterChange(client, guildId, changedSection) {
   }
 }
 
-module.exports = { updateDashboard, setActivePanel, getActivePanel, refreshPanelAfterChange };
+module.exports = { 
+  updateDashboard, 
+  setActivePanel, 
+  getActivePanel, 
+  refreshPanelAfterChange,
+  getPanelForGuild,
+  updateBrandingPanel  // NUEVA función exportada
+};
