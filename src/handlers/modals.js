@@ -1,7 +1,7 @@
 // src/handlers/modals.js
 const { updateGuildSection, getGuildConfig, updateGuildConfig } = require('../database/mongoManager');
 const { brandingPanel, tiktokPanel, twitchPanel, youtubePanel } = require('../dashboard/panels');
-const { updateDashboard, getActivePanel } = require('../dashboard/updater');
+const { updateDashboard, getActivePanel, updateBrandingPanel } = require('../dashboard/updater'); // ← AÑADIR updateBrandingPanel
 const { checkUser } = require('../platforms/tiktok/checks');
 const { verifyStreamer } = require('../platforms/twitch/utils');
 const { verifyChannel } = require('../platforms/youtube/utils');
@@ -178,12 +178,8 @@ async function handleModal(interaction, client) {
       flags: 64 
     });
     
-    const activePanel = await getActivePanel(guildId);
-    if (activePanel.type === 'branding') {
-      await refreshDashboardIfNeeded(client, guildId, 'branding', await brandingPanel(guildId));
-    } else {
-      await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
-    }
+    // ACTUALIZAR DASHBOARD DE BRANDING DIRECTAMENTE
+    await updateBrandingPanel(client, guildId);
     return;
   }
 
@@ -216,12 +212,8 @@ async function handleModal(interaction, client) {
       flags: 64 
     });
     
-    const activePanel = await getActivePanel(guildId);
-    if (activePanel.type === 'branding') {
-      await refreshDashboardIfNeeded(client, guildId, 'branding', await brandingPanel(guildId));
-    } else {
-      await updateDashboard(client, guildId, activePanel.type, activePanel.mode);
-    }
+    // ACTUALIZAR DASHBOARD DE BRANDING DIRECTAMENTE
+    await updateBrandingPanel(client, guildId);
     return;
   }
 

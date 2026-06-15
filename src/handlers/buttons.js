@@ -1,7 +1,7 @@
 // src/handlers/buttons.js
 const { getGuildConfig, updateGuildSection, updateGuildConfig } = require('../database/mongoManager');
 const { mainPanel, generalPanel, botPanel, brandingPanel, tiktokPanel, twitchPanel, youtubePanel, testPanel } = require('../dashboard/panels');
-const { updateDashboard, setActivePanel, getActivePanel } = require('../dashboard/updater');
+const { updateDashboard, setActivePanel, getActivePanel, updateBrandingPanel } = require('../dashboard/updater'); // ← AÑADIR updateBrandingPanel
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { checkUser } = require('../platforms/tiktok/checks');
 const { verifyStreamer } = require('../platforms/twitch/utils');
@@ -134,9 +134,8 @@ async function handleButton(interaction, client) {
     await updateGuildSection(interaction.guild.id, 'branding', { name: null, avatar: null });
     await safeUpdate(interaction, await brandingPanel(interaction.guild.id));
     
-    // Actualizar dashboard en segundo plano
-    const activePanel = await getActivePanel(interaction.guild.id);
-    await updateDashboard(interaction.client, interaction.guild.id, activePanel.type, activePanel.mode);
+    // ACTUALIZAR DASHBOARD DE BRANDING DIRECTAMENTE
+    await updateBrandingPanel(client, interaction.guild.id);
     return;
   }
 
