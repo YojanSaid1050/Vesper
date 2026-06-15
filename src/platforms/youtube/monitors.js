@@ -1,7 +1,8 @@
+// src/platforms/youtube/monitors.js
 const { getAllGuildConfigs, getGuildConfig } = require('../../database/mongoManager');
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const CacheManager = require('../../core/CacheManager');
-const { checkLiveUsers, checkVideos, checkShorts } = require('./checks');
+const { checkLiveUsers, checkVideos, checkShorts, clearChannelCache } = require('./checks');
 const { liveEmbed, videoEmbed, shortEmbed } = require('./embeds');
 const { monitor } = require('../../utils/logger');
 
@@ -53,6 +54,65 @@ async function withRetry(fn, context, maxRetries = CONFIG.MAX_RETRIES) {
       await new Promise(resolve => setTimeout(resolve, CONFIG.RETRY_DELAY * (i + 1)));
     }
   }
+}
+
+// ==================================================
+// NUEVA FUNCIÓN: Limpiar caché de un canal específico en el almacenamiento persistente
+// ==================================================
+function cleanYouTubeChannelCache(guildId, channelId) {
+  // Limpiar liveStatus
+  const liveStatus = cache.load('liveStatus', {});
+  if (liveStatus[guildId] && liveStatus[guildId][channelId] !== undefined) {
+    delete liveStatus[guildId][channelId];
+    // Si el objeto del guild queda vacío, eliminarlo
+    if (Object.keys(liveStatus[guildId]).length === 0) {
+      delete liveStatus[guildId];
+    }
+    cache.save('liveStatus', liveStatus);
+    console.log(`[YouTube] Cache de liveStatus eliminado para canal ${channelId} en guild ${guildId}`);
+  }
+  
+  // Limpiar videos
+  const videos = cache.load('videos', {});
+  if (videos[guildId] && videos[guildId][channelId] !== undefined) {
+    delete videos[guildId][channelId];
+    if (Object.keys(videos[guildId]).length === 0) {
+      delete videos[guildId];
+    }
+    cache.save('videos', videos);
+    console.log(`[YouTube] Cache de videos eliminado para canal ${channelId} en guild ${guildId}`);
+  }
+  
+  // Limpiar shorts
+  const shorts = cache.load('shorts', {});
+  if (shorts[guildId] && shorts[guildId][channelId] !== undefined) {
+    delete shorts[guildId][channelId];
+    if (Object.keys(shorts[guildId]).length === 0) {
+      delete shorts[guildId];
+    }
+    cache.save('shorts', shorts);
+    console.log(`[YouTube] Cache de shorts eliminado para canal ${channelId} en guild ${guildId}`);
+  }
+  
+  // También limpiar la caché en memoria
+  clearChannelCache(channelId);
+}
+
+// Mantener la función original para compatibilidad (aunque ya no se debería usar)
+function clearGuildCache(guildId) {
+  const liveStatus = cache.load('liveStatus', {});
+  const videos = cache.load('videos', {});
+  const shorts = cache.load('shorts', {});
+  
+  delete liveStatus[guildId];
+  delete videos[guildId];
+  delete shorts[guildId];
+  
+  cache.save('liveStatus', liveStatus);
+  cache.save('videos', videos);
+  cache.save('shorts', shorts);
+  
+  monitor('YouTube', 'Cache Cleared', guildId, { action: 'Manual cache clear' });
 }
 
 async function monitorLives(client) {
@@ -111,6 +171,7 @@ async function processGuildLives(guildId, config, client, liveStatus) {
   const youtubeConfig = config.youtube || {};
   const users = youtubeConfig.users || [];
   const liveChannelId = youtubeConfig.liveChannel;
+  const pingRole = youtubeConfig.pingRole || null;
 
   if (users.length === 0 || !liveChannelId) return null;
   
@@ -158,6 +219,8 @@ async function processGuildLives(guildId, config, client, liveStatus) {
 
     let newLives = 0;
     let hasChanges = false;
+    
+    const pingText = pingRole ? `<@&${pingRole}>\n\n` : '';
 
     for (const user of results) {
       if (!user?.success) {
@@ -177,9 +240,15 @@ async function processGuildLives(guildId, config, client, liveStatus) {
         
         try {
           const embed = liveEmbed({
-            channelName: user.channelName, handle: user.handle, title: user.title,
-            viewers: user.viewers, thumbnail: user.thumbnail, liveUrl: user.liveUrl,
-            startedAt: user.startedAt, likes: user.likes
+            channelName: user.channelName,
+            handle: user.handle,
+            title: user.title,
+            viewers: user.viewers,
+            thumbnail: user.thumbnail,
+            liveUrl: user.liveUrl,
+            startedAt: user.startedAt,
+            likes: user.likes,
+            pingText: pingText
           });
           
           if (embed) {
@@ -267,6 +336,7 @@ async function processGuildVideos(guildId, config, client, videos) {
   const youtubeConfig = config.youtube || {};
   const users = youtubeConfig.users || [];
   const videoChannelId = youtubeConfig.videoChannel;
+  const pingRole = youtubeConfig.pingRole || null;
 
   if (users.length === 0 || !videoChannelId) return null;
   
@@ -313,6 +383,8 @@ async function processGuildVideos(guildId, config, client, videos) {
 
     let newVideos = 0;
     let hasChanges = false;
+    
+    const pingText = pingRole ? `<@&${pingRole}>\n\n` : '';
 
     for (const user of results) {
       if (!user?.success) {
@@ -346,7 +418,7 @@ async function processGuildVideos(guildId, config, client, videos) {
           const embed = videoEmbed({ 
             channelName: user.channelName, 
             handle: user.handle
-          }, latestVideo);
+          }, latestVideo, pingText);
           
           if (embed) {
             await sendBrandedMessage(channel, embed);
@@ -431,6 +503,7 @@ async function processGuildShorts(guildId, config, client, shorts) {
   const youtubeConfig = config.youtube || {};
   const users = youtubeConfig.users || [];
   const shortChannelId = youtubeConfig.shortChannel;
+  const pingRole = youtubeConfig.pingRole || null;
 
   if (users.length === 0 || !shortChannelId) return null;
   
@@ -477,6 +550,8 @@ async function processGuildShorts(guildId, config, client, shorts) {
 
     let newShorts = 0;
     let hasChanges = false;
+    
+    const pingText = pingRole ? `<@&${pingRole}>\n\n` : '';
 
     for (const user of results) {
       if (!user?.success) {
@@ -510,7 +585,7 @@ async function processGuildShorts(guildId, config, client, shorts) {
           const embed = shortEmbed({ 
             channelName: user.channelName, 
             handle: user.handle
-          }, latestShort);
+          }, latestShort, pingText);
           
           if (embed) {
             await sendBrandedMessage(channel, embed);
@@ -539,22 +614,6 @@ async function processGuildShorts(guildId, config, client, shorts) {
   }
 }
 
-async function clearGuildCache(guildId) {
-  const liveStatus = cache.load('liveStatus', {});
-  const videos = cache.load('videos', {});
-  const shorts = cache.load('shorts', {});
-  
-  delete liveStatus[guildId];
-  delete videos[guildId];
-  delete shorts[guildId];
-  
-  cache.save('liveStatus', liveStatus);
-  cache.save('videos', videos);
-  cache.save('shorts', shorts);
-  
-  monitor('YouTube', 'Cache Cleared', guildId, { action: 'Manual cache clear' });
-}
-
 async function getMonitorStats() {
   const liveStatus = cache.load('liveStatus', {});
   const videos = cache.load('videos', {});
@@ -574,4 +633,11 @@ async function getMonitorStats() {
   };
 }
 
-module.exports = { monitorLives, monitorVideos, monitorShorts, clearGuildCache, getMonitorStats };
+module.exports = { 
+  monitorLives, 
+  monitorVideos, 
+  monitorShorts, 
+  clearGuildCache, 
+  cleanYouTubeChannelCache,  // NUEVA: Exportar función de limpieza específica
+  getMonitorStats 
+};

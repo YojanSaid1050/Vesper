@@ -32,7 +32,8 @@ function liveEmbed(data) {
     viewers = 0, 
     title = 'Transmisión en vivo', 
     cover, 
-    liveUrl
+    liveUrl,
+    pingText = ''
   } = data;
 
   if (!username || !liveUrl) {
@@ -43,6 +44,9 @@ function liveEmbed(data) {
   const formattedViewers = typeof viewers === 'number' ? viewers.toLocaleString() : viewers;
   const truncatedTitle = title.length > 100 ? title.substring(0, 97) + '...' : title;
   const isValidCover = cover && (cover.startsWith('http://') || cover.startsWith('https://'));
+
+  // Construir el título con el ping al final
+  const titleWithPing = `## ᯓᡣ𐭩 ${escapeMarkdown(nickname || username)} 𝒉𝒂𝒔 𝒓𝒆𝒔𝒐𝒏𝒂𝒕𝒆𝒅 ${pingText}\n\n**${escapeMarkdown(truncatedTitle)}**\n\n𓆰♕𓆪 𝑬𝒄𝒉𝒐 𝑶𝒓𝒊𝒈𝒊𝒏: @${escapeMarkdown(username)}\n\n𓆩ꨄ︎𓆪 𝑺𝒐𝒖𝒍𝒔 𝑳𝒊𝒔𝒕𝒆𝒏𝒊𝒏𝒈: ${formattedViewers}\n\n༺𓆩~~𝒄𝒂𝒏 𝒚𝒐𝒖 𝒉𝒆𝒂𝒓 𝒊𝒕 𝒃𝒆𝒚𝒐𝒏𝒅 𝒕𝒉𝒆 𝒔𝒌𝒚?~~𓆪༻`;
 
   return {
     flags: 32768,
@@ -58,7 +62,7 @@ function liveEmbed(data) {
         { type: 14, spacing: 1 },
         {
           type: 10,
-          content: `## ᯓᡣ𐭩 ${escapeMarkdown(nickname || username)} 𝒉𝒂𝒔 𝒓𝒆𝒔𝒐𝒏𝒂𝒕𝒆𝒅\n\n**${escapeMarkdown(truncatedTitle)}**\n\n𓆰♕𓆪 𝑬𝒄𝒉𝒐 𝑶𝒓𝒊𝒈𝒊𝒏: @${escapeMarkdown(username)}\n\n𓆩ꨄ︎𓆪 𝑺𝒐𝒖𝒍𝒔 𝑳𝒊𝒔𝒕𝒆𝒏𝒊𝒏𝒈: ${formattedViewers}\n\n༺𓆩~~𝒄𝒂𝒏 𝒚𝒐𝒖 𝒉𝒆𝒂𝒓 𝒊𝒕 𝒃𝒆𝒚𝒐𝒏𝒅 𝒕𝒉𝒆 𝒔𝒌𝒚?~~𓆪༻`
+          content: titleWithPing
         },
         ...(isValidCover ? [{ type: 12, items: [{ media: { url: cover } }] }] : []),
         {
@@ -83,7 +87,8 @@ function videoEmbed(data) {
     thumbnail, 
     url, 
     playCount = 0, 
-    commentCount = 0
+    commentCount = 0,
+    pingText = ''
   } = data;
 
   if (!username || !url) {
@@ -96,6 +101,9 @@ function videoEmbed(data) {
   const truncatedDescription = description.length > 150 ? description.substring(0, 147) + '...' : description;
   const isValidThumbnail = thumbnail && (thumbnail.startsWith('http://') || thumbnail.startsWith('https://'));
   const finalDescription = truncatedDescription || '𝐴 𝑓𝑜𝑟𝑔𝑜𝑡𝑡𝑒𝑛 𝑓𝑟𝑎𝑔𝑚𝑒𝑛𝑡 𝑑𝑟𝑖𝑓𝑡𝑠 𝑡ℎ𝑟𝑜𝑢𝑔ℎ 𝑡ℎ𝑒 𝑛𝑖𝑔ℎ𝑡 𝑠𝑘𝑦...';
+
+  // Construir el título con el ping al final
+  const titleWithPing = `## ᯓ⚝ ${escapeMarkdown(nickname || username)} 𝒉𝒂𝒔 𝒍𝒆𝒇𝒕 𝒂 𝒕𝒓𝒂𝒄𝒆 ${pingText}\n\n**${escapeMarkdown(finalDescription)}**\n\n𓆰✦𓆪 𝑺𝒊𝒈𝒏𝒂𝒍 𝑶𝒓𝒊𝒈𝒊𝒏\n@${escapeMarkdown(username)}\n\n𓆩☽𓆪 𝑺𝒕𝒂𝒓𝒔 𝑹𝒆𝒂𝒄𝒉𝒆𝒅\n${formattedPlays}\n\n𓆰✧𓆪 𝑹𝒆𝒔𝒐𝒏𝒂𝒏𝒄𝒆𝒔\n${formattedComments}\n\n༺𓆩~~𝒂𝒏𝒐𝒕𝒉𝒆𝒓 𝒎𝒆𝒎𝒐𝒓𝒚 𝒏𝒐𝒘 𝒔𝒉𝒊𝒏𝒆𝒔 𝒂𝒎𝒐𝒏𝒈 𝒕𝒉𝒆 𝒔𝒕𝒂𝒓𝒔~~𓆪༻`;
 
   return {
     flags: 32768,
@@ -111,7 +119,7 @@ function videoEmbed(data) {
         { type: 14, spacing: 1 },
         {
           type: 10,
-          content: `## ᯓ⚝ ${escapeMarkdown(nickname || username)} 𝒉𝒂𝒔 𝒍𝒆𝒇𝒕 𝒂 𝒕𝒓𝒂𝒄𝒆\n\n**${escapeMarkdown(finalDescription)}**\n\n𓆰✦𓆪 𝑺𝒊𝒈𝒏𝒂𝒍 𝑶𝒓𝒊𝒈𝒊𝒏\n@${escapeMarkdown(username)}\n\n𓆩☽𓆪 𝑺𝒕𝒂𝒓𝒔 𝑹𝒆𝒂𝒄𝒉𝒆𝒅\n${formattedPlays}\n\n𓆰✧𓆪 𝑹𝒆𝒔𝒐𝒏𝒂𝒏𝒄𝒆𝒔\n${formattedComments}\n\n༺𓆩~~𝒂𝒏𝒐𝒕𝒉𝒆𝒓 𝒎𝒆𝒎𝒐𝒓𝒚 𝒏𝒐𝒘 𝒔𝒉𝒊𝒏𝒆𝒔 𝒂𝒎𝒐𝒏𝒈 𝒕𝒉𝒆 𝒔𝒕𝒂𝒓𝒔~~𓆪༻`
+          content: titleWithPing
         },
         ...(isValidThumbnail ? [{ type: 12, items: [{ media: { url: thumbnail } }] }] : []),
         {

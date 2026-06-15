@@ -56,7 +56,6 @@ function setCachedUser(username, data) {
         timestamp: Date.now()
     });
     
-    // Limpiar caché si es muy grande
     if (userCache.size > CACHE_CONFIG.MAX_CACHE_SIZE) {
         const now = Date.now();
         for (const [key, value] of userCache.entries()) {
@@ -105,10 +104,9 @@ async function checkLiveUsers(usernames = []) {
                 return items || [];
             },
             `checkLiveUsers (${usernames.length} usuarios)`,
-            { maxAttemptsPerToken: 1 } // Solo 1 intento por token para lives
+            { maxAttemptsPerToken: 1 }
         );
         
-        // Guardar en caché
         if (results && results.length > 0) {
             liveCache.set(cacheKey, {
                 data: results,
@@ -204,7 +202,6 @@ async function checkUsers(usernames = []) {
 
     const normalizedUsernames = usernames.map(u => u.toLowerCase());
     
-    // Separar usuarios cacheados y no cacheados
     const uncachedUsers = [];
     const results = [];
     
@@ -250,7 +247,6 @@ async function checkUsers(usernames = []) {
                     return uncachedUsers.map(u => ({ exists: false, username: u }));
                 }
 
-                // Agrupar por usuario
                 const userVideosMap = new Map();
                 
                 for (const userData of items) {
@@ -267,7 +263,6 @@ async function checkUsers(usernames = []) {
                 
                 const processedResults = [];
                 
-                // Procesar cada usuario encontrado
                 for (const [username, userItems] of userVideosMap) {
                     const sortedItems = userItems.sort((a, b) => {
                         const timeA = parseInt(a.createTime) || 0;
@@ -299,7 +294,6 @@ async function checkUsers(usernames = []) {
                     }
                 }
                 
-                // Marcar usuarios no encontrados
                 const foundUsernames = Array.from(userVideosMap.keys());
                 for (const username of uncachedUsers) {
                     if (!foundUsernames.includes(username)) {
@@ -374,11 +368,141 @@ function getCacheStats() {
     };
 }
 
+// ==================================================
+// LIMPIEZA PERIÓDICA DE USUARIOS INEXISTENTES (CADA 7 DÍAS)
+// ==================================================
+
+// Verificar si un usuario sigue existiendo en TikTok
+async function verifyUserExists(username) {
+    try {
+        const result = await checkUser(username);
+        return result.exists === true;
+    } catch (error) {
+        console.error(`[TikTok] Error verificando existencia de @${username}:`, error.message);
+        return false;
+    }
+}
+
+// Limpiar usuarios inexistentes de un guild específico
+async function cleanNonExistentUsersInGuild(guildId, users, updateGuildSectionFunc) {
+    if (!users || users.length === 0) return { validUsers: [], removedUsers: [] };
+    
+    const validUsers = [];
+    const removedUsers = [];
+    
+    for (const username of users) {
+        const exists = await verifyUserExists(username);
+        if (exists) {
+            validUsers.push(username);
+        } else {
+            removedUsers.push(username);
+            clearUserCache(username);
+            console.log(`[TikTok] Usuario @${username} ya no existe, eliminando de la lista...`);
+        }
+        await sleep(500);
+    }
+    
+    if (removedUsers.length > 0) {
+        await updateGuildSectionFunc(guildId, 'tiktok', { users: validUsers });
+    }
+    
+    return { validUsers, removedUsers };
+}
+
+// Limpieza periódica global (CADA 7 DÍAS - ahorra créditos de Apify)
+async function scheduledCleanup() {
+    console.log('🔍 [TikTok] Iniciando limpieza periódica de usuarios inexistentes (cada 7 días)...');
+    
+    const { getAllGuildConfigs, updateGuildSection } = require('../../database/mongoManager');
+    const guilds = await getAllGuildConfigs();
+    let totalRemoved = 0;
+    
+    for (const [guildId, config] of Object.entries(guilds)) {
+        const tiktokConfig = config.tiktok || {};
+        const users = tiktokConfig.users || [];
+        
+        if (users.length === 0) continue;
+        
+        const { removedUsers } = await cleanNonExistentUsersInGuild(guildId, users, updateGuildSection);
+        totalRemoved += removedUsers.length;
+        
+        if (removedUsers.length > 0) {
+            console.log(`[TikTok] Guild ${guildId}: Eliminados ${removedUsers.length} usuarios inexistentes: ${removedUsers.join(', ')}`);
+        }
+    }
+    
+    console.log(`✅ [TikTok] Limpieza completada. Total de usuarios eliminados: ${totalRemoved}`);
+}
+
+// ==================================================
+// LIMPIEZA DE CACHÉ HUÉRFANA (CADA 6 HORAS - NO CONSUME CRÉDITOS)
+// ==================================================
+
+// Limpiar caché de usuarios que ya no existen en MongoDB
+async function cleanOrphanedCache() {
+    console.log('🔍 [TikTok] Iniciando limpieza de caché huérfana (cada 6 horas)...');
+    
+    const { getAllGuildConfigs } = require('../../database/mongoManager');
+    const guilds = await getAllGuildConfigs();
+    
+    // Recopilar todos los usuarios activos de MongoDB
+    const activeUsers = new Set();
+    for (const [guildId, config] of Object.entries(guilds)) {
+        const tiktokConfig = config.tiktok || {};
+        const users = tiktokConfig.users || [];
+        users.forEach(u => activeUsers.add(u.toLowerCase()));
+    }
+    
+    let orphanedCount = 0;
+    
+    // Limpiar userCache (caché en memoria)
+    for (const [username, value] of userCache.entries()) {
+        if (!activeUsers.has(username)) {
+            userCache.delete(username);
+            orphanedCount++;
+            console.log(`[TikTok] Caché huérfana eliminada para: ${username}`);
+        }
+    }
+    
+    // Limpiar liveCache (contiene keys con múltiples usuarios)
+    for (const [cacheKey, value] of liveCache.entries()) {
+        const usersInKey = cacheKey.replace('live_', '').split(',');
+        const hasOrphan = usersInKey.some(u => !activeUsers.has(u));
+        if (hasOrphan) {
+            liveCache.delete(cacheKey);
+            orphanedCount++;
+            console.log(`[TikTok] Caché huérfana eliminada para: ${cacheKey}`);
+        }
+    }
+    
+    console.log(`✅ [TikTok] Limpieza de caché huérfana completada. ${orphanedCount} entradas eliminadas.`);
+}
+
+// ==================================================
+// PROGRAMACIÓN DE LIMPIEZAS
+// ==================================================
+
+// Limpieza de existencia: cada 7 días (primer ejecución en 1 hora)
+setTimeout(() => {
+    scheduledCleanup();
+    setInterval(scheduledCleanup, 7 * 24 * 60 * 60 * 1000);
+}, 60 * 60 * 1000);
+
+// Limpieza de caché huérfana: cada 6 horas (primer ejecución en 30 minutos)
+setTimeout(() => {
+    cleanOrphanedCache();
+    setInterval(cleanOrphanedCache, 6 * 60 * 60 * 1000);
+}, 30 * 60 * 1000);
+
 module.exports = { 
     checkLiveUsers, 
     checkUser, 
     checkUsers,
     clearUserCache,
     clearAllCache,
-    getCacheStats
+    getCacheStats,
+    verifyUserExists,
+    cleanNonExistentUsersInGuild,
+    scheduledCleanup,
+    cleanOrphanedCache
 };

@@ -2,7 +2,7 @@
 const { formatNumber, escapeMarkdown } = require('./utils');
 
 function liveEmbed(data) {
-  const { streamer, title, game, viewers, thumbnail, streamUrl } = data;
+  const { streamer, title, game, viewers, thumbnail, streamUrl, pingText = '' } = data;
 
   if (!streamer || !streamUrl) {
     console.error('❌ Missing required data for liveEmbed:', { streamer, streamUrl });
@@ -13,11 +13,14 @@ function liveEmbed(data) {
   const truncatedTitle = title?.length > 100 ? title.substring(0, 97) + '...' : title || 'Sin título';
   const isValidThumbnail = thumbnail && (thumbnail.startsWith('http://') || thumbnail.startsWith('https://'));
 
+  // Construir el título con el ping al final
+  const titleWithPing = `## ꒰ঌ ${escapeMarkdown(streamer)} 𝒉𝒂𝒔 𝒂𝒘𝒂𝒌𝒆𝒏𝒆𝒅 ${pingText}\n\n**${escapeMarkdown(truncatedTitle)}**\n\n𓆰♕𓆪 𝑹𝒆𝒂𝒍𝒎: ${escapeMarkdown(game || 'Unknown')}\n\n𓆩ꨄ︎𓆪 𝑺𝒐𝒖𝒍𝒔 𝑾𝒂𝒕𝒄𝒉𝒊𝒏𝒈: ${formattedViewers}\n\n༺𓆩~~𝒂 𝒇𝒐𝒓𝒈𝒐𝒕𝒕𝒆𝒏 𝒆𝒎𝒃𝒆𝒓 𝒈𝒍𝒐𝒘𝒔 𝒐𝒏𝒄𝒆 𝒂𝒈𝒂𝒊𝒏~~𓆪༻`;
+
   return {
     flags: 32768,
     components: [{
       type: 17,
-      accent_color: 0x800080,  // 🟣 MORADO (Purple)
+      accent_color: 0x800080,  // 🟣 MORADO
       spoiler: false,
       components: [
         {
@@ -27,7 +30,7 @@ function liveEmbed(data) {
         { type: 14, spacing: 1 },
         {
           type: 10,
-          content: `## ꒰ঌ ${escapeMarkdown(streamer)} 𝒉𝒂𝒔 𝒂𝒘𝒂𝒌𝒆𝒏𝒆𝒅\n\n**${escapeMarkdown(truncatedTitle)}**\n\n𓆰♕𓆪 𝑹𝒆𝒂𝒍𝒎: ${escapeMarkdown(game || 'Unknown')}\n\n𓆩ꨄ︎𓆪 𝑺𝒐𝒖𝒍𝒔 𝑾𝒂𝒕𝒄𝒉𝒊𝒏𝒈: ${formattedViewers}\n\n༺𓆩~~𝒂 𝒇𝒐𝒓𝒈𝒐𝒕𝒕𝒆𝒏 𝒆𝒎𝒃𝒆𝒓 𝒈𝒍𝒐𝒘𝒔 𝒐𝒏𝒄𝒆 𝒂𝒈𝒂𝒊𝒏~~𓆪༻`
+          content: titleWithPing
         },
         ...(isValidThumbnail ? [{ type: 12, items: [{ media: { url: thumbnail } }] }] : []),
         {

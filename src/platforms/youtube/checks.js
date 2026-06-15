@@ -1,3 +1,4 @@
+// src/platforms/youtube/checks.js
 const { google } = require('googleapis');
 const { getChannelInfo, isShort, formatDuration } = require('./utils');
 
@@ -215,7 +216,6 @@ async function getLatestVideos(channelId) {
       }
     }
     
-    // Ordenar por fecha (más reciente primero)
     videos.sort((a, b) => b.timestamp - a.timestamp);
     
     console.log(`[YouTube DEBUG] Videos procesados para ${channelId}: ${videos.length} (más reciente: ${videos[0]?.videoId || 'ninguno'})`);
@@ -308,9 +308,8 @@ async function getLatestShorts(channelId) {
 
   try {
     const shorts = [];
-    const videoIds = new Set(); // Para evitar duplicados
+    const videoIds = new Set();
     
-    // MÉTODO 1: Buscar playlist de shorts del canal
     try {
       const playlistsResponse = await youtube.playlists.list({
         part: ['snippet', 'contentDetails'],
@@ -318,7 +317,6 @@ async function getLatestShorts(channelId) {
         maxResults: 10
       });
       
-      // Buscar playlist que parezca ser de shorts
       const shortsPlaylist = playlistsResponse.data.items?.find(playlist => 
         playlist.snippet.title?.toLowerCase().includes('short') ||
         playlist.snippet.title?.toLowerCase().includes('shorts')
@@ -343,7 +341,6 @@ async function getLatestShorts(channelId) {
             if (videoId && !videoIds.has(videoId)) {
               videoIds.add(videoId);
               
-              // Obtener detalles del video (vistas, duración)
               const videoDetails = await youtube.videos.list({
                 part: ['statistics', 'contentDetails'],
                 id: [videoId]
@@ -352,7 +349,6 @@ async function getLatestShorts(channelId) {
               const stats = videoDetails.data.items?.[0];
               const duration = stats?.contentDetails?.duration || '';
               
-              // Calcular duración en segundos
               let durationSeconds = 0;
               const durationMatch = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
               if (durationMatch) {
@@ -385,7 +381,6 @@ async function getLatestShorts(channelId) {
       console.log(`[YouTube Shorts] No se encontró playlist de shorts para ${channelId}`);
     }
     
-    // MÉTODO 2: Buscar videos recientes y filtrar por duración (hasta 3 minutos)
     const searchResponse = await youtube.search.list({
       part: ['snippet'],
       channelId: channelId,
@@ -418,7 +413,7 @@ async function getLatestShorts(channelId) {
       
       const title = (video.snippet.title || '').toLowerCase();
       const hasShortTag = title.includes('#shorts');
-      const isShortDuration = durationSeconds > 0 && durationSeconds <= 180; // 3 minutos máximo
+      const isShortDuration = durationSeconds > 0 && durationSeconds <= 180;
       
       if (isShortDuration || hasShortTag) {
         shorts.push({
@@ -436,7 +431,6 @@ async function getLatestShorts(channelId) {
       }
     }
     
-    // Ordenar por fecha (más reciente primero)
     shorts.sort((a, b) => b.timestamp - a.timestamp);
     
     console.log(`[YouTube Shorts] Canal ${channelId}: encontró ${shorts.length} shorts (límite 3 minutos)`);
@@ -520,21 +514,159 @@ async function checkShorts(users) {
   return results;
 }
 
-function clearCache(channelId = null) {
+// ==================================================
+// FUNCIONES PARA LIMPIEZA ESPECÍFICA
+// ==================================================
+
+function clearChannelCache(channelId) {
   if (channelId) {
     liveCache.delete(channelId);
     videoCache.delete(channelId);
     videoCache.delete(`shorts_${channelId}`);
+    console.log(`[YouTube] Cache limpiado para canal: ${channelId}`);
+  }
+}
+
+async function verifyChannelExists(channelId) {
+  try {
+    const info = await getChannelInfo(channelId);
+    return info !== null;
+  } catch (error) {
+    console.error(`[YouTube] Error verificando existencia del canal ${channelId}:`, error.message);
+    return false;
+  }
+}
+
+function clearCache(channelId = null) {
+  if (channelId) {
+    clearChannelCache(channelId);
   } else {
     liveCache.clear();
     videoCache.clear();
+    console.log('[YouTube] Todas las cachés han sido limpiadas');
   }
 }
+
+// ==================================================
+// LIMPIEZA PERIÓDICA DE CANALES INEXISTENTES (CADA 7 DÍAS)
+// ==================================================
+
+async function cleanNonExistentChannelsInGuild(guildId, channels, updateGuildSectionFunc) {
+  if (!channels || channels.length === 0) return { validChannels: [], removedChannels: [] };
+  
+  const validChannels = [];
+  const removedChannels = [];
+  
+  for (const channelId of channels) {
+    const exists = await verifyChannelExists(channelId);
+    if (exists) {
+      validChannels.push(channelId);
+    } else {
+      removedChannels.push(channelId);
+      clearChannelCache(channelId);
+      console.log(`[YouTube] Canal ${channelId} ya no existe, eliminando de la lista...`);
+    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  
+  if (removedChannels.length > 0) {
+    await updateGuildSectionFunc(guildId, 'youtube', { users: validChannels });
+  }
+  
+  return { validChannels, removedChannels };
+}
+
+async function scheduledCleanup() {
+  console.log('🔍 [YouTube] Iniciando limpieza periódica de canales inexistentes (cada 7 días)...');
+  
+  const { getAllGuildConfigs, updateGuildSection } = require('../../database/mongoManager');
+  const guilds = await getAllGuildConfigs();
+  let totalRemoved = 0;
+  
+  for (const [guildId, config] of Object.entries(guilds)) {
+    const youtubeConfig = config.youtube || {};
+    const channels = youtubeConfig.users || [];
+    
+    if (channels.length === 0) continue;
+    
+    const { removedChannels } = await cleanNonExistentChannelsInGuild(guildId, channels, updateGuildSection);
+    totalRemoved += removedChannels.length;
+    
+    if (removedChannels.length > 0) {
+      console.log(`[YouTube] Guild ${guildId}: Eliminados ${removedChannels.length} canales inexistentes`);
+    }
+  }
+  
+  console.log(`✅ [YouTube] Limpieza completada. Total de canales eliminados: ${totalRemoved}`);
+}
+
+// ==================================================
+// LIMPIEZA DE CACHÉ HUÉRFANA (CADA 6 HORAS - NO CONSUME CUOTA DE API)
+// ==================================================
+
+async function cleanOrphanedCache() {
+  console.log('🔍 [YouTube] Iniciando limpieza de caché huérfana (cada 6 horas)...');
+  
+  const { getAllGuildConfigs } = require('../../database/mongoManager');
+  const guilds = await getAllGuildConfigs();
+  
+  // Recopilar todos los canales activos de MongoDB
+  const activeChannels = new Set();
+  for (const [guildId, config] of Object.entries(guilds)) {
+    const youtubeConfig = config.youtube || {};
+    const channels = youtubeConfig.users || [];
+    channels.forEach(c => activeChannels.add(c));
+  }
+  
+  let orphanedCount = 0;
+  
+  // Limpiar liveCache
+  for (const [channelId, value] of liveCache.entries()) {
+    if (!activeChannels.has(channelId)) {
+      liveCache.delete(channelId);
+      orphanedCount++;
+      console.log(`[YouTube] Caché huérfana (live) eliminada para: ${channelId}`);
+    }
+  }
+  
+  // Limpiar videoCache
+  for (const [key, value] of videoCache.entries()) {
+    const channelId = key.replace('shorts_', '');
+    if (!activeChannels.has(channelId)) {
+      videoCache.delete(key);
+      orphanedCount++;
+      console.log(`[YouTube] Caché huérfana (video/shorts) eliminada para: ${key}`);
+    }
+  }
+  
+  console.log(`✅ [YouTube] Limpieza de caché huérfana completada. ${orphanedCount} entradas eliminadas.`);
+}
+
+// ==================================================
+// PROGRAMACIÓN DE LIMPIEZAS
+// ==================================================
+
+// Limpieza de existencia: cada 7 días (primer ejecución en 1 hora)
+setTimeout(() => {
+  scheduledCleanup();
+  setInterval(scheduledCleanup, 7 * 24 * 60 * 60 * 1000);
+}, 60 * 60 * 1000);
+
+// Limpieza de caché huérfana: cada 6 horas (primer ejecución en 30 minutos)
+setTimeout(() => {
+  cleanOrphanedCache();
+  setInterval(cleanOrphanedCache, 6 * 60 * 60 * 1000);
+}, 30 * 60 * 1000);
 
 module.exports = {
   checkLiveUsers,
   checkVideos,
   checkShorts,
   clearCache,
-  findExactChannel
+  clearChannelCache,
+  verifyChannelExists,
+  findExactChannel,
+  cleanNonExistentChannelsInGuild,
+  scheduledCleanup,
+  cleanOrphanedCache
 };

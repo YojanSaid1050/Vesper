@@ -225,7 +225,9 @@ async function monitorLives(client) {
 }
 
 async function processGuildLives(guildData, client, liveStatus) {
-    const { guildId, users, liveChannelId } = guildData;
+    const { guildId, config, users, liveChannelId } = guildData;
+    const tiktokConfig = config.tiktok || {};
+    const pingRole = tiktokConfig.pingRole || null;
     
     try {
         const channel = await client.channels.fetch(liveChannelId).catch(() => null);
@@ -262,6 +264,8 @@ async function processGuildLives(guildData, client, liveStatus) {
         
         let newLives = 0;
         let hasChanges = false;
+        
+        const pingText = pingRole ? `<@&${pingRole}>\n\n` : '';
 
         for (const user of results) {
             if (!user?.success) continue;
@@ -282,7 +286,8 @@ async function processGuildLives(guildData, client, liveStatus) {
                         viewers: user.liveRoom?.liveRoomStats?.userCount || 0,
                         title: user.liveRoom?.title || 'TikTok Live',
                         cover: user.liveRoom?.coverUrl,
-                        liveUrl: `https://www.tiktok.com/@${username}/live`
+                        liveUrl: `https://www.tiktok.com/@${username}/live`,
+                        pingText: pingText
                     });
                     
                     if (embed) {
@@ -388,7 +393,9 @@ async function monitorVideos(client) {
 }
 
 async function processGuildVideos(guildData, client, videos) {
-    const { guildId, users, videoChannelId } = guildData;
+    const { guildId, config, users, videoChannelId } = guildData;
+    const tiktokConfig = config.tiktok || {};
+    const pingRole = tiktokConfig.pingRole || null;
     
     try {
         const channel = await client.channels.fetch(videoChannelId).catch(() => null);
@@ -424,6 +431,8 @@ async function processGuildVideos(guildData, client, videos) {
 
         let newVideos = 0;
         let hasChanges = false;
+        
+        const pingText = pingRole ? `<@&${pingRole}>\n\n` : '';
 
         for (const user of results) {
             if (!user?.exists) continue;
@@ -453,7 +462,8 @@ async function processGuildVideos(guildData, client, videos) {
                         thumbnail: user.latestVideoThumbnail,
                         url: user.latestVideoUrl,
                         playCount: user.latestVideoPlayCount,
-                        commentCount: user.latestVideoCommentCount
+                        commentCount: user.latestVideoCommentCount,
+                        pingText: pingText
                     });
                     
                     if (embed) {

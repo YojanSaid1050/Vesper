@@ -1,3 +1,4 @@
+// src/platforms/youtube/index.js
 const utils = require('./utils');
 const embeds = require('./embeds');
 const checks = require('./checks');
@@ -18,8 +19,10 @@ module.exports = {
   
   // Funciones adicionales
   clearGuildCache: monitors.clearGuildCache,
+  cleanYouTubeChannelCache: monitors.cleanYouTubeChannelCache, // NUEVA exportación
   getMonitorStats: monitors.getMonitorStats,
   clearCache: checks.clearCache,
+  clearChannelCache: checks.clearChannelCache, // NUEVA exportación
   
   // Configuración
   config: {

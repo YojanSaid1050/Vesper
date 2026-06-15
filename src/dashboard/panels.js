@@ -1,3 +1,4 @@
+// src/dashboard/panels.js
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelSelectMenuBuilder, RoleSelectMenuBuilder, ChannelType } = require('discord.js');
 const { getGuildConfig } = require('../database/mongoManager');
 
@@ -40,7 +41,45 @@ async function mainPanel(guildId) {
 async function generalPanel(guildId) {
   const config = await getGuildConfig(guildId);
   const general = config.general || {};
-  
+
+  const welcomeSelector = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('general_welcome')
+      .setPlaceholder('🔮 𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑏𝑖𝑒𝑛𝑣𝑒𝑛𝑖𝑑𝑎')
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const goodbyeSelector = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('general_goodbye')
+      .setPlaceholder('🌑 𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑑𝑒𝑠𝑝𝑒𝑑𝑖𝑑𝑎')
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const logSelector = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('general_log')
+      .setPlaceholder('📜 𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑟𝑒𝑔𝑖𝑠𝑡𝑟𝑜𝑠')
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  // Botones de limpieza con estilo místico
+  const clearButtonsRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('general_clear_welcome').setLabel('☠ 𝐸𝑙𝑖𝑚𝑖𝑛𝑎𝑟 𝑃𝑜𝑟𝑡𝑎𝑙').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('general_clear_goodbye').setLabel('☠ 𝐸𝑙𝑖𝑚𝑖𝑛𝑎𝑟 𝑉𝑎𝑐í𝑜').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('general_clear_log').setLabel('☠ 𝐸𝑙𝑖𝑚𝑖𝑛𝑎𝑟 𝐸𝑐𝑜𝑠').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
+  );
+
+  const homeButton = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('dashboard_home').setLabel('← 𝑉𝑜𝑙𝑣𝑒𝑟').setStyle(ButtonStyle.Secondary)
+  );
+
   return {
     components: [{
       type: 17, accent_color: 0xFFFFFF, spoiler: false,
@@ -53,12 +92,15 @@ async function generalPanel(guildId) {
         { type: 14, spacing: 2 },
         { type: 10, content: '⚙️ **𝑉𝑖𝑛𝑐𝑢𝑙𝑎 𝑙𝑜𝑠 𝑝𝑜𝑟𝑡𝑎𝑙𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑢𝑛 𝑐𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑎𝑠𝑖𝑔𝑛𝑎𝑟𝑙𝑒 𝑢𝑛𝑎 𝑑𝑒 𝑙𝑎𝑠 𝑓𝑢𝑛𝑐𝑖𝑜𝑛𝑒𝑠 𝑑𝑒𝑙 𝑣𝑎𝑐í𝑜.' },
         { type: 14, spacing: 1 },
-        new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId('general_welcome').setPlaceholder('🔮 𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑏𝑖𝑒𝑛𝑣𝑒𝑛𝑖𝑑𝑎').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)).toJSON(),
-        new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId('general_goodbye').setPlaceholder('🌑 𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑑𝑒𝑠𝑝𝑒𝑑𝑖𝑑𝑎').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)).toJSON(),
-        new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId('general_log').setPlaceholder('📜 𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑟𝑒𝑔𝑖𝑠𝑡𝑟𝑜𝑠').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)).toJSON(),
+        welcomeSelector.toJSON(),
+        goodbyeSelector.toJSON(),
+        logSelector.toJSON(),
+        { type: 14, spacing: 1 },
+        { type: 10, content: '🗑️ **𝐸𝑙𝑖𝑚𝑖𝑛𝑎𝑟 𝑙𝑜𝑠 𝑝𝑜𝑟𝑡𝑎𝑙𝑒𝑠**\n𝑆𝑖 𝑑𝑒𝑠𝑒𝑎𝑠 𝑐𝑒𝑟𝑟𝑎𝑟 𝑢𝑛𝑜 𝑑𝑒 𝑙𝑜𝑠 𝑝𝑜𝑟𝑡𝑎𝑙𝑒𝑠, ℎ𝑎𝑧 𝑐𝑙𝑖𝑐 𝑒𝑛 𝑒𝑙 𝑏𝑜𝑡ó𝑛 𝑐𝑜𝑟𝑟𝑒𝑠𝑝𝑜𝑛𝑑𝑖𝑒𝑛𝑡𝑒.' },
+        { type: 14, spacing: 1 },
+        clearButtonsRow.toJSON(),
         { type: 14, spacing: 2 },
-        { type: 10, content: '╰┈➤ˎˊ˗ 𝑅𝑒𝑡𝑢𝑟𝑛 𝑡𝑜 𝑡ℎ𝑒 𝑚𝑎𝑖𝑛 𝑝𝑜𝑟𝑡𝑎𝑙' },
-        new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('dashboard_home').setLabel('Volver').setStyle(ButtonStyle.Secondary)).toJSON()
+        homeButton.toJSON()
       ]
     }]
   };
@@ -67,7 +109,33 @@ async function generalPanel(guildId) {
 async function botPanel(guildId) {
   const config = await getGuildConfig(guildId);
   const general = config.general || {};
-  
+
+  const roleSelector = new ActionRowBuilder().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('bot_role')
+      .setPlaceholder('⚙️ 𝑅𝑜𝑙 𝑝𝑎𝑟𝑎 𝑚á𝑞𝑢𝑖𝑛𝑎𝑠')
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const logSelector = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('bot_log_channel')
+      .setPlaceholder('📜 𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑟𝑒𝑔𝑖𝑠𝑡𝑟𝑜𝑠')
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const clearButtonsRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('bot_clear_role').setLabel('☠ 𝐿𝑖𝑏𝑒𝑟𝑎𝑟 𝑀á𝑞𝑢𝑖𝑛𝑎𝑠').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('bot_clear_log_channel').setLabel('☠ 𝐵𝑜𝑟𝑟𝑎𝑟 𝑅𝑒𝑔𝑖𝑠𝑡𝑟𝑜𝑠').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
+  );
+
+  const homeButton = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('dashboard_home').setLabel('← 𝑉𝑜𝑙𝑣𝑒𝑟').setStyle(ButtonStyle.Secondary)
+  );
+
   return {
     components: [{
       type: 17, accent_color: 0x808080, spoiler: false,
@@ -80,11 +148,14 @@ async function botPanel(guildId) {
         { type: 14, spacing: 2 },
         { type: 10, content: '⚙️ **𝑉𝑖𝑛𝑐𝑢𝑙𝑎 𝑙𝑜𝑠 𝑒𝑛𝑔𝑟𝑎𝑛𝑎𝑗𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑢𝑛 𝑟𝑜𝑙 𝑦 𝑢𝑛 𝑐𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑞𝑢𝑒 𝑙𝑎 𝑚𝑎𝑞𝑢𝑖𝑛𝑎𝑟𝑖𝑎 𝑓𝑢𝑛𝑐𝑖𝑜𝑛𝑒 𝑒𝑛 𝑎𝑟𝑚𝑜𝑛í𝑎.' },
         { type: 14, spacing: 1 },
-        new ActionRowBuilder().addComponents(new RoleSelectMenuBuilder().setCustomId('bot_role').setPlaceholder('⚙️ 𝑅𝑜𝑙 𝑝𝑎𝑟𝑎 𝑚á𝑞𝑢𝑖𝑛𝑎𝑠').setMinValues(1).setMaxValues(1)).toJSON(),
-        new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId('bot_log_channel').setPlaceholder('📜 𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑟𝑒𝑔𝑖𝑠𝑡𝑟𝑜𝑠').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)).toJSON(),
+        roleSelector.toJSON(),
+        logSelector.toJSON(),
+        { type: 14, spacing: 1 },
+        { type: 10, content: '🗑️ **𝐿𝑖𝑏𝑒𝑟𝑎𝑟 𝑙𝑜𝑠 𝑒𝑛𝑔𝑟𝑎𝑛𝑎𝑗𝑒𝑠**\n𝑆𝑖 𝑑𝑒𝑠𝑒𝑎𝑠 𝑙𝑖𝑏𝑒𝑟𝑎𝑟 𝑢𝑛𝑎 𝑐𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑎𝑐𝑖ó𝑛, 𝑢𝑠𝑎 𝑙𝑜𝑠 𝑏𝑜𝑡𝑜𝑛𝑒𝑠 𝑎 𝑐𝑜𝑛𝑡𝑖𝑛𝑢𝑎𝑐𝑖ó𝑛.' },
+        { type: 14, spacing: 1 },
+        clearButtonsRow.toJSON(),
         { type: 14, spacing: 2 },
-        { type: 10, content: '╰┈➤ˎˊ˗ 𝑅𝑒𝑡𝑢𝑟𝑛 𝑡𝑜 𝑡ℎ𝑒 𝑚𝑎𝑖𝑛 𝑝𝑜𝑟𝑡𝑎𝑙' },
-        new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('dashboard_home').setLabel('Volver').setStyle(ButtonStyle.Secondary)).toJSON()
+        homeButton.toJSON()
       ]
     }]
   };
@@ -109,20 +180,23 @@ async function brandingPanel(guildId) {
     );
   }
 
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('branding_name').setLabel('🔥 𝐹𝑜𝑟𝑗𝑎𝑟 𝑁𝑜𝑚𝑏𝑟𝑒').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('branding_avatar').setLabel('🎭 𝐹𝑜𝑟𝑗𝑎𝑟 𝐴𝑣𝑎𝑡𝑎𝑟').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('branding_reset').setLabel('⚡ 𝑅𝑒𝑠𝑒𝑡𝑒𝑎𝑟 𝑙𝑎 𝐹𝑜𝑟𝑗𝑎').setStyle(ButtonStyle.Danger)
+  );
+
+  const homeButton = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('dashboard_home').setLabel('← 𝑉𝑜𝑙𝑣𝑒𝑟').setStyle(ButtonStyle.Secondary)
+  );
+
   components.push(
     { type: 14, spacing: 2 },
     { type: 10, content: '⚙️ **𝐹𝑜𝑟𝑗𝑎 𝑙𝑎 𝑖𝑑𝑒𝑛𝑡𝑖𝑑𝑎𝑑**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑞𝑢é 𝑎𝑠𝑝𝑒𝑐𝑡𝑜 𝑑𝑒𝑙 𝑟𝑒𝑙𝑖𝑐𝑎𝑟𝑖𝑜 𝑑𝑒𝑠𝑒𝑎𝑠 𝑚𝑜𝑙𝑑𝑒𝑎𝑟.' },
     { type: 14, spacing: 1 },
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('branding_name').setLabel('Nombre').setStyle(ButtonStyle.Secondary).setEmoji('🔥'),
-      new ButtonBuilder().setCustomId('branding_avatar').setLabel('Avatar').setStyle(ButtonStyle.Secondary).setEmoji('🎭'),
-      new ButtonBuilder().setCustomId('branding_reset').setLabel('Reset').setStyle(ButtonStyle.Secondary).setEmoji('⚡')
-    ).toJSON(),
+    actionRow.toJSON(),
     { type: 14, spacing: 2 },
-    { type: 10, content: '╰┈➤ˎˊ˗ Return to the main portal' },
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('dashboard_home').setLabel('Volver').setStyle(ButtonStyle.Secondary)
-    ).toJSON()
+    homeButton.toJSON()
   );
 
   return {
@@ -142,6 +216,50 @@ async function tiktokPanel(guildId, mode = 'default') {
   const isList = mode === 'list';
   const liveChannel = tiktok.liveChannel || null;
   const videoChannel = tiktok.videoChannel || null;
+  const pingRole = tiktok.pingRole || null;
+
+  const liveSelector = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('tiktok_live_channel')
+      .setPlaceholder('🎤 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑣𝑜𝑐𝑒𝑠 𝑒𝑛 𝑣𝑖𝑣𝑜')
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const videoSelector = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('tiktok_video_channel')
+      .setPlaceholder('🎬 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑒𝑐𝑜𝑠 𝑔𝑟𝑎𝑏𝑎𝑑𝑜𝑠')
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const pingRoleSelector = new ActionRowBuilder().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('tiktok_ping_role')
+      .setPlaceholder('👥 𝑅𝑜𝑙 𝑎 𝑒𝑡𝑖𝑞𝑢𝑒𝑡𝑎𝑟')
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const clearButtonsRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('tiktok_clear_live_channel').setLabel('☠ 𝐵𝑜𝑟𝑟𝑎𝑟 𝐿𝑖𝑣𝑒').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('tiktok_clear_video_channel').setLabel('☠ 𝐵𝑜𝑟𝑟𝑎𝑟 𝑉𝑖𝑑𝑒𝑜𝑠').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('tiktok_clear_ping_role').setLabel('☠ 𝐿𝑖𝑏𝑒𝑟𝑎𝑟 𝑅𝑜𝑙').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
+  );
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('tiktok_add_user').setLabel('➕ 𝐴ñ𝑎𝑑𝑖𝑟 𝑆𝑢𝑠𝑢𝑟𝑟𝑜').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('tiktok_remove_user').setLabel('➖ 𝐸𝑙𝑖𝑚𝑖𝑛𝑎𝑟 𝑆𝑢𝑠𝑢𝑟𝑟𝑜').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('tiktok_list_users').setLabel(isList ? '👁️ 𝑂𝑐𝑢𝑙𝑡𝑎𝑟' : '👁️ 𝑉𝑒𝑟 𝑆𝑢𝑠𝑢𝑟𝑟𝑜𝑠').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('tiktok_clear_all_users').setLabel('☠ 𝐵𝑜𝑟𝑟𝑎𝑟 𝑇𝑜𝑑𝑜𝑠').setStyle(ButtonStyle.Danger)
+  );
+
+  const homeButton = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('dashboard_home').setLabel('← 𝑉𝑜𝑙𝑣𝑒𝑟').setStyle(ButtonStyle.Secondary)
+  );
 
   return {
     components: [{
@@ -151,26 +269,28 @@ async function tiktokPanel(guildId, mode = 'default') {
         { type: 14, spacing: 2 },
         { type: 10, content: '### 𝑇ℎ𝑒 𝑣𝑜𝑖𝑑 𝑙𝑖𝑠𝑡𝑒𝑛𝑠 𝑡𝑜 𝑓𝑙𝑒𝑒𝑡𝑖𝑛𝑔 𝑠𝑜𝑢𝑛𝑑𝑠 𝑓𝑟𝑜𝑚 𝑏𝑒𝑦𝑜𝑛𝑑.\n\n༺𓆩~~𝑌𝑜𝑢 𝑎𝑟𝑒 𝑛𝑜𝑡 𝑠𝑒𝑡𝑡𝑖𝑛𝑔 𝑢𝑝 𝑎𝑙𝑒𝑟𝑡𝑠… 𝑦𝑜𝑢 𝑎𝑟𝑒 𝑎𝑡𝑡𝑢𝑛𝑖𝑛𝑔 𝑒𝑎𝑟𝑠 𝑡𝑜 𝑡ℎ𝑒 𝑢𝑛𝑘𝑛𝑜𝑤𝑛.~~𓆪༻' },
         { type: 14, spacing: 2 },
-        { type: 10, content: `🎤 **𝐿𝑖𝑣𝑒 𝑉𝑜𝑖𝑐𝑒𝑠**\n𝐿𝑎𝑠 𝑣𝑜𝑐𝑒𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑒𝑠𝑐𝑢𝑐ℎ𝑎 𝑒𝑛 𝑣𝑖𝑣𝑜, 𝑟𝑒𝑠𝑜𝑛𝑎𝑛𝑑𝑜 𝑒𝑛 𝑙𝑎 𝑖𝑛𝑚𝑒𝑛𝑠𝑖𝑑𝑎𝑑.\n${liveChannel ? `<#${liveChannel}>` : '`No vinculado`'}\n\n🎬 **𝐸𝑐ℎ𝑜𝑒𝑠 𝑅𝑒𝑐𝑜𝑟𝑑𝑒𝑑**\n𝐿𝑜𝑠 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑎𝑡𝑟𝑎𝑝𝑎 𝑒𝑛 𝑠𝑢𝑠 𝑎𝑟𝑐ℎ𝑖𝑣𝑜𝑠 𝑝𝑎𝑟𝑎 𝑙𝑎 𝑒𝑡𝑒𝑟𝑛𝑖𝑑𝑎𝑑.\n${videoChannel ? `<#${videoChannel}>` : '`No vinculado`'}\n\n👤 **𝑉𝑜𝑐𝑒𝑠 𝐴𝑡𝑒𝑛𝑑𝑖𝑑𝑎𝑠**\n${users.length} 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 ℎ𝑎 𝑐𝑎𝑝𝑡𝑎𝑑𝑜.` },
+        { type: 10, content: `🎤 **𝐿𝑖𝑣𝑒 𝑉𝑜𝑖𝑐𝑒𝑠**\n𝐿𝑎𝑠 𝑣𝑜𝑐𝑒𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑒𝑠𝑐𝑢𝑐ℎ𝑎 𝑒𝑛 𝑣𝑖𝑣𝑜, 𝑟𝑒𝑠𝑜𝑛𝑎𝑛𝑑𝑜 𝑒𝑛 𝑙𝑎 𝑖𝑛𝑚𝑒𝑛𝑠𝑖𝑑𝑎𝑑.\n${liveChannel ? `<#${liveChannel}>` : '`No vinculado`'}\n\n🎬 **𝐸𝑐ℎ𝑜𝑒𝑠 𝑅𝑒𝑐𝑜𝑟𝑑𝑒𝑑**\n𝐿𝑜𝑠 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑎𝑡𝑟𝑎𝑝𝑎 𝑒𝑛 𝑠𝑢𝑠 𝑎𝑟𝑐ℎ𝑖𝑣𝑜𝑠 𝑝𝑎𝑟𝑎 𝑙𝑎 𝑒𝑡𝑒𝑟𝑛𝑖𝑑𝑎𝑑.\n${videoChannel ? `<#${videoChannel}>` : '`No vinculado`'}\n\n👤 **𝑉𝑜𝑐𝑒𝑠 𝐴𝑡𝑒𝑛𝑑𝑖𝑑𝑎𝑠**\n${users.length} 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 ℎ𝑎 𝑐𝑎𝑝𝑡𝑎𝑑𝑜.\n\n👥 **𝑅𝑜𝑙 𝑎 𝑒𝑡𝑖𝑞𝑢𝑒𝑡𝑎𝑟**\n${pingRole ? `<@&${pingRole}>` : '`No vinculado`'}` },
         { type: 14, spacing: 2 },
         ...(isList && users.length > 0 ? [{ type: 10, content: `📋 **𝑆𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑒𝑠𝑐𝑢𝑐ℎ𝑎**\n${users.slice(0, 25).map(u => `• ${u}`).join('\n')}${users.length > 25 ? `\n• ... y ${users.length - 25} más` : ''}` }, { type: 14, spacing: 2 }] : []),
         ...(isList && users.length === 0 ? [{ type: 10, content: '📋 **𝑆𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑒𝑠𝑐𝑢𝑐ℎ𝑎**\n`𝑁𝑖𝑛𝑔𝑢𝑛 𝑠𝑢𝑠𝑢𝑟𝑟𝑜 𝑎𝑡𝑒𝑛𝑑𝑖𝑑𝑜`' }, { type: 14, spacing: 2 }] : []),
         { type: 10, content: '⚙️ **𝑉𝑖𝑛𝑐𝑢𝑙𝑎𝑟 𝑙𝑜𝑠 𝑝𝑜𝑟𝑡𝑎𝑙𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑙𝑜𝑠 𝑐𝑎𝑛𝑎𝑙𝑒𝑠 𝑝𝑜𝑟 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑐𝑖𝑏𝑖𝑟á 𝑙𝑜𝑠 𝑒𝑐𝑜𝑠.' },
         { type: 14, spacing: 1 },
-        new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId('tiktok_live_channel').setPlaceholder('🎤 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑣𝑜𝑐𝑒𝑠 𝑒𝑛 𝑣𝑖𝑣𝑜').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)).toJSON(),
-        new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId('tiktok_video_channel').setPlaceholder('🎬 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑒𝑐𝑜𝑠 𝑔𝑟𝑎𝑏𝑎𝑑𝑜𝑠').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)).toJSON(),
+        liveSelector.toJSON(),
+        videoSelector.toJSON(),
+        { type: 14, spacing: 2 },
+        { type: 10, content: '👥 **𝐶𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑎𝑟 𝑟𝑜𝑙 𝑎 𝑒𝑡𝑖𝑞𝑢𝑒𝑡𝑎𝑟**\n𝐿𝑜𝑠 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑝𝑢𝑒𝑑𝑒𝑛 𝑙𝑙𝑎𝑚𝑎𝑟 𝑎 𝑢𝑛 𝑒𝑠𝑝í𝑟𝑖𝑡𝑢 𝑒𝑠𝑝𝑒𝑐í𝑓𝑖𝑐𝑜.' },
+        { type: 14, spacing: 1 },
+        pingRoleSelector.toJSON(),
+        { type: 14, spacing: 1 },
+        { type: 10, content: '🗑️ **𝐿𝑖𝑚𝑝𝑖𝑎𝑟 𝑙𝑜𝑠 𝑒𝑐𝑜𝑠**\n𝑆𝑖 𝑑𝑒𝑠𝑒𝑎𝑠 𝑏𝑜𝑟𝑟𝑎𝑟 𝑢𝑛𝑎 𝑐𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑎𝑐𝑖ó𝑛, 𝑢𝑠𝑎 𝑙𝑜𝑠 𝑏𝑜𝑡𝑜𝑛𝑒𝑠 𝑑𝑒 𝑎𝑏𝑎𝑗𝑜.' },
+        { type: 14, spacing: 1 },
+        clearButtonsRow.toJSON(),
         { type: 14, spacing: 2 },
         { type: 10, content: '🎭 **𝐴𝑡𝑒𝑛𝑑𝑒𝑟 𝑙𝑎𝑠 𝑣𝑜𝑐𝑒𝑠**\n𝐴𝑔𝑟𝑒𝑔𝑎 𝑜 𝑒𝑙𝑖𝑚𝑖𝑛𝑎 𝑙𝑜𝑠 𝑛𝑜𝑚𝑏𝑟𝑒𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑑𝑒𝑏𝑒 𝑒𝑠𝑐𝑢𝑐ℎ𝑎𝑟.' },
         { type: 14, spacing: 1 },
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('tiktok_add_user').setLabel('Añadir').setEmoji('➕').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('tiktok_remove_user').setLabel('Eliminar').setEmoji('➖').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('tiktok_list_users').setLabel(isList ? 'Ocultar' : 'Ver').setEmoji('👁️').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('tiktok_clear_all_users').setLabel('Borrar todo').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
-        ).toJSON(),
+        actionRow.toJSON(),
         { type: 14, spacing: 2 },
-        { type: 10, content: '╰┈➤ˎˊ˗ 𝑅𝑒𝑡𝑢𝑟𝑛 𝑡𝑜 𝑡ℎ𝑒 𝑚𝑎𝑖𝑛 𝑝𝑜𝑟𝑡𝑎𝑙' },
-        new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('dashboard_home').setLabel('Volver').setStyle(ButtonStyle.Secondary)).toJSON()
+        homeButton.toJSON()
       ]
     }]
   };
@@ -182,6 +302,40 @@ async function twitchPanel(guildId) {
   const users = twitch.users || [];
   const showUsers = twitch.showUsers ?? false;
   const liveChannel = twitch.liveChannel || null;
+  const pingRole = twitch.pingRole || null;
+
+  const liveSelector = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('twitch_live_channel')
+      .setPlaceholder('👁️ 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑎𝑣𝑖𝑠𝑜𝑠 𝑑𝑒 𝑙𝑢𝑧')
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const pingRoleSelector = new ActionRowBuilder().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('twitch_ping_role')
+      .setPlaceholder('👥 𝑅𝑜𝑙 𝑎 𝑒𝑡𝑖𝑞𝑢𝑒𝑡𝑎𝑟')
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const clearButtonsRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('twitch_clear_live_channel').setLabel('☠ 𝐵𝑜𝑟𝑟𝑎𝑟 𝐿𝑢𝑧').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('twitch_clear_ping_role').setLabel('☠ 𝐿𝑖𝑏𝑒𝑟𝑎𝑟 𝑅𝑜𝑙').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
+  );
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('twitch_add_user').setLabel('➕ 𝐴ñ𝑎𝑑𝑖𝑟 𝑉𝑖𝑔𝑖𝑙𝑎𝑛𝑡𝑒').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('twitch_remove_user').setLabel('➖ 𝐸𝑙𝑖𝑚𝑖𝑛𝑎𝑟 𝑉𝑖𝑔𝑖𝑙𝑎𝑛𝑡𝑒').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('twitch_list_users').setLabel(showUsers ? '👁️ 𝑂𝑐𝑢𝑙𝑡𝑎𝑟' : '👁️ 𝑉𝑒𝑟 𝑉𝑖𝑔𝑖𝑙𝑎𝑛𝑡𝑒𝑠').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('twitch_clear_all_users').setLabel('☠ 𝐵𝑜𝑟𝑟𝑎𝑟 𝑇𝑜𝑑𝑜𝑠').setStyle(ButtonStyle.Danger)
+  );
+
+  const homeButton = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('dashboard_home').setLabel('← 𝑉𝑜𝑙𝑣𝑒𝑟').setStyle(ButtonStyle.Secondary)
+  );
 
   return {
     components: [{
@@ -191,25 +345,27 @@ async function twitchPanel(guildId) {
         { type: 14, spacing: 2 },
         { type: 10, content: '### 𝑇ℎ𝑒 𝑣𝑜𝑖𝑑 𝑤𝑎𝑡𝑐ℎ𝑒𝑠 𝑡ℎ𝑒 𝑠𝑡𝑟𝑒𝑎𝑚𝑠 𝑎𝑠 𝑡ℎ𝑒𝑦 𝑑𝑒𝑠𝑐𝑒𝑛𝑑.\n\n༺𓆩~~𝑌𝑜𝑢 𝑎𝑟𝑒 𝑛𝑜𝑡 𝑐𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑖𝑛𝑔 𝑚𝑜𝑛𝑖𝑡𝑜𝑟𝑖𝑛𝑔… 𝑦𝑜𝑢 𝑎𝑟𝑒 𝑝𝑜𝑠𝑖𝑡𝑖𝑜𝑛𝑖𝑛𝑔 𝑤𝑎𝑡𝑐ℎ𝑡𝑜𝑤𝑒𝑟𝑠.~~𓆪༻' },
         { type: 14, spacing: 2 },
-        { type: 10, content: `👁️ **𝐿𝑖𝑣𝑒 𝑆𝑡𝑟𝑒𝑎𝑚𝑠**\n𝐸𝑙 𝑝𝑜𝑟𝑡𝑎𝑙 𝑝𝑜𝑟 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑎𝑛𝑢𝑛𝑐𝑖𝑎 𝑐𝑢𝑎𝑛𝑑𝑜 𝑙𝑎 𝑙𝑢𝑧 𝑖𝑟𝑟𝑢𝑚𝑝𝑒 𝑒𝑛 𝑙𝑎 𝑜𝑠𝑐𝑢𝑟𝑖𝑑𝑎𝑑.\n${liveChannel ? `<#${liveChannel}>` : '`No vinculado`'}\n\n👥 **𝑂𝑗𝑜𝑠 𝑉𝑖𝑔𝑖𝑙𝑎𝑛𝑡𝑒𝑠**\n${users.length} 𝑛𝑜𝑚𝑏𝑟𝑒𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑠𝑖𝑔𝑢𝑒 𝑒𝑛 𝑙𝑎 𝑒𝑡𝑒𝑟𝑛𝑖𝑑𝑎𝑑.` },
+        { type: 10, content: `👁️ **𝐿𝑖𝑣𝑒 𝑆𝑡𝑟𝑒𝑎𝑚𝑠**\n𝐸𝑙 𝑝𝑜𝑟𝑡𝑎𝑙 𝑝𝑜𝑟 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑎𝑛𝑢𝑛𝑐𝑖𝑎 𝑐𝑢𝑎𝑛𝑑𝑜 𝑙𝑎 𝑙𝑢𝑧 𝑖𝑟𝑟𝑢𝑚𝑝𝑒 𝑒𝑛 𝑙𝑎 𝑜𝑠𝑐𝑢𝑟𝑖𝑑𝑎𝑑.\n${liveChannel ? `<#${liveChannel}>` : '`No vinculado`'}\n\n👥 **𝑂𝑗𝑜𝑠 𝑉𝑖𝑔𝑖𝑙𝑎𝑛𝑡𝑒𝑠**\n${users.length} 𝑛𝑜𝑚𝑏𝑟𝑒𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑠𝑖𝑔𝑢𝑒 𝑒𝑛 𝑙𝑎 𝑒𝑡𝑒𝑟𝑛𝑖𝑑𝑎𝑑.\n\n👥 **𝑅𝑜𝑙 𝑎 𝑒𝑡𝑖𝑞𝑢𝑒𝑡𝑎𝑟**\n${pingRole ? `<@&${pingRole}>` : '`No vinculado`'}` },
         { type: 14, spacing: 2 },
         ...(showUsers && users.length > 0 ? [{ type: 10, content: `📋 **𝑆𝑡𝑟𝑒𝑎𝑚𝑒𝑟𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑣𝑖𝑔𝑖𝑙𝑎**\n${users.slice(0, 25).map(u => `• ${u}`).join('\n')}${users.length > 25 ? `\n• ... y ${users.length - 25} más` : ''}` }, { type: 14, spacing: 2 }] : []),
         ...(showUsers && users.length === 0 ? [{ type: 10, content: '📋 **𝑆𝑡𝑟𝑒𝑎𝑚𝑒𝑟𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑣𝑖𝑔𝑖𝑙𝑎**\n`𝑁𝑖𝑛𝑔𝑢𝑛𝑎 𝑎𝑙𝑚𝑎 𝑒𝑛 𝑣𝑖𝑔𝑖𝑙𝑎𝑛𝑐𝑖𝑎`' }, { type: 14, spacing: 2 }] : []),
-        { type: 10, content: '⚙️ **𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑛𝑜𝑡𝑖𝑓𝑖𝑐𝑎𝑐𝑖𝑜𝑛𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑒𝑙 𝑝𝑜𝑟𝑡𝑎𝑙 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑝𝑟𝑜𝑐𝑙𝑎𝑚𝑎𝑟á 𝑙𝑜𝑠 𝑎𝑣𝑖𝑠𝑜𝑠.' },
+        { type: 10, content: '⚙️ **𝐶𝑎𝑛𝑎𝑙 𝑑𝑒 𝑛𝑜𝑡𝑖𝑓𝑖𝑐𝑎𝑐𝑖𝑜𝑛𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑒𝑙 𝑝𝑜𝑟𝑡𝑎𝑙 𝑝𝑜𝑟 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑝𝑟𝑜𝑐𝑙𝑎𝑚𝑎𝑟á 𝑙𝑜𝑠 𝑎𝑣𝑖𝑠𝑜𝑠.' },
         { type: 14, spacing: 1 },
-        new ActionRowBuilder().addComponents(new ChannelSelectMenuBuilder().setCustomId('twitch_live_channel').setPlaceholder('👁️ 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑎𝑣𝑖𝑠𝑜𝑠 𝑑𝑒 𝑙𝑢𝑧').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)).toJSON(),
+        liveSelector.toJSON(),
+        { type: 14, spacing: 2 },
+        { type: 10, content: '👥 **𝐶𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑎𝑟 𝑟𝑜𝑙 𝑎 𝑒𝑡𝑖𝑞𝑢𝑒𝑡𝑎𝑟**\n𝐿𝑜𝑠 𝑣𝑖𝑔𝑖𝑙𝑎𝑛𝑡𝑒𝑠 𝑝𝑢𝑒𝑑𝑒𝑛 𝑙𝑙𝑎𝑚𝑎𝑟 𝑎 𝑢𝑛 𝑒𝑗é𝑟𝑐𝑖𝑡𝑜 𝑒𝑠𝑝𝑒𝑐í𝑓𝑖𝑐𝑜.' },
+        { type: 14, spacing: 1 },
+        pingRoleSelector.toJSON(),
+        { type: 14, spacing: 1 },
+        { type: 10, content: '🗑️ **𝐿𝑖𝑚𝑝𝑖𝑎𝑟 𝑙𝑎 𝑣𝑖𝑔𝑖𝑙𝑎𝑛𝑐𝑖𝑎**\n𝑆𝑖 𝑑𝑒𝑠𝑒𝑎𝑠 𝑏𝑜𝑟𝑟𝑎𝑟 𝑢𝑛𝑎 𝑐𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑎𝑐𝑖ó𝑛, 𝑢𝑠𝑎 𝑙𝑜𝑠 𝑏𝑜𝑡𝑜𝑛𝑒𝑠 𝑑𝑒 𝑎𝑏𝑎𝑗𝑜.' },
+        { type: 14, spacing: 1 },
+        clearButtonsRow.toJSON(),
         { type: 14, spacing: 2 },
         { type: 10, content: '🎭 **𝐴𝑑𝑚𝑖𝑛𝑖𝑠𝑡𝑟𝑎𝑟 𝑣𝑖𝑔𝑖𝑙𝑎𝑛𝑡𝑒𝑠**\n𝐴𝑔𝑟𝑒𝑔𝑎 𝑜 𝑒𝑙𝑖𝑚𝑖𝑛𝑎 𝑙𝑜𝑠 𝑛𝑜𝑚𝑏𝑟𝑒𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑑𝑒𝑏𝑒 𝑣𝑖𝑔𝑖𝑙𝑎𝑟.' },
         { type: 14, spacing: 1 },
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('twitch_add_user').setLabel('Añadir').setEmoji('➕').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('twitch_remove_user').setLabel('Eliminar').setEmoji('➖').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('twitch_list_users').setLabel(showUsers ? 'Ocultar' : 'Ver').setEmoji('📋').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('twitch_clear_all_users').setLabel('Borrar todo').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
-        ).toJSON(),
+        actionRow.toJSON(),
         { type: 14, spacing: 2 },
-        { type: 10, content: '╰┈➤ˎˊ˗ 𝑅𝑒𝑡𝑢𝑟𝑛 𝑡𝑜 𝑡ℎ𝑒 𝑚𝑎𝑖𝑛 𝑝𝑜𝑟𝑡𝑎𝑙' },
-        new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('dashboard_home').setLabel('Volver').setStyle(ButtonStyle.Secondary)).toJSON()
+        homeButton.toJSON()
       ]
     }]
   };
@@ -223,6 +379,60 @@ async function youtubePanel(guildId, mode = 'default') {
   const liveChannel = youtube.liveChannel || null;
   const videoChannel = youtube.videoChannel || null;
   const shortChannel = youtube.shortChannel || null;
+  const pingRole = youtube.pingRole || null;
+
+  const liveSelector = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('youtube_live_channel')
+      .setPlaceholder('🔴 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑙𝑢𝑧 𝑒𝑛 𝑣𝑖𝑣𝑜')
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const videoSelector = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('youtube_video_channel')
+      .setPlaceholder('📹 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑒𝑐𝑜𝑠 𝑔𝑟𝑎𝑏𝑎𝑑𝑜𝑠')
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const shortSelector = new ActionRowBuilder().addComponents(
+    new ChannelSelectMenuBuilder()
+      .setCustomId('youtube_short_channel')
+      .setPlaceholder('📱 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑒𝑓í𝑚𝑒𝑟𝑜𝑠')
+      .addChannelTypes(ChannelType.GuildText)
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const pingRoleSelector = new ActionRowBuilder().addComponents(
+    new RoleSelectMenuBuilder()
+      .setCustomId('youtube_ping_role')
+      .setPlaceholder('👥 𝑅𝑜𝑙 𝑎 𝑒𝑡𝑖𝑞𝑢𝑒𝑡𝑎𝑟')
+      .setMinValues(1)
+      .setMaxValues(1)
+  );
+
+  const clearButtonsRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('youtube_clear_live_channel').setLabel('☠ 𝐵𝑜𝑟𝑟𝑎𝑟 𝐿𝑢𝑧').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('youtube_clear_video_channel').setLabel('☠ 𝐵𝑜𝑟𝑟𝑎𝑟 𝑉𝑖𝑑𝑒𝑜𝑠').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('youtube_clear_short_channel').setLabel('☠ 𝐵𝑜𝑟𝑟𝑎𝑟 𝑆ℎ𝑜𝑟𝑡𝑠').setEmoji('🗑️').setStyle(ButtonStyle.Danger),
+    new ButtonBuilder().setCustomId('youtube_clear_ping_role').setLabel('☠ 𝐿𝑖𝑏𝑒𝑟𝑎𝑟 𝑅𝑜𝑙').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
+  );
+
+  const actionRow = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('youtube_add_user').setLabel('➕ 𝐴ñ𝑎𝑑𝑖𝑟 𝑆𝑒𝑛𝑑𝑎').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('youtube_remove_user').setLabel('➖ 𝐸𝑙𝑖𝑚𝑖𝑛𝑎𝑟 𝑆𝑒𝑛𝑑𝑎').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('youtube_list_users').setLabel(isList ? '👁️ 𝑂𝑐𝑢𝑙𝑡𝑎𝑟' : '👁️ 𝑉𝑒𝑟 𝑆𝑒𝑛𝑑𝑎𝑠').setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId('youtube_clear_all_users').setLabel('☠ 𝐵𝑜𝑟𝑟𝑎𝑟 𝑇𝑜𝑑𝑜𝑠').setStyle(ButtonStyle.Danger)
+  );
+
+  const homeButton = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId('dashboard_home').setLabel('← 𝑉𝑜𝑙𝑣𝑒𝑟').setStyle(ButtonStyle.Secondary)
+  );
 
   let channelInfoList = [];
   if (isList && users.length > 0) {
@@ -254,7 +464,7 @@ async function youtubePanel(guildId, mode = 'default') {
         { type: 14, spacing: 2 },
         { type: 10, content: '### 𝑇ℎ𝑒 𝑣𝑜𝑖𝑑 𝑎𝑟𝑐ℎ𝑖𝑣𝑒𝑠 𝑒𝑣𝑒𝑟𝑦 𝑠𝑡𝑟𝑒𝑎𝑚 𝑎𝑛𝑑 𝑒𝑐ℎ𝑜 𝑡ℎ𝑎𝑡 𝑒𝑣𝑒𝑟 𝑒𝑥𝑖𝑠𝑡𝑠.\n\n༺𓆩~~𝑌𝑜𝑢 𝑎𝑟𝑒 𝑛𝑜𝑡 𝑐𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑖𝑛𝑔 𝑛𝑜𝑡𝑖𝑓𝑖𝑐𝑎𝑡𝑖𝑜𝑛𝑠… 𝑦𝑜𝑢 𝑎𝑟𝑒 𝑐𝑎𝑡𝑎𝑙𝑜𝑔𝑖𝑛𝑔 𝑠𝑡𝑎𝑟𝑠.~~𓆪༻' },
         { type: 14, spacing: 2 },
-        { type: 10, content: `🔴 **𝐿𝑖𝑣𝑒 𝑆𝑡𝑟𝑒𝑎𝑚𝑠**\n𝐿𝑎 𝑙𝑢𝑧 𝑞𝑢𝑒 𝑖𝑟𝑟𝑢𝑚𝑝𝑒 𝑒𝑛 𝑙𝑎 𝑜𝑠𝑐𝑢𝑟𝑖𝑑𝑎𝑑, 𝑡𝑟𝑎𝑛𝑠𝑚𝑖𝑡𝑖𝑑𝑎 𝑒𝑛 𝑣𝑖𝑣𝑜 𝑑𝑒𝑠𝑑𝑒 𝑒𝑙 𝑓𝑖𝑛 𝑑𝑒𝑙 𝑢𝑛𝑖𝑣𝑒𝑟𝑠𝑜.\n${liveChannel ? `<#${liveChannel}>` : '`No vinculado`'}\n\n📹 **𝑅𝑒𝑐𝑜𝑟𝑑𝑒𝑑 𝑉𝑖𝑠𝑖𝑜𝑛𝑠**\n𝐿𝑜𝑠 𝑒𝑐𝑜𝑠 𝑞𝑢𝑒 𝑝𝑒𝑟𝑚𝑎𝑛𝑒𝑐𝑒𝑛, 𝑔𝑟𝑎𝑏𝑎𝑑𝑜𝑠 𝑝𝑎𝑟𝑎 𝑙𝑎 𝑒𝑡𝑒𝑟𝑛𝑖𝑑𝑎𝑑 𝑒𝑛 𝑙𝑜𝑠 𝑎𝑟𝑐ℎ𝑖𝑣𝑜𝑠 𝑑𝑒𝑙 𝑣𝑎𝑐í𝑜.\n${videoChannel ? `<#${videoChannel}>` : '`No vinculado`'}\n\n📱 **𝐹𝑙𝑒𝑒𝑡𝑖𝑛𝑔 𝑊ℎ𝑖𝑠𝑝𝑒𝑟𝑠**\n𝐿𝑜𝑠 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑑𝑢𝑟𝑎𝑛 𝑢𝑛 𝑖𝑛𝑠𝑡𝑎𝑛𝑡𝑒, 𝑝𝑒𝑟𝑜 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑐𝑜𝑔𝑒 𝑐𝑜𝑛 𝑎𝑛𝑠𝑖𝑎.\n${shortChannel ? `<#${shortChannel}>` : '`No vinculado`'}\n\n👁️ **𝑂𝑏𝑠𝑒𝑟𝑣𝑒𝑑 𝐶ℎ𝑎𝑛𝑛𝑒𝑙𝑠**\n${users.length} 𝑠𝑒𝑛𝑑𝑎𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑐𝑜𝑟𝑟𝑒.` },
+        { type: 10, content: `🔴 **𝐿𝑖𝑣𝑒 𝑆𝑡𝑟𝑒𝑎𝑚𝑠**\n𝐿𝑎 𝑙𝑢𝑧 𝑞𝑢𝑒 𝑖𝑟𝑟𝑢𝑚𝑝𝑒 𝑒𝑛 𝑙𝑎 𝑜𝑠𝑐𝑢𝑟𝑖𝑑𝑎𝑑.\n${liveChannel ? `<#${liveChannel}>` : '`No vinculado`'}\n\n📹 **𝑅𝑒𝑐𝑜𝑟𝑑𝑒𝑑 𝑉𝑖𝑠𝑖𝑜𝑛𝑠**\n𝐿𝑜𝑠 𝑒𝑐𝑜𝑠 𝑞𝑢𝑒 𝑝𝑒𝑟𝑚𝑎𝑛𝑒𝑐𝑒𝑛.\n${videoChannel ? `<#${videoChannel}>` : '`No vinculado`'}\n\n📱 **𝐹𝑙𝑒𝑒𝑡𝑖𝑛𝑔 𝑊ℎ𝑖𝑠𝑝𝑒𝑟𝑠**\n𝐿𝑜𝑠 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑞𝑢𝑒 𝑑𝑢𝑟𝑎𝑛 𝑢𝑛 𝑖𝑛𝑠𝑡𝑎𝑛𝑡𝑒.\n${shortChannel ? `<#${shortChannel}>` : '`No vinculado`'}\n\n👁️ **𝑂𝑏𝑠𝑒𝑟𝑣𝑒𝑑 𝐶ℎ𝑎𝑛𝑛𝑒𝑙𝑠**\n${users.length} 𝑠𝑒𝑛𝑑𝑎𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑐𝑜𝑟𝑟𝑒.\n\n👥 **𝑅𝑜𝑙 𝑎 𝑒𝑡𝑖𝑞𝑢𝑒𝑡𝑎𝑟**\n${pingRole ? `<@&${pingRole}>` : '`No vinculado`'}` },
         { type: 14, spacing: 2 },
         ...(isList && channelInfoList.length > 0 ? [
           { type: 10, content: `📋 **𝑆𝑒𝑛𝑑𝑎𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑐𝑜𝑟𝑟𝑒**\n${channelInfoList.join('\n')}` },
@@ -264,31 +474,25 @@ async function youtubePanel(guildId, mode = 'default') {
           { type: 10, content: '📋 **𝑆𝑒𝑛𝑑𝑎𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑟𝑒𝑐𝑜𝑟𝑟𝑒**\n`𝑁𝑖𝑛𝑔𝑢𝑛𝑎 𝑠𝑒𝑛𝑑𝑎 𝑒𝑠𝑐𝑜𝑔𝑖𝑑𝑎`' },
           { type: 14, spacing: 2 }
         ] : []),
-        { type: 10, content: '⚙️ **𝑉𝑖𝑛𝑐𝑢𝑙𝑎𝑟 𝑙𝑜𝑠 𝑝𝑜𝑟𝑡𝑎𝑙𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑙𝑜𝑠 𝑐𝑎𝑛𝑎𝑙𝑒𝑠 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑣𝑒𝑟𝑡𝑒𝑟á 𝑐𝑎𝑑𝑎 𝑡𝑖𝑝𝑜 𝑑𝑒 𝑚𝑒𝑛𝑠𝑎𝑗𝑒.' },
+        { type: 10, content: '⚙️ **𝑉𝑖𝑛𝑐𝑢𝑙𝑎𝑟 𝑙𝑜𝑠 𝑝𝑜𝑟𝑡𝑎𝑙𝑒𝑠**\n𝑆𝑒𝑙𝑒𝑐𝑐𝑖𝑜𝑛𝑎 𝑙𝑜𝑠 𝑐𝑎𝑛𝑎𝑙𝑒𝑠 𝑝𝑜𝑟 𝑑𝑜𝑛𝑑𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑣𝑒𝑟𝑡𝑒𝑟á 𝑙𝑜𝑠 𝑎𝑟𝑐ℎ𝑖𝑣𝑜𝑠.' },
         { type: 14, spacing: 1 },
-        new ActionRowBuilder().addComponents(
-          new ChannelSelectMenuBuilder().setCustomId('youtube_live_channel').setPlaceholder('🔴 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑙𝑢𝑧 𝑒𝑛 𝑣𝑖𝑣𝑜').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)
-        ).toJSON(),
-        new ActionRowBuilder().addComponents(
-          new ChannelSelectMenuBuilder().setCustomId('youtube_video_channel').setPlaceholder('📹 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑒𝑐𝑜𝑠 𝑔𝑟𝑎𝑏𝑎𝑑𝑜𝑠').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)
-        ).toJSON(),
-        new ActionRowBuilder().addComponents(
-          new ChannelSelectMenuBuilder().setCustomId('youtube_short_channel').setPlaceholder('📱 𝐶𝑎𝑛𝑎𝑙 𝑝𝑎𝑟𝑎 𝑠𝑢𝑠𝑢𝑟𝑟𝑜𝑠 𝑒𝑓í𝑚𝑒𝑟𝑜𝑠').addChannelTypes(ChannelType.GuildText).setMinValues(1).setMaxValues(1)
-        ).toJSON(),
+        liveSelector.toJSON(),
+        videoSelector.toJSON(),
+        shortSelector.toJSON(),
+        { type: 14, spacing: 2 },
+        { type: 10, content: '👥 **𝐶𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑎𝑟 𝑟𝑜𝑙 𝑎 𝑒𝑡𝑖𝑞𝑢𝑒𝑡𝑎𝑟**\n𝐿𝑜𝑠 𝑎𝑟𝑐ℎ𝑖𝑣𝑜𝑠 𝑝𝑢𝑒𝑑𝑒𝑛 𝑙𝑙𝑎𝑚𝑎𝑟 𝑎 𝑢𝑛𝑎 𝑒𝑛𝑡𝑖𝑑𝑎𝑑 𝑒𝑠𝑝𝑒𝑐í𝑓𝑖𝑐𝑎.' },
+        { type: 14, spacing: 1 },
+        pingRoleSelector.toJSON(),
+        { type: 14, spacing: 1 },
+        { type: 10, content: '🗑️ **𝐿𝑖𝑚𝑝𝑖𝑎𝑟 𝑙𝑜𝑠 𝑎𝑟𝑐ℎ𝑖𝑣𝑜𝑠**\n𝑆𝑖 𝑑𝑒𝑠𝑒𝑎𝑠 𝑏𝑜𝑟𝑟𝑎𝑟 𝑢𝑛𝑎 𝑐𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑎𝑐𝑖ó𝑛, 𝑢𝑠𝑎 𝑙𝑜𝑠 𝑏𝑜𝑡𝑜𝑛𝑒𝑠 𝑑𝑒 𝑎𝑏𝑎𝑗𝑜.' },
+        { type: 14, spacing: 1 },
+        clearButtonsRow.toJSON(),
         { type: 14, spacing: 2 },
         { type: 10, content: '🎭 **𝐴𝑡𝑒𝑛𝑑𝑒𝑟 𝑙𝑎𝑠 𝑠𝑒𝑛𝑑𝑎𝑠**\n𝐴𝑔𝑟𝑒𝑔𝑎 𝑜 𝑒𝑙𝑖𝑚𝑖𝑛𝑎 𝑙𝑜𝑠 𝑛𝑜𝑚𝑏𝑟𝑒𝑠 𝑞𝑢𝑒 𝑒𝑙 𝑣𝑎𝑐í𝑜 𝑑𝑒𝑏𝑒 𝑣𝑖𝑔𝑖𝑙𝑎𝑟.' },
         { type: 14, spacing: 1 },
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('youtube_add_user').setLabel('Añadir').setEmoji('➕').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('youtube_remove_user').setLabel('Eliminar').setEmoji('➖').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('youtube_list_users').setLabel(isList ? 'Ocultar' : 'Ver').setEmoji('👁️').setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder().setCustomId('youtube_clear_all_users').setLabel('Borrar todo').setEmoji('🗑️').setStyle(ButtonStyle.Danger)
-        ).toJSON(),
+        actionRow.toJSON(),
         { type: 14, spacing: 2 },
-        { type: 10, content: '╰┈➤ˎˊ˗ 𝑅𝑒𝑡𝑢𝑟𝑛 𝑡𝑜 𝑡ℎ𝑒 𝑚𝑎𝑖𝑛 𝑝𝑜𝑟𝑡𝑎𝑙' },
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder().setCustomId('dashboard_home').setLabel('Volver').setStyle(ButtonStyle.Secondary)
-        ).toJSON()
+        homeButton.toJSON()
       ]
     }]
   };
@@ -318,15 +522,18 @@ async function testPanel(guildId) {
         `🎭 **Whispers (TikTok)**\n` +
         `└ Live Channel: ${tiktok.liveChannel ? `<#${tiktok.liveChannel}>` : '`No vinculado`'}\n` +
         `└ Video Channel: ${tiktok.videoChannel ? `<#${tiktok.videoChannel}>` : '`No vinculado`'}\n` +
-        `└ Users: ${tiktok.users?.length || 0}\n\n` +
+        `└ Users: ${tiktok.users?.length || 0}\n` +
+        `└ Ping Role: ${tiktok.pingRole ? `<@&${tiktok.pingRole}>` : '`No vinculado`'}\n\n` +
         `👁️ **The Vigil (Twitch)**\n` +
         `└ Live Channel: ${twitch.liveChannel ? `<#${twitch.liveChannel}>` : '`No vinculado`'}\n` +
-        `└ Users: ${twitch.users?.length || 0}\n\n` +
+        `└ Users: ${twitch.users?.length || 0}\n` +
+        `└ Ping Role: ${twitch.pingRole ? `<@&${twitch.pingRole}>` : '`No vinculado`'}\n\n` +
         `📀 **Eternal Records (YouTube)**\n` +
         `└ Live Channel: ${youtube.liveChannel ? `<#${youtube.liveChannel}>` : '`No vinculado`'}\n` +
         `└ Video Channel: ${youtube.videoChannel ? `<#${youtube.videoChannel}>` : '`No vinculado`'}\n` +
         `└ Shorts Channel: ${youtube.shortChannel ? `<#${youtube.shortChannel}>` : '`No vinculado`'}\n` +
-        `└ Users: ${youtube.users?.length || 0}\n\n` +
+        `└ Users: ${youtube.users?.length || 0}\n` +
+        `└ Ping Role: ${youtube.pingRole ? `<@&${youtube.pingRole}>` : '`No vinculado`'}\n\n` +
         `🎨 **Branding**\n` +
         `└ Name: ${branding.name || '`No configurado`'}\n` +
         `└ Avatar: ${branding.avatar ? '✅ Configurado' : '`No configurado`'}`;
@@ -344,7 +551,8 @@ async function testPanel(guildId) {
         '│\n' +
         '⚙️ COMANDOS DE CONFIGURACIÓN\n' +
         '├─ /tiktok-setchannel live <#canal>   → Canal para directos\n' +
-        '└─ /tiktok-setchannel videos <#canal> → Canal para videos\n' +
+        '├─ /tiktok-setchannel videos <#canal> → Canal para videos\n' +
+        '└─ /tiktok-setpingrole <rol> → Configura rol a etiquetar\n' +
         '│\n' +
         '🧪 COMANDOS DE PRUEBA\n' +
         '└─ /tiktok-test <usuario>    → Prueba una cuenta TikTok\n' +
@@ -352,7 +560,8 @@ async function testPanel(guildId) {
         '📊 **Estado actual:**\n' +
         `└ Live Channel: ${tiktok.liveChannel ? `<#${tiktok.liveChannel}>` : '`No configurado`'}\n` +
         `└ Video Channel: ${tiktok.videoChannel ? `<#${tiktok.videoChannel}>` : '`No configurado`'}\n` +
-        `└ Usuarios monitoreados: ${tiktok.users?.length || 0}`;
+        `└ Usuarios monitoreados: ${tiktok.users?.length || 0}\n` +
+        `└ Ping Role: ${tiktok.pingRole ? `<@&${tiktok.pingRole}>` : '`No configurado`'}`;
       break;
 
     case 'twitch':
@@ -366,14 +575,16 @@ async function testPanel(guildId) {
         '├─ /twitch-clear              → Elimina todos los streamers\n' +
         '│\n' +
         '⚙️ COMANDOS DE CONFIGURACIÓN\n' +
-        '└─ /twitch-setchannel <#canal> → Canal para notificaciones\n' +
+        '├─ /twitch-setchannel <#canal> → Canal para notificaciones\n' +
+        '└─ /twitch-setpingrole <rol>   → Configura rol a etiquetar\n' +
         '│\n' +
         '🧪 COMANDOS DE PRUEBA\n' +
         '└─ /twitch-test <streamer>    → Prueba un streamer de Twitch\n' +
         '```\n\n' +
         '📊 **Estado actual:**\n' +
         `└ Live Channel: ${twitch.liveChannel ? `<#${twitch.liveChannel}>` : '`No configurado`'}\n` +
-        `└ Streamers monitoreados: ${twitch.users?.length || 0}`;
+        `└ Streamers monitoreados: ${twitch.users?.length || 0}\n` +
+        `└ Ping Role: ${twitch.pingRole ? `<@&${twitch.pingRole}>` : '`No configurado`'}`;
       break;
 
     case 'youtube':
@@ -389,7 +600,8 @@ async function testPanel(guildId) {
         '⚙️ COMANDOS DE CONFIGURACIÓN\n' +
         '├─ /youtube-setchannel live <#canal>   → Canal para directos\n' +
         '├─ /youtube-setchannel videos <#canal> → Canal para videos\n' +
-        '└─ /youtube-setchannel shorts <#canal> → Canal para shorts\n' +
+        '├─ /youtube-setchannel shorts <#canal> → Canal para shorts\n' +
+        '└─ /youtube-setpingrole <rol>          → Configura rol a etiquetar\n' +
         '│\n' +
         '🧪 COMANDOS DE PRUEBA\n' +
         '└─ /youtube-test <tipo> <canal> → Prueba notificaciones de YouTube\n' +
@@ -398,7 +610,8 @@ async function testPanel(guildId) {
         `└ Live Channel: ${youtube.liveChannel ? `<#${youtube.liveChannel}>` : '`No configurado`'}\n` +
         `└ Video Channel: ${youtube.videoChannel ? `<#${youtube.videoChannel}>` : '`No configurado`'}\n` +
         `└ Shorts Channel: ${youtube.shortChannel ? `<#${youtube.shortChannel}>` : '`No configurado`'}\n` +
-        `└ Canales monitoreados: ${youtube.users?.length || 0}`;
+        `└ Canales monitoreados: ${youtube.users?.length || 0}\n` +
+        `└ Ping Role: ${youtube.pingRole ? `<@&${youtube.pingRole}>` : '`No configurado`'}`;
       break;
 
     case 'branding':

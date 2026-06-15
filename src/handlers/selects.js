@@ -1,3 +1,4 @@
+// src/handlers/selects.js
 const { updateGuildSection, getGuildConfig } = require('../database/mongoManager');
 const { generalPanel, botPanel, tiktokPanel, twitchPanel, youtubePanel } = require('../dashboard/panels');
 const { updateDashboard, getActivePanel } = require('../dashboard/updater');
@@ -55,10 +56,13 @@ async function handleSelect(interaction, client) {
     bot_log_channel: { section: 'general', data: { botLogChannel: selectedValue }, panel: 'bot' },
     tiktok_live_channel: { section: 'tiktok', data: { liveChannel: selectedValue }, panel: 'tiktok', mode: 'auto' },
     tiktok_video_channel: { section: 'tiktok', data: { videoChannel: selectedValue }, panel: 'tiktok', mode: 'auto' },
+    tiktok_ping_role: { section: 'tiktok', data: { pingRole: selectedValue }, panel: 'tiktok', mode: 'auto' },
     twitch_live_channel: { section: 'twitch', data: { liveChannel: selectedValue }, panel: 'twitch' },
+    twitch_ping_role: { section: 'twitch', data: { pingRole: selectedValue }, panel: 'twitch' },
     youtube_live_channel: { section: 'youtube', data: { liveChannel: selectedValue }, panel: 'youtube', mode: 'auto' },
     youtube_video_channel: { section: 'youtube', data: { videoChannel: selectedValue }, panel: 'youtube', mode: 'auto' },
-    youtube_short_channel: { section: 'youtube', data: { shortChannel: selectedValue }, panel: 'youtube', mode: 'auto' }
+    youtube_short_channel: { section: 'youtube', data: { shortChannel: selectedValue }, panel: 'youtube', mode: 'auto' },
+    youtube_ping_role: { section: 'youtube', data: { pingRole: selectedValue }, panel: 'youtube', mode: 'auto' }
   };
 
   const config = configMap[customId];

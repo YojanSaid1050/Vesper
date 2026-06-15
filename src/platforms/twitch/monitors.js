@@ -1,3 +1,4 @@
+// src/platforms/twitch/monitors.js
 const { getAllGuildConfigs, getGuildConfig } = require('../../database/mongoManager');
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const CacheManager = require('../../core/CacheManager');
@@ -109,6 +110,7 @@ async function processGuildStreams(guildId, config, client, streamStatus) {
   const twitchConfig = config.twitch || {};
   const users = twitchConfig.users || [];
   const liveChannelId = twitchConfig.liveChannel;
+  const pingRole = twitchConfig.pingRole || null;
 
   if (users.length === 0 || !liveChannelId) return null;
   if (shouldSkipGuild(guildId)) {
@@ -156,6 +158,8 @@ async function processGuildStreams(guildId, config, client, streamStatus) {
 
     let newStreams = 0;
     let hasChanges = false;
+    
+    const pingText = pingRole ? `<@&${pingRole}>\n\n` : '';
 
     for (const streamer of results) {
       if (!streamer?.success) {
@@ -180,7 +184,8 @@ async function processGuildStreams(guildId, config, client, streamStatus) {
             game: streamer.game || 'Sin categoría',
             viewers: streamer.viewers || 0,
             thumbnail: streamer.thumbnail,
-            streamUrl: streamer.streamUrl || `https://twitch.tv/${streamerLogin}`
+            streamUrl: streamer.streamUrl || `https://twitch.tv/${streamerLogin}`,
+            pingText: pingText
           });
           
           if (embed) {

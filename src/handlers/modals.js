@@ -389,50 +389,51 @@ async function handleModal(interaction, client) {
   }
 
   // YouTube Remove
-  if (interaction.customId === 'youtube_remove_modal') {
-    const input = interaction.fields.getTextInputValue('channel_input').trim();
-    
-    if (!input) {
-      await interaction.reply({ content: '❌ Nombre de canal inválido.', flags: 64 });
-      return;
-    }
-    
-    await processModalAsync(interaction, client, async () => {
-      let config = await getGuildConfig(guildId);
-      if (!config.youtube) config.youtube = { users: [] };
-      config.youtube.users = normalizeUserArray(config.youtube.users, 'youtube');
-      
-      let foundChannelId = null;
-      let foundChannelName = null;
-      
-      // Buscar por ID exacto o por nombre/handle
-      for (const channelId of config.youtube.users) {
-        const info = await verifyChannel(channelId);
-        if (info.exists) {
-          const inputLower = input.toLowerCase();
-          const handleLower = info.handle?.toLowerCase();
-          const nameLower = info.name?.toLowerCase();
-          
-          if (channelId === input || handleLower === inputLower || nameLower === inputLower) {
-            foundChannelId = channelId;
-            foundChannelName = info.name;
-            break;
-          }
-        }
-      }
-      
-      if (!foundChannelId) {
-        return { message: `❌ No se encontró el canal **${input}** en la lista de monitoreo.\n\nUsa /youtube-list para ver los canales actuales.` };
-      }
-      
-      config.youtube.users = config.youtube.users.filter(u => u !== foundChannelId);
-      await updateGuildConfig(guildId, config);
-      cleanYouTubeGuild(guildId);
-      
-      return { message: `✅ **${foundChannelName || foundChannelId}** eliminado de la lista de monitoreo.\n\n📋 Canales restantes: ${config.youtube.users.length}` };
-    });
+if (interaction.customId === 'youtube_remove_modal') {
+  const input = interaction.fields.getTextInputValue('channel_input').trim();
+  
+  if (!input) {
+    await interaction.reply({ content: '❌ Nombre de canal inválido.', flags: 64 });
     return;
   }
+  
+  await processModalAsync(interaction, client, async () => {
+    let config = await getGuildConfig(guildId);
+    if (!config.youtube) config.youtube = { users: [] };
+    config.youtube.users = normalizeUserArray(config.youtube.users, 'youtube');
+    
+    let foundChannelId = null;
+    let foundChannelName = null;
+    
+    for (const channelId of config.youtube.users) {
+      const info = await verifyChannel(channelId);
+      if (info.exists) {
+        const inputLower = input.toLowerCase();
+        const handleLower = info.handle?.toLowerCase();
+        const nameLower = info.name?.toLowerCase();
+        
+        if (channelId === input || handleLower === inputLower || nameLower === inputLower) {
+          foundChannelId = channelId;
+          foundChannelName = info.name;
+          break;
+        }
+      }
+    }
+    
+    if (!foundChannelId) {
+      return { message: `❌ No se encontró el canal **${input}** en la lista de monitoreo.\n\nUsa /youtube-list para ver los canales actuales.` };
+    }
+    
+    config.youtube.users = config.youtube.users.filter(u => u !== foundChannelId);
+    await updateGuildConfig(guildId, config);
+    
+    const { cleanYouTubeChannelCache } = require('../platforms/youtube/monitors');
+    cleanYouTubeChannelCache(guildId, foundChannelId);  // ✅ Solo borra la caché del canal eliminado
+    
+    return { message: `✅ **${foundChannelName || foundChannelId}** eliminado de la lista de monitoreo.\n\n📋 Canales restantes: ${config.youtube.users.length}` };
+  });
+  return;
+}
 }
 
 module.exports = { handleModal };

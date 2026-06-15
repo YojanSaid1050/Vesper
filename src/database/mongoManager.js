@@ -1,3 +1,4 @@
+// src/database/mongoManager.js
 const mongoose = require('mongoose');
 const Guild = require('./models/Guild');
 
@@ -7,7 +8,6 @@ let connectionPromise = null;
 async function connectMongo() {
   if (isConnected) return;
   
-  // Si ya hay una conexión en curso, esperar a que termine
   if (connectionPromise) {
     return connectionPromise;
   }
@@ -36,7 +36,6 @@ async function connectMongo() {
   return connectionPromise;
 }
 
-// Manejar desconexión
 mongoose.connection.on('disconnected', () => {
   isConnected = false;
   console.log('⚠️ MongoDB desconectado');
@@ -64,14 +63,13 @@ async function getGuildConfig(guildId) {
     return guild.toObject();
   } catch (error) {
     console.error(`Error obteniendo configuración para guild ${guildId}:`, error.message);
-    // Devolver configuración por defecto
     return {
       guildId,
       general: { welcomeChannel: null, goodbyeChannel: null, logChannel: null, botLogChannel: null, botRole: null },
       dashboard: { channel: null, message: null, enabled: false, currentPanel: 'main', currentMode: 'default' },
-      tiktok: { liveChannel: null, videoChannel: null, users: [], showUsers: false },
-      twitch: { liveChannel: null, users: [], showUsers: false },
-      youtube: { liveChannel: null, videoChannel: null, shortChannel: null, users: [], showUsers: false },
+      tiktok: { liveChannel: null, videoChannel: null, users: [], showUsers: false, pingRole: null },
+      twitch: { liveChannel: null, users: [], showUsers: false, pingRole: null },
+      youtube: { liveChannel: null, videoChannel: null, shortChannel: null, users: [], showUsers: false, pingRole: null },
       branding: { name: null, avatar: null },
       testPanel: { activeSection: 'general' }
     };
@@ -148,7 +146,6 @@ async function deleteGuild(guildId) {
   return await Guild.deleteOne({ guildId });
 }
 
-// Función para limpiar usuarios duplicados en arrays
 async function cleanDuplicateUsers() {
   await connectMongo();
   

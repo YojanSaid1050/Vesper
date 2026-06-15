@@ -1,24 +1,12 @@
+// src/commands/youtube/remove.js
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 const { verifyChannel } = require('../../platforms/youtube/utils');
-const CacheManager = require('../../core/CacheManager');
+const { cleanYouTubeChannelCache } = require('../../platforms/youtube/monitors'); // NUEVA importación
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 
-const youtubeCache = new CacheManager('./data/youtube');
-
-function cleanYouTubeGuild(guildId) {
-  const liveStatus = youtubeCache.load('liveStatus', {});
-  delete liveStatus[guildId];
-  youtubeCache.save('liveStatus', liveStatus);
-
-  const videos = youtubeCache.load('videos', {});
-  delete videos[guildId];
-  youtubeCache.save('videos', videos);
-
-  const shorts = youtubeCache.load('shorts', {});
-  delete shorts[guildId];
-  youtubeCache.save('shorts', shorts);
-}
+// ELIMINAMOS la función cleanYouTubeGuild que borraba todo
+// Ya no es necesaria
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -54,7 +42,8 @@ module.exports = {
       const newUsers = currentUsers.filter(u => u !== foundChannelId);
       await updateGuildSection(interaction.guildId, 'youtube', { ...config.youtube, users: newUsers });
 
-      cleanYouTubeGuild(interaction.guildId);
+      // NUEVO: Limpiar SOLO la caché del canal eliminado, no todo el guild
+      cleanYouTubeChannelCache(interaction.guildId, foundChannelId);
 
       await interaction.editReply({ content: `✅ Se eliminó **${foundChannelName || foundChannelId}** de la lista de monitoreo.\n\n📋 Canales restantes: ${newUsers.length}` });
       

@@ -1,3 +1,4 @@
+// src/database/models/Guild.js
 const mongoose = require('mongoose');
 
 const guildSchema = new mongoose.Schema({
@@ -13,26 +14,29 @@ const guildSchema = new mongoose.Schema({
     channel: { type: String, default: null },
     message: { type: String, default: null },
     enabled: { type: Boolean, default: false },
-    currentPanel: { type: String, default: 'main' }, // Añadido para persistencia
-    currentMode: { type: String, default: 'default' } // Añadido para persistencia
+    currentPanel: { type: String, default: 'main' },
+    currentMode: { type: String, default: 'default' }
   },
   tiktok: {
     liveChannel: { type: String, default: null },
     videoChannel: { type: String, default: null },
     users: { type: [String], default: [] },
-    showUsers: { type: Boolean, default: false }
+    showUsers: { type: Boolean, default: false },
+    pingRole: { type: String, default: null }  // NUEVO: Rol a etiquetar
   },
   twitch: {
     liveChannel: { type: String, default: null },
     users: { type: [String], default: [] },
-    showUsers: { type: Boolean, default: false }
+    showUsers: { type: Boolean, default: false },
+    pingRole: { type: String, default: null }  // NUEVO: Rol a etiquetar
   },
   youtube: {
     liveChannel: { type: String, default: null },
     videoChannel: { type: String, default: null },
     shortChannel: { type: String, default: null },
     users: { type: [String], default: [] },
-    showUsers: { type: Boolean, default: false }
+    showUsers: { type: Boolean, default: false },
+    pingRole: { type: String, default: null }  // NUEVO: Rol a etiquetar
   },
   branding: {
     name: { type: String, default: null },
@@ -43,7 +47,6 @@ const guildSchema = new mongoose.Schema({
   }
 }, { 
   timestamps: true,
-  // Asegurar que los arrays no tengan duplicados
   toJSON: { virtuals: true },
   toObject: { virtuals: true }
 });
