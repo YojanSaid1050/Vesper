@@ -1,6 +1,7 @@
 // src/database/mongoManager.js
 const mongoose = require('mongoose');
 const Guild = require('./models/Guild');
+const { moduleDefaults } = require('../config/guildPolicy');
 
 let isConnected = false;
 let connectionPromise = null;
@@ -85,6 +86,10 @@ async function getGuildConfig(guildId) {
       twitch: { liveChannel: null, users: [], showUsers: false, pingRole: null },
       youtube: { liveChannel: null, videoChannel: null, shortChannel: null, users: [], showUsers: false, pingRole: null },
       branding: { name: null, avatar: null },
+      features: moduleDefaults(),
+      permissions: { socialManagerRoles: [], moderatorRoles: [], musicDjRoles: [] },
+      moderation: { filterLinks: false, allowedDomains: [], blockInvites: true, maxMentions: 5, repeatLimit: 4, action: 'warn' },
+      music: { requestChannel: null, defaultVolume: 50, maxQueue: 100, maxPerUser: 3, maxTrackMinutes: 15, idleSeconds: 180 },
       testPanel: { activeSection: 'general' }
     };
   }
@@ -98,7 +103,7 @@ async function updateGuildConfig(guildId, updates) {
   await connectMongo();
   
   try {
-    const allowedSections = ['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'testPanel'];
+    const allowedSections = ['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'features', 'permissions', 'moderation', 'music', 'testPanel'];
     const sanitizedUpdates = {};
     for (const section of allowedSections) {
       if (updates?.[section] !== undefined) sanitizedUpdates[section] = updates[section];
@@ -124,7 +129,7 @@ async function updateGuildSection(guildId, section, values) {
   await connectMongo();
   
   try {
-    const allowedSections = new Set(['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'testPanel']);
+    const allowedSections = new Set(['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'features', 'permissions', 'moderation', 'music', 'testPanel']);
     if (!allowedSections.has(section)) throw new Error(`Sección de configuración no permitida: ${section}`);
 
     const update = {};

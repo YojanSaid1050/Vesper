@@ -27,7 +27,8 @@ app.get('/health', (req, res) => {
     database,
     shuttingDown: isShuttingDown,
     uptime: client?.uptime || 0,
-    monitors: getMonitorStats()
+    monitors: getMonitorStats(),
+    music: client?.music?.status?.() || { configured: false, connected: false, players: 0 }
   });
 });
 
@@ -53,6 +54,7 @@ async function gracefulShutdown(signal) {
   }
   
   if (client && client.isReady()) {
+    await client.music?.shutdown?.().catch(error => console.error('❌ Error cerrando música:', error.message));
     console.log('🤖 Desconectando bot de Discord...');
     await client.destroy();
   }

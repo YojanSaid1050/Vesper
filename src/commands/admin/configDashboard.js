@@ -4,6 +4,7 @@ const { updateGuildSection, getGuildConfig } = require('../../database/mongoMana
 const { mainPanel } = require('../../dashboard/panels');
 
 module.exports = {
+  scope: 'main',
   data: new SlashCommandBuilder()
     .setName('config-dashboard')
     .setDescription('Crea o reinicia el dashboard de configuración.')

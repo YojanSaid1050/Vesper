@@ -1,5 +1,5 @@
 // src/database/guildManager.js
-const { 
+const {
   getGuildConfig, 
   updateGuildConfig, 
   updateGuildSection, 
@@ -10,6 +10,7 @@ const {
   cleanDuplicateUsers,
   connectMongo
 } = require('./mongoManager');
+const { moduleDefaults } = require('../config/guildPolicy');
 
 function createDefaultGuild() {
   return {
@@ -19,6 +20,10 @@ function createDefaultGuild() {
     twitch: { liveChannel: null, users: [], showUsers: false, pingRole: null },
     youtube: { liveChannel: null, videoChannel: null, shortChannel: null, users: [], showUsers: false, pingRole: null },
     branding: { name: null, avatar: null },
+    features: moduleDefaults(),
+    permissions: { socialManagerRoles: [], moderatorRoles: [], musicDjRoles: [] },
+    moderation: { filterLinks: false, allowedDomains: [], blockInvites: true, maxMentions: 5, repeatLimit: 4, action: 'warn' },
+    music: { requestChannel: null, defaultVolume: 50, maxQueue: 100, maxPerUser: 3, maxTrackMinutes: 15, idleSeconds: 180 },
     testPanel: { activeSection: 'general' }
   };
 }

@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const { recordRequest } = require('../../core/ProviderMetrics');
 
 const channelCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
@@ -40,6 +41,7 @@ async function findExactChannel(searchTerm) {
       type: ['channel'],
       maxResults: 10
     });
+    recordRequest('youtube', 100);
     
     for (const item of searchResponse.data.items || []) {
       const channelId = item.snippet.channelId;
@@ -103,6 +105,7 @@ async function getChannelInfo(identifier) {
         type: ['channel'],
         maxResults: 1
       });
+      recordRequest('youtube', 100);
 
       if (!search.data.items?.length) return null;
       channelId = search.data.items[0].snippet.channelId;
@@ -112,6 +115,7 @@ async function getChannelInfo(identifier) {
       part: ['snippet', 'statistics'],
       id: [channelId]
     });
+    recordRequest('youtube', 1);
 
     const channel = response.data.items?.[0];
     if (!channel) return null;
@@ -159,6 +163,7 @@ async function isShort(videoId) {
       part: ['contentDetails', 'snippet'],
       id: [videoId]
     });
+    recordRequest('youtube', 1);
     
     const item = details.data.items?.[0];
     if (!item) return false;

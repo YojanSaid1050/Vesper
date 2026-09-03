@@ -2,6 +2,8 @@ const { Events } = require('discord.js');
 const { startAllMonitors } = require('../platforms');
 const { updateDashboard } = require('../dashboard/updater');
 const { connectMongo } = require('../database/mongoManager'); // Añadido para verificar conexión
+const { getMainGuildId } = require('../config/guildPolicy');
+const { auditGuild } = require('../core/DiagnosticsService');
 
 module.exports = {
   name: Events.ClientReady,
@@ -44,6 +46,22 @@ module.exports = {
       console.log('✅ Monitores iniciados correctamente');
     } catch (error) {
       console.error('❌ Error iniciando monitores:', error);
+    }
+
+    try {
+      await client.music.start();
+      console.log(client.music.status().configured ? '🎵 Servicio de música iniciado' : 'ℹ️ Música disponible pero Lavalink no está configurado');
+    } catch (error) {
+      console.error('❌ Error iniciando música:', error.message);
+    }
+
+    const mainGuild = client.guilds.cache.get(getMainGuildId());
+    if (mainGuild) {
+      const audit = await auditGuild(mainGuild).catch(() => null);
+      if (audit?.issues?.length) console.warn(`⚠️ Auditoría Main: ${audit.issues.join(' | ')}`);
+      else if (audit) console.log('✅ Auditoría inicial del Main completada sin incidencias');
+    } else {
+      console.warn('⚠️ MAIN_GUILD_ID no corresponde a un servidor disponible para Vesper');
     }
 
     // Log final

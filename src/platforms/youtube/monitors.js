@@ -1,10 +1,11 @@
 // src/platforms/youtube/monitors.js
 const { getAllGuildConfigs, getGuildConfig } = require('../../database/mongoManager');
-const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { sendNotification, completeActiveLive } = require('../../core/NotificationService');
 const CacheManager = require('../../core/CacheManager');
 const { checkLiveUsers, checkVideos, checkShorts, clearChannelCache } = require('./checks');
-const { liveEmbed, videoEmbed, shortEmbed } = require('./embeds');
+const { youtubeLive, youtubeVideo, youtubeShort } = require('../messageFactory');
 const { monitor } = require('../../utils/logger');
+const { isModuleEnabledConfig } = require('../../config/guildPolicy');
 
 const cache = new CacheManager('./data/youtube');
 
@@ -168,6 +169,7 @@ async function monitorLives(client) {
 }
 
 async function processGuildLives(guildId, config, client, liveStatus) {
+  if (!isModuleEnabledConfig(config, 'youtube')) return null;
   const youtubeConfig = config.youtube || {};
   const users = youtubeConfig.users || [];
   const liveChannelId = youtubeConfig.liveChannel;
@@ -239,7 +241,7 @@ async function processGuildLives(guildId, config, client, liveStatus) {
         });
         
         try {
-          const embed = liveEmbed({
+          const embed = youtubeLive(guildId, {
             channelName: user.channelName,
             handle: user.handle,
             title: user.title,
@@ -252,15 +254,30 @@ async function processGuildLives(guildId, config, client, liveStatus) {
           });
           
           if (embed) {
-            await sendBrandedMessage(channel, embed);
-            newLives++;
-            guildStatus[channelId] = isLive;
-            hasChanges = true;
+            const delivery = await sendNotification(channel, embed, {
+              guildId,
+              platform: 'youtube',
+              account: channelId,
+              eventType: 'live_started',
+              eventId: user.videoId || user.startedAt
+            });
+            if (delivery.sent || (delivery.duplicate && ['sent', 'ended'].includes(delivery.event?.status))) {
+              if (delivery.sent) newLives++;
+              guildStatus[channelId] = true;
+              hasChanges = true;
+            }
           }
         } catch (error) {
           console.error(`[YouTube] Error enviando mensaje live para ${user.channelName}:`, error);
         }
       } else if (guildStatus[channelId] !== isLive) {
+        if (!isLive && wasLive) {
+          await completeActiveLive(channel, {
+            guildId,
+            platform: 'youtube',
+            account: channelId
+          }).catch(error => recordError(guildId, 'complete_live', error));
+        }
         guildStatus[channelId] = isLive;
         hasChanges = true;
       }
@@ -333,6 +350,7 @@ async function monitorVideos(client) {
 }
 
 async function processGuildVideos(guildId, config, client, videos) {
+  if (!isModuleEnabledConfig(config, 'youtube')) return null;
   const youtubeConfig = config.youtube || {};
   const users = youtubeConfig.users || [];
   const videoChannelId = youtubeConfig.videoChannel;
@@ -415,16 +433,24 @@ async function processGuildVideos(guildId, config, client, videos) {
         });
         
         try {
-          const embed = videoEmbed({ 
+          const embed = youtubeVideo(guildId, { 
             channelName: user.channelName, 
             handle: user.handle
           }, latestVideo, pingText);
           
           if (embed) {
-            await sendBrandedMessage(channel, embed);
-            newVideos++;
-            guildVideos[channelId] = latestVideo.videoId;
-            hasChanges = true;
+            const delivery = await sendNotification(channel, embed, {
+              guildId,
+              platform: 'youtube',
+              account: channelId,
+              eventType: 'video_published',
+              eventId: latestVideo.videoId
+            });
+            if (delivery.sent || (delivery.duplicate && ['sent', 'ended'].includes(delivery.event?.status))) {
+              if (delivery.sent) newVideos++;
+              guildVideos[channelId] = latestVideo.videoId;
+              hasChanges = true;
+            }
           }
         } catch (error) {
           console.error(`[YouTube] Error enviando mensaje video para ${user.channelName}:`, error);
@@ -500,6 +526,7 @@ async function monitorShorts(client) {
 }
 
 async function processGuildShorts(guildId, config, client, shorts) {
+  if (!isModuleEnabledConfig(config, 'youtube')) return null;
   const youtubeConfig = config.youtube || {};
   const users = youtubeConfig.users || [];
   const shortChannelId = youtubeConfig.shortChannel;
@@ -582,16 +609,24 @@ async function processGuildShorts(guildId, config, client, shorts) {
         });
         
         try {
-          const embed = shortEmbed({ 
+          const embed = youtubeShort(guildId, { 
             channelName: user.channelName, 
             handle: user.handle
           }, latestShort, pingText);
           
           if (embed) {
-            await sendBrandedMessage(channel, embed);
-            newShorts++;
-            guildShorts[channelId] = latestShort.videoId;
-            hasChanges = true;
+            const delivery = await sendNotification(channel, embed, {
+              guildId,
+              platform: 'youtube',
+              account: channelId,
+              eventType: 'short_published',
+              eventId: latestShort.videoId
+            });
+            if (delivery.sent || (delivery.duplicate && ['sent', 'ended'].includes(delivery.event?.status))) {
+              if (delivery.sent) newShorts++;
+              guildShorts[channelId] = latestShort.videoId;
+              hasChanges = true;
+            }
           }
         } catch (error) {
           console.error(`[YouTube] Error enviando mensaje short para ${user.channelName}:`, error);

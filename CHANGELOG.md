@@ -1,5 +1,24 @@
 # Historial de cambios
 
+## 2.4.0
+
+- Separación estricta entre servidor Main y servidores satélite.
+- Catálogo de comandos exclusivo del Main con doble validación en ejecución.
+- Personalidad original conservada en el Main y perfil neutral en satélites.
+- Roles de colores, países, juegos, plataformas y verificación aislados al Main.
+- Centro de control Main con auditoría, diagnóstico, módulos e historial.
+- Activación persistente por servidor de TikTok, Twitch, YouTube, bienvenida,
+  despedida, logs, música y moderación.
+- Historial de notificaciones en MongoDB con retención automática configurable.
+- Protección anti-duplicados mediante clave única y recuperación de envíos fallidos.
+- Reintentos progresivos únicamente ante errores temporales.
+- Ciclo completo de directos en el Main, editando el mensaje al finalizar.
+- Moderación opcional con advertencias, timeouts, sanciones y filtros.
+- Reproductor musical autohospedado con Lavalink, colas y límites por servidor.
+- Respaldo Chromium para perfiles y lives TikTok cuando la consulta pública devuelve CAPTCHA.
+- Configuración central de música y moderación para servidores aprobados.
+- Embeds originales de plataformas y dashboard conservados sin cambios.
+
 ## 2.3.0
 
 - Eliminada por completo la dependencia de Apify y todas sus credenciales.

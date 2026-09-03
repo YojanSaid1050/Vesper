@@ -296,6 +296,42 @@ class TikTokBrowserService {
     }
   }
 
+  async profile(username) {
+    const browser = await this.ensureReady();
+    const context = await browser.newContext({
+      userAgent: CONFIG.USER_AGENT,
+      locale: 'es-CO',
+      timezoneId: 'America/Bogota',
+      viewport: { width: 1365, height: 900 },
+      extraHTTPHeaders: { 'accept-language': 'es-CO,es;q=0.9,en;q=0.7' }
+    });
+    try {
+      await context.addInitScript(() => {
+        Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        Object.defineProperty(navigator, 'languages', { get: () => ['es-CO', 'es', 'en'] });
+        Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      });
+      const page = await context.newPage();
+      await page.route('**/*', route => {
+        const type = route.request().resourceType();
+        if (['media', 'font', 'image'].includes(type)) return route.abort();
+        return route.continue();
+      });
+      const response = await page.goto(`https://www.tiktok.com/@${username}/live`, {
+        waitUntil: 'domcontentloaded',
+        timeout: CONFIG.BROWSER_TIMEOUT_MS
+      });
+      if (response && response.status() >= 400) throw new Error(`TikTok respondió HTTP ${response.status()} al navegador local`);
+      await page.waitForTimeout(CONFIG.PAGE_SETTLE_MS);
+      await page.waitForFunction(() => Boolean(
+        document.querySelector('script#SIGI_STATE, script#__UNIVERSAL_DATA_FOR_REHYDRATION__')
+      ), null, { timeout: 20_000 }).catch(() => null);
+      return parseProfileHtml(await page.content(), username);
+    } finally {
+      await context.close().catch(() => {});
+    }
+  }
+
   async stats() {
     return {
       mode: 'integrated',
@@ -369,7 +405,18 @@ class FreeTikTokClient {
         });
         const html = await response.text();
         if (!response.ok) throw new Error(`TikTok respondió HTTP ${response.status} para @${normalized}`);
-        return parseProfileHtml(html, normalized);
+        try {
+          return parseProfileHtml(html, normalized);
+        } catch (directError) {
+          // TikTok puede responder 200 con una página CAPTCHA o un HTML mínimo.
+          // El navegador local es el respaldo gratuito y mantiene el resto de
+          // plataformas aislado si también fuera bloqueado.
+          try {
+            return await this.browser.profile(normalized);
+          } catch (browserError) {
+            throw new Error(`Consulta pública bloqueada (${directError.message}); respaldo Chromium falló (${browserError.message})`);
+          }
+        }
       });
       this.recordSuccess();
       return result;

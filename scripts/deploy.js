@@ -8,6 +8,7 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const TOKEN = process.env.TOKEN;
 const USE_GUILD_COMMANDS = process.env.USE_GUILD_COMMANDS === 'true';
 const GUILD_ID = process.env.GUILD_ID;
+const MAIN_GUILD_ID = process.env.MAIN_GUILD_ID || GUILD_ID;
 
 // Validaciones
 if (!CLIENT_ID || !TOKEN) {
@@ -87,6 +88,7 @@ const commandFiles = getCommandFiles(commandsPath);
 console.log(`📂 Encontrados ${commandFiles.length} archivos de comandos`);
 
 const commands = [];
+const mainOnlyCommands = [];
 const failedCommands = [];
 
 // Cargar comandos
@@ -98,7 +100,8 @@ for (const filePath of commandFiles) {
     if (command.data && typeof command.data.toJSON === 'function') {
       const jsonCommand = command.data.toJSON();
       const cleanedCommand = cleanCommand(jsonCommand);
-      commands.push(cleanedCommand);
+      if (command.scope === 'main') mainOnlyCommands.push(cleanedCommand);
+      else commands.push(cleanedCommand);
       console.log(`✅ Comando cargado: ${cleanedCommand.name}`);
     } else {
       console.log(`⚠️ ${path.basename(filePath)} no tiene estructura válida`);
@@ -115,7 +118,8 @@ if (commands.length === 0) {
   process.exit(1);
 }
 
-console.log(`\n📋 Comandos a desplegar: ${commands.length}`);
+console.log(`\n📋 Comandos comunes: ${commands.length}`);
+console.log(`🏠 Comandos exclusivos Main: ${mainOnlyCommands.length}`);
 commands.slice(0, 20).forEach(cmd => console.log(`   - /${cmd.name}`));
 if (commands.length > 20) console.log(`   ... y ${commands.length - 20} más`);
 
@@ -132,14 +136,21 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
     const startTime = Date.now();
     
     if (USE_GUILD_COMMANDS) {
-      console.log(`\n🏠 Registrando ${commands.length} comandos en el servidor local...`);
-      await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: commands });
-      console.log(`✅ ${commands.length} comandos locales registrados correctamente`);
+      const localCommands = GUILD_ID === MAIN_GUILD_ID ? [...commands, ...mainOnlyCommands] : commands;
+      console.log(`\n🏠 Registrando ${localCommands.length} comandos en el servidor local...`);
+      await rest.put(Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID), { body: localCommands });
+      console.log(`✅ ${localCommands.length} comandos locales registrados correctamente`);
     } else {
       console.log(`\n🌍 Registrando ${commands.length} comandos globalmente...`);
       console.log('⏳ Los comandos globales pueden tardar hasta 1 hora en propagarse');
       await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
       console.log(`✅ ${commands.length} comandos globales registrados correctamente`);
+      if (MAIN_GUILD_ID) {
+        await rest.put(Routes.applicationGuildCommands(CLIENT_ID, MAIN_GUILD_ID), { body: mainOnlyCommands });
+        console.log(`✅ ${mainOnlyCommands.length} comandos exclusivos registrados en el Main`);
+      } else if (mainOnlyCommands.length > 0) {
+        console.warn('⚠️ MAIN_GUILD_ID no definido; no se registraron comandos exclusivos');
+      }
     }
     
     const duration = Date.now() - startTime;

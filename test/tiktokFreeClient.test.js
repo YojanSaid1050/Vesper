@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   parseProfileHtml,
+  TikTokBrowserService,
   latestBrowserVideo,
   extractVideoLinksFromHtml,
   videoTimestampFromId
@@ -78,4 +79,27 @@ test('extrae enlaces de video desde el HTML como respaldo', () => {
   const result = extractVideoLinksFromHtml(html, { username: 'vesper' });
   assert.equal(result.latestVideoId, newId);
   assert.equal(videoTimestampFromId(newId), 1700100000);
+});
+
+test('el respaldo Chromium puede recuperar un perfil/live cuando el HTML directo falla', async () => {
+  const service = new TikTokBrowserService();
+  const page = {
+    route: async () => {},
+    goto: async () => ({ status: () => 200 }),
+    waitForTimeout: async () => {},
+    waitForFunction: async () => {},
+    content: async () => profileHtml({ username: 'vesper', status: 2 })
+  };
+  service.browser = {
+    isConnected: () => true,
+    newContext: async () => ({
+      addInitScript: async () => {},
+      newPage: async () => page,
+      close: async () => {}
+    })
+  };
+  const result = await service.profile('vesper');
+  assert.equal(result.exists, true);
+  assert.equal(result.isLive, true);
+  assert.equal(result.username, 'vesper');
 });

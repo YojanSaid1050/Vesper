@@ -42,6 +42,37 @@ const guildSchema = new mongoose.Schema({
     name: { type: String, default: null },
     avatar: { type: String, default: null }
   },
+  features: {
+    tiktok: { type: Boolean, default: true },
+    twitch: { type: Boolean, default: true },
+    youtube: { type: Boolean, default: true },
+    welcome: { type: Boolean, default: true },
+    goodbye: { type: Boolean, default: true },
+    logs: { type: Boolean, default: true },
+    music: { type: Boolean, default: false },
+    moderation: { type: Boolean, default: false }
+  },
+  permissions: {
+    socialManagerRoles: { type: [String], default: [] },
+    moderatorRoles: { type: [String], default: [] },
+    musicDjRoles: { type: [String], default: [] }
+  },
+  moderation: {
+    filterLinks: { type: Boolean, default: false },
+    allowedDomains: { type: [String], default: [] },
+    blockInvites: { type: Boolean, default: true },
+    maxMentions: { type: Number, default: 5 },
+    repeatLimit: { type: Number, default: 4 },
+    action: { type: String, enum: ['delete', 'warn', 'timeout'], default: 'warn' }
+  },
+  music: {
+    requestChannel: { type: String, default: null },
+    defaultVolume: { type: Number, min: 1, max: 100, default: 50 },
+    maxQueue: { type: Number, min: 1, max: 500, default: 100 },
+    maxPerUser: { type: Number, min: 1, max: 25, default: 3 },
+    maxTrackMinutes: { type: Number, min: 1, max: 180, default: 15 },
+    idleSeconds: { type: Number, min: 30, max: 3600, default: 180 }
+  },
   testPanel: {
     activeSection: { type: String, default: 'general' }
   }

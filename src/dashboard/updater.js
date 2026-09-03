@@ -10,6 +10,7 @@ const {
   youtubePanel,
   testPanel 
 } = require('./panels');
+const { isMainGuild } = require('../config/guildPolicy');
 
 // Mapa para almacenar el panel activo de cada guild
 const activePanels = new Map();
@@ -45,6 +46,7 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
     
     let guildsToUpdate = [];
     
+    if (guildId && !isMainGuild(guildId)) return { updated: 0, failed: 0, cleaned: 0 };
     if (guildId) {
       const config = await getGuildConfig(guildId);
       if (config && config.dashboard?.channel && config.dashboard?.message) {
@@ -68,7 +70,7 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
           dashboard: config.dashboard || {},
           currentPanel: activePanels.get(id) || { type: config.dashboard?.currentPanel || 'main', mode: 'default' }
         }))
-        .filter(g => g.dashboard?.channel && g.dashboard?.message);
+        .filter(g => isMainGuild(g.guildId) && g.dashboard?.channel && g.dashboard?.message);
     }
     
     console.log(`[DEBUG] Guilds a actualizar: ${guildsToUpdate.length}`);
