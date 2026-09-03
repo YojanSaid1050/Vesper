@@ -1,6 +1,6 @@
 {
   "name": "vesper-bot",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Vesper - Discord Bot for streaming monitoring",
   "main": "src/index.js",
   "scripts": {
@@ -24,7 +24,9 @@
     "logs:follow": "node scripts/view-logs.js --follow",
     "status": "node scripts/bot-status.js",
     "test": "node --test",
-    "check": "npm run env:check && npm test",
+    "verify:visual": "node scripts/verify-visuals.js",
+    "qa": "npm test && npm run verify:visual",
+    "check": "npm run env:check && npm run qa",
     "reset-config": "node scripts/reset-config.js",
     "mongo:stats": "node scripts/clean-mongo.js --stats",
     "mongo:clean": "node scripts/clean-mongo.js --clean",
@@ -42,7 +44,8 @@
     "googleapis": "^173.0.0",
     "mongodb": "^7.2.0",
     "mongoose": "^9.6.3",
-    "playwright": "^1.62.1"
+    "playwright": "^1.62.1",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

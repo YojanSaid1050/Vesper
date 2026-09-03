@@ -1,6 +1,10 @@
 const { Client, Collection, GatewayIntentBits, Partials } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const { REST, Routes } = require('discord.js');
+const { executeEventWithPolicy } = require('./EventPolicy');
+const { getMainGuildId } = require('../config/guildPolicy');
+const { MusicService } = require('./MusicService');
 
 class BotClient extends Client {
   constructor() {
@@ -19,6 +23,7 @@ class BotClient extends Client {
     this.commands = new Collection();
     this.cooldowns = new Collection();
     this.timers = {};
+    this.music = new MusicService(this);
   }
 
   async initialize() {
@@ -89,7 +94,7 @@ class BotClient extends Client {
           try {
             const event = require(filePath);
             if (event.name) {
-              const handler = (...args) => event.execute(...args, this);
+              const handler = (...args) => executeEventWithPolicy(event, args, this);
               
               if (event.once) {
                 this.once(event.name, handler);
@@ -114,11 +119,22 @@ class BotClient extends Client {
 
   // Método para registrar comandos globalmente
   async registerCommands() {
-    const commandsData = this.commands.map(cmd => cmd.data.toJSON());
-    
+    const globalCommands = this.commands
+      .filter(command => command.scope !== 'main')
+      .map(command => command.data.toJSON());
+    const mainCommands = this.commands
+      .filter(command => command.scope === 'main')
+      .map(command => command.data.toJSON());
+    const mainGuildId = getMainGuildId();
+    const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+
     try {
-      await this.application.commands.set(commandsData);
-      console.log(`✅ ${commandsData.length} comandos registrados globalmente`);
+      await rest.put(Routes.applicationCommands(this.application.id), { body: globalCommands });
+      console.log(`✅ ${globalCommands.length} comandos comunes registrados globalmente`);
+      if (mainGuildId) {
+        await rest.put(Routes.applicationGuildCommands(this.application.id, mainGuildId), { body: mainCommands });
+        console.log(`✅ ${mainCommands.length} comandos exclusivos registrados en el Main`);
+      }
     } catch (error) {
       console.error('❌ Error registrando comandos:', error);
     }

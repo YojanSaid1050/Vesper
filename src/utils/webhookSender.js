@@ -3,25 +3,7 @@ const { monitorError } = require('./logger');
 
 const webhookCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000;
-const rateLimits = new Map();
-
-function getRateLimitKey(channelId) {
-  return `webhook_${channelId}`;
-}
-
-async function checkRateLimit(channelId) {
-  const key = getRateLimitKey(channelId);
-  const now = Date.now();
-  const limit = rateLimits.get(key);
-  
-  if (limit && now - limit.timestamp < 1000) {
-    if (limit.count >= 5) return false;
-    limit.count++;
-  } else {
-    rateLimits.set(key, { timestamp: now, count: 1 });
-  }
-  return true;
-}
+const channelQueues = new Map();
 
 async function getWebhook(channel) {
   const cacheKey = `${channel.guild.id}_${channel.id}`;
@@ -54,14 +36,8 @@ async function getWebhook(channel) {
   }
 }
 
-async function sendBrandedMessage(channel, payload) {
+async function sendBrandedMessageNow(channel, payload, options = {}) {
   try {
-    const canSend = await checkRateLimit(channel.id);
-    if (!canSend) {
-      console.warn(`⚠️ Rate limit exceeded for channel ${channel.id}`);
-      return null;
-    }
-    
     const config = await getGuildConfig(channel.guild.id);
     const branding = config.branding || {};
     const allowedRoleIds = [
@@ -101,17 +77,48 @@ async function sendBrandedMessage(channel, payload) {
       return webhook.send(webhookOptions);
     } else {
       // Fallback a mensaje normal con el bot (sin branding personalizado)
-      return channel.send(payload);
+      return channel.send({
+        ...payload,
+        allowedMentions: { parse: [], roles: allowedRoleIds, users: [] }
+      });
     }
   } catch (error) {
     monitorError('Webhook', 'Send Message', channel.guild.id, error, {
       channelId: channel.id
     });
-    return channel.send(payload).catch(fallbackError => {
+    return channel.send({ ...payload, allowedMentions: { parse: [], roles: [], users: [] } }).catch(fallbackError => {
       monitorError('Webhook', 'Fallback Send', channel.guild.id, fallbackError);
+      if (options.throwOnFailure) throw fallbackError;
       return null;
     });
   }
+}
+
+function enqueueChannel(channelId, operation) {
+  const previous = channelQueues.get(channelId) || Promise.resolve();
+  const current = previous.catch(() => null).then(operation);
+  const queued = current.finally(() => {
+    if (channelQueues.get(channelId) === queued) channelQueues.delete(channelId);
+  });
+  channelQueues.set(channelId, queued);
+  return queued;
+}
+
+async function sendBrandedMessage(channel, payload, options = {}) {
+  return enqueueChannel(channel.id, () => sendBrandedMessageNow(channel, payload, options));
+}
+
+async function editBrandedMessage(channel, messageId, payload) {
+  return enqueueChannel(channel.id, async () => {
+    const webhook = await getWebhook(channel);
+    const safePayload = {
+      ...payload,
+      allowedMentions: { parse: [], roles: [], users: [] }
+    };
+    if (webhook) return webhook.editMessage(messageId, safePayload);
+    const message = await channel.messages.fetch(messageId);
+    return message.edit(safePayload);
+  });
 }
 
 function clearWebhookCache(guildId = null) {
@@ -129,5 +136,6 @@ function clearWebhookCache(guildId = null) {
 
 module.exports = { 
   sendBrandedMessage,
+  editBrandedMessage,
   clearWebhookCache
 };

@@ -8,7 +8,12 @@ const requiredEnvVars = [
 
 const optionalEnvVars = [
   'GUILD_ID',
+  'MAIN_GUILD_ID',
+  'APPROVED_GUILD_IDS',
   'BOT_OWNER_IDS',
+  'SOCIAL_MANAGER_ROLE_IDS',
+  'MODERATOR_ROLE_IDS',
+  'MUSIC_DJ_ROLE_IDS',
   'TWITCH_CLIENT_ID',
   'TWITCH_CLIENT_SECRET',
   'YOUTUBE_API_KEY',
@@ -29,14 +34,18 @@ const optionalEnvVars = [
   'TIKTOK_REQUEST_TIMEOUT_MS',
   'TIKTOK_BROWSER_TIMEOUT_MS',
   'TIKTOK_PAGE_SETTLE_MS',
-  'TIKTOK_BROWSER_PATH'
+  'TIKTOK_BROWSER_PATH',
+  'NOTIFICATION_HISTORY_DAYS',
+  'LAVALINK_URL',
+  'LAVALINK_PASSWORD'
 ];
 
 const sensitiveEnvVars = new Set([
   'TOKEN',
   'MONGODB_URI',
   'TWITCH_CLIENT_SECRET',
-  'YOUTUBE_API_KEY'
+  'YOUTUBE_API_KEY',
+  'LAVALINK_PASSWORD'
 ]);
 
 function displayValue(envVar, value) {
@@ -58,6 +67,11 @@ for (const envVar of requiredEnvVars) {
     const value = process.env[envVar];
     console.log(`✅ ${envVar}: ${displayValue(envVar, value)}`);
   }
+}
+
+if (!process.env.MAIN_GUILD_ID && !process.env.GUILD_ID) {
+  console.error('❌ FALTA: MAIN_GUILD_ID (o GUILD_ID como compatibilidad)');
+  missing.push('MAIN_GUILD_ID');
 }
 
 console.log('\n📋 Variables opcionales:');

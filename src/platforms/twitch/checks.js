@@ -1,6 +1,7 @@
 // src/platforms/twitch/checks.js
 const axios = require('axios');
 const { getAccessToken, normalize, getStreamerInfo } = require('./utils');
+const { recordRequest } = require('../../core/ProviderMetrics');
 
 // Cache para streamers
 const streamerCache = new Map();
@@ -33,6 +34,11 @@ async function checkStreamerStatus(userId) {
         'Authorization': `Bearer ${token}`
       },
       timeout: 10000
+    });
+    recordRequest('twitch', 1, {
+      remaining: response.headers?.['ratelimit-remaining'],
+      limit: response.headers?.['ratelimit-limit'],
+      resetAt: response.headers?.['ratelimit-reset'] ? new Date(Number(response.headers['ratelimit-reset']) * 1000).toISOString() : null
     });
 
     const stream = response.data.data?.[0];
@@ -74,6 +80,11 @@ async function fetchStreamerBatch(users) {
     headers,
     timeout: 10000
   });
+  recordRequest('twitch', 1, {
+    remaining: userResponse.headers?.['ratelimit-remaining'],
+    limit: userResponse.headers?.['ratelimit-limit'],
+    resetAt: userResponse.headers?.['ratelimit-reset'] ? new Date(Number(userResponse.headers['ratelimit-reset']) * 1000).toISOString() : null
+  });
 
   const info = (userResponse.data.data || []).map(user => ({
     id: user.id,
@@ -92,6 +103,11 @@ async function fetchStreamerBatch(users) {
     params: streamParams,
     headers,
     timeout: 10000
+  });
+  recordRequest('twitch', 1, {
+    remaining: streamResponse.headers?.['ratelimit-remaining'],
+    limit: streamResponse.headers?.['ratelimit-limit'],
+    resetAt: streamResponse.headers?.['ratelimit-reset'] ? new Date(Number(streamResponse.headers['ratelimit-reset']) * 1000).toISOString() : null
   });
   const streams = new Map((streamResponse.data.data || []).map(stream => [stream.user_id, stream]));
 
@@ -324,16 +340,20 @@ async function cleanOrphanedCache() {
 // ==================================================
 
 // Limpieza de existencia: cada 7 días (primer ejecución en 1 hora)
-setTimeout(() => {
+const scheduledCleanupTimer = setTimeout(() => {
   scheduledCleanup();
-  setInterval(scheduledCleanup, 7 * 24 * 60 * 60 * 1000);
+  const timer = setInterval(scheduledCleanup, 7 * 24 * 60 * 60 * 1000);
+  timer.unref?.();
 }, 60 * 60 * 1000);
+scheduledCleanupTimer.unref?.();
 
 // Limpieza de caché huérfana: cada 6 horas (primer ejecución en 30 minutos)
-setTimeout(() => {
+const orphanCleanupTimer = setTimeout(() => {
   cleanOrphanedCache();
-  setInterval(cleanOrphanedCache, 6 * 60 * 60 * 1000);
+  const timer = setInterval(cleanOrphanedCache, 6 * 60 * 60 * 1000);
+  timer.unref?.();
 }, 30 * 60 * 1000);
+orphanCleanupTimer.unref?.();
 
 module.exports = { 
   checkStreamers, 

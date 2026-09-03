@@ -8,8 +8,11 @@ const { verifyStreamer } = require('../platforms/twitch/utils');
 const { verifyChannel } = require('../platforms/youtube/utils');
 const CacheManager = require('../core/CacheManager');
 const verifyButton = require('./verifyButton');
-const { requireAdministrator } = require('../utils/interactionGuards');
+const { requireAdministrator, requireMainGuild } = require('../utils/interactionGuards');
 const { clearGuildCache: clearTikTokGuild } = require('../platforms/tiktok/monitors');
+const { buildDiagnosticsEmbed, buildAuditEmbed } = require('../core/DiagnosticsService');
+const { controlCenterPayload, modulesPayload, historyPayload } = require('../dashboard/controlCenter');
+const { CAPABILITIES, requireCapability } = require('../core/PermissionService');
 
 const twitchCache = new CacheManager('./data/twitch');
 const youtubeCache = new CacheManager('./data/youtube');
@@ -81,11 +84,28 @@ async function handleButton(interaction, client) {
     }
   };
 
-  if (customId === 'verify_void') return verifyButton(interaction);
+  if (customId === 'verify_void') {
+    if (!await requireMainGuild(interaction)) return;
+    return verifyButton(interaction);
+  }
 
   // Todos los demás botones de este archivo administran la configuración
   // persistente del servidor. Los permisos se validan en cada interacción y no
   // solamente al crear el comando que publicó el dashboard.
+  if (!await requireMainGuild(interaction)) return;
+
+  // ==================================================
+  // CENTRO DE CONTROL EXCLUSIVO DEL MAIN
+  // ==================================================
+  if (customId.startsWith('main_')) {
+    if (!await requireCapability(interaction, CAPABILITIES.MAIN_ADMIN)) return;
+    if (customId === 'main_refresh') return safeUpdate(await controlCenterPayload(interaction.guild));
+    if (customId === 'main_diagnostics') return interaction.reply({ embeds: [await buildDiagnosticsEmbed(client)], flags: 64 });
+    if (customId === 'main_audit') return interaction.reply({ embeds: [await buildAuditEmbed(interaction.guild)], flags: 64 });
+    if (customId === 'main_modules') return interaction.reply({ ...(await modulesPayload(interaction.guild.id)), flags: 64 });
+    if (customId === 'main_history') return interaction.reply({ ...(await historyPayload()), flags: 64 });
+  }
+
   if (!await requireAdministrator(interaction)) return;
 
   // ==================================================

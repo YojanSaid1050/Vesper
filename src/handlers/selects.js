@@ -2,7 +2,7 @@
 const { updateGuildSection, getGuildConfig } = require('../database/mongoManager');
 const { generalPanel, botPanel, tiktokPanel, twitchPanel, youtubePanel } = require('../dashboard/panels');
 const { updateDashboard, getActivePanel } = require('../dashboard/updater');
-const { requireAdministrator } = require('../utils/interactionGuards');
+const { requireAdministrator, requireMainGuild } = require('../utils/interactionGuards');
 
 async function getPanelMode(guildId, platform) {
   const config = await getGuildConfig(guildId);
@@ -14,6 +14,7 @@ async function getPanelMode(guildId, platform) {
 async function handleSelect(interaction, client) {
   if (!interaction.guild) return;
 
+  if (!await requireMainGuild(interaction)) return;
   if (!await requireAdministrator(interaction)) return;
 
   await interaction.deferUpdate();

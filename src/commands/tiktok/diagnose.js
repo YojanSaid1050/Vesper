@@ -3,6 +3,7 @@ const { checkLiveUsers, checkUser, getCacheStats, CONFIG } = require('../../plat
 const { normalizeUsername } = require('../../platforms/tiktok/utils');
 
 module.exports = {
+  scope: 'main',
   data: new SlashCommandBuilder()
     .setName('tiktok-test')
     .setDescription('Comprueba una cuenta y el estado real de los proveedores de TikTok')

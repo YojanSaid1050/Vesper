@@ -8,7 +8,7 @@ const { verifyChannel } = require('../platforms/youtube/utils');
 const { clearWebhookCache } = require('../utils/webhookSender');
 const CacheManager = require('../core/CacheManager');
 const { EmbedBuilder } = require('discord.js');
-const { requireAdministrator } = require('../utils/interactionGuards');
+const { requireAdministrator, requireMainGuild } = require('../utils/interactionGuards');
 const { isValidImageUrl } = require('../utils/imageUrlValidator');
 const { clearUserState: clearTikTokUserState } = require('../platforms/tiktok/monitors');
 
@@ -130,6 +130,7 @@ async function handleModal(interaction, client) {
     return;
   }
 
+  if (!await requireMainGuild(interaction)) return;
   if (!await requireAdministrator(interaction)) return;
 
   const guildId = interaction.guild.id;

@@ -203,9 +203,10 @@ async function cleanOldLogs(daysToKeep = 7) {
 
 // Limpiar logs al inicio y periódicamente
 cleanOldLogs(7).catch(() => {});
-setInterval(() => {
+const logCleanupTimer = setInterval(() => {
     cleanOldLogs(7).catch(() => {});
 }, 24 * 60 * 60 * 1000);
+logCleanupTimer.unref?.();
 
 module.exports = { 
     error, 

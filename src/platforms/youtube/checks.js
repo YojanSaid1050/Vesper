@@ -1,6 +1,7 @@
 // src/platforms/youtube/checks.js
 const { google } = require('googleapis');
 const { getChannelInfo, formatDuration } = require('./utils');
+const { recordRequest } = require('../../core/ProviderMetrics');
 
 const youtube = google.youtube({
   version: 'v3',
@@ -35,6 +36,7 @@ async function getChannelContent(channelId) {
     playlistId: uploadsPlaylistId,
     maxResults: 20
   });
+  recordRequest('youtube', 1);
 
   const ids = (playlist.data.items || [])
     .map(item => item.contentDetails?.videoId || item.snippet?.resourceId?.videoId)
@@ -49,6 +51,7 @@ async function getChannelContent(channelId) {
     part: ['snippet', 'statistics', 'contentDetails', 'liveStreamingDetails'],
     id: ids
   });
+  recordRequest('youtube', 1);
 
   const content = (details.data.items || []).map(item => {
     const duration = item.contentDetails?.duration || '';
@@ -94,6 +97,7 @@ async function findExactChannel(identifier) {
       type: ['channel'],
       maxResults: 5
     });
+    recordRequest('youtube', 100);
     
     for (const item of searchResponse.data.items || []) {
       const channelId = item.snippet.channelId;
@@ -703,16 +707,20 @@ async function cleanOrphanedCache() {
 // ==================================================
 
 // Limpieza de existencia: cada 7 días (primer ejecución en 1 hora)
-setTimeout(() => {
+const scheduledCleanupTimer = setTimeout(() => {
   scheduledCleanup();
-  setInterval(scheduledCleanup, 7 * 24 * 60 * 60 * 1000);
+  const timer = setInterval(scheduledCleanup, 7 * 24 * 60 * 60 * 1000);
+  timer.unref?.();
 }, 60 * 60 * 1000);
+scheduledCleanupTimer.unref?.();
 
 // Limpieza de caché huérfana: cada 6 horas (primer ejecución en 30 minutos)
-setTimeout(() => {
+const orphanCleanupTimer = setTimeout(() => {
   cleanOrphanedCache();
-  setInterval(cleanOrphanedCache, 6 * 60 * 60 * 1000);
+  const timer = setInterval(cleanOrphanedCache, 6 * 60 * 60 * 1000);
+  timer.unref?.();
 }, 30 * 60 * 1000);
+orphanCleanupTimer.unref?.();
 
 module.exports = {
   checkLiveUsers,

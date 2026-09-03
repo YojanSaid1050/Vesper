@@ -1,5 +1,7 @@
+const { verificationRole } = require('../config/mainGuild');
+
 module.exports = async function verifyButton(interaction) {
-  const roleId = '1506900567199449179';
+  const roleId = verificationRole;
   const role = interaction.guild.roles.cache.get(roleId);
 
   if (!role) {

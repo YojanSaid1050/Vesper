@@ -1,10 +1,11 @@
 // src/platforms/twitch/monitors.js
 const { getAllGuildConfigs, getGuildConfig } = require('../../database/mongoManager');
-const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { sendNotification, completeActiveLive } = require('../../core/NotificationService');
 const CacheManager = require('../../core/CacheManager');
 const { checkStreamers } = require('./checks');
-const { liveEmbed } = require('./embeds');
+const { twitchLive } = require('../messageFactory');
 const { monitor, monitorError } = require('../../utils/logger');
+const { isModuleEnabledConfig } = require('../../config/guildPolicy');
 
 const cache = new CacheManager('./data/twitch');
 
@@ -107,6 +108,7 @@ async function monitorStreams(client) {
 }
 
 async function processGuildStreams(guildId, config, client, streamStatus) {
+  if (!isModuleEnabledConfig(config, 'twitch')) return null;
   const twitchConfig = config.twitch || {};
   const users = twitchConfig.users || [];
   const liveChannelId = twitchConfig.liveChannel;
@@ -178,7 +180,7 @@ async function processGuildStreams(guildId, config, client, streamStatus) {
         });
         
         try {
-          const embed = liveEmbed({
+          const embed = twitchLive(guildId, {
             streamer: streamer.streamerName,
             title: streamer.title || 'Sin título',
             game: streamer.game || 'Sin categoría',
@@ -189,15 +191,30 @@ async function processGuildStreams(guildId, config, client, streamStatus) {
           });
           
           if (embed) {
-            await sendBrandedMessage(channel, embed);
-            newStreams++;
-            guildStatus[streamerLogin] = isLive;
-            hasChanges = true;
+            const delivery = await sendNotification(channel, embed, {
+              guildId,
+              platform: 'twitch',
+              account: streamerLogin,
+              eventType: 'live_started',
+              eventId: streamer.streamId || streamer.startedAt
+            });
+            if (delivery.sent || (delivery.duplicate && ['sent', 'ended'].includes(delivery.event?.status))) {
+              if (delivery.sent) newStreams++;
+              guildStatus[streamerLogin] = true;
+              hasChanges = true;
+            }
           }
         } catch (error) {
           monitorError('Twitch', 'Send Stream Message', guildId, error, { streamer: streamerLogin });
         }
       } else {
+        if (!isLive && wasLive) {
+          await completeActiveLive(channel, {
+            guildId,
+            platform: 'twitch',
+            account: streamerLogin
+          }).catch(error => monitorError('Twitch', 'Complete Stream Message', guildId, error, { streamer: streamerLogin }));
+        }
         // Actualizar estado aunque no haya cambio
         if (guildStatus[streamerLogin] !== isLive) {
           guildStatus[streamerLogin] = isLive;

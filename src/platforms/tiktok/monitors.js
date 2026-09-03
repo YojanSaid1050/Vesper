@@ -1,10 +1,11 @@
 const { getAllGuildConfigs } = require('../../database/mongoManager');
-const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { sendNotification, completeActiveLive } = require('../../core/NotificationService');
 const PersistentStateStore = require('../../core/PersistentStateStore');
 const { checkLiveUsers, checkUsers, getCacheStats } = require('./checks');
-const { liveEmbed, videoEmbed } = require('./embeds');
+const { tiktokLive, tiktokVideo } = require('../messageFactory');
 const { monitor, monitorError } = require('../../utils/logger');
 const { normalizeUsername } = require('./utils');
+const { isModuleEnabledConfig } = require('../../config/guildPolicy');
 
 const stateStore = new PersistentStateStore('tiktok');
 const runningMonitors = new Set();
@@ -32,6 +33,7 @@ function collectEligibleGuilds(guilds, kind) {
   const channelKey = kind === 'live' ? 'liveChannel' : 'videoChannel';
   const eligible = [];
   for (const [guildId, config] of Object.entries(guilds)) {
+    if (!isModuleEnabledConfig(config, 'tiktok')) continue;
     const tiktok = config.tiktok || {};
     const users = uniqueUsernames(tiktok.users || []);
     if (users.length === 0 || !tiktok[channelKey]) continue;
@@ -105,7 +107,7 @@ async function monitorLives(client) {
         const wasLive = guildStatus[username] === true;
 
         if (result.isLive && !wasLive) {
-          const payload = liveEmbed({
+          const payload = tiktokLive(guildData.guildId, {
             username,
             nickname: result.nickname,
             viewers: result.viewers,
@@ -117,15 +119,30 @@ async function monitorLives(client) {
 
           if (!payload) continue;
           try {
-            await sendBrandedMessage(channel, payload);
+            const delivery = await sendNotification(channel, payload, {
+              guildId: guildData.guildId,
+              platform: 'tiktok',
+              account: username,
+              eventType: 'live_started',
+              eventId: result.roomId || result.liveUrl
+            });
+            const delivered = delivery.sent || (delivery.duplicate && ['sent', 'ended'].includes(delivery.event?.status));
+            if (!delivered) throw delivery.error || new Error('No se pudo enviar la alerta');
             guildStatus[username] = true;
-            newLives++;
+            if (delivery.sent) newLives++;
             monitor('TikTok', 'Live Started', guildData.guildId, { username, viewers: result.viewers });
           } catch (error) {
             errors++;
             recordError(guildData.guildId, 'send_live', error);
           }
         } else if (!result.isLive) {
+          if (wasLive) {
+            await completeActiveLive(channel, {
+              guildId: guildData.guildId,
+              platform: 'tiktok',
+              account: username
+            }).catch(error => recordError(guildData.guildId, 'complete_live', error));
+          }
           guildStatus[username] = false;
         }
       }
@@ -205,7 +222,7 @@ async function monitorVideos(client) {
         }
         if (previousId === result.latestVideoId) continue;
 
-        const payload = videoEmbed({
+        const payload = tiktokVideo(guildData.guildId, {
           username,
           nickname: result.nickname,
           description: result.latestVideoTitle,
@@ -218,9 +235,17 @@ async function monitorVideos(client) {
         if (!payload) continue;
 
         try {
-          await sendBrandedMessage(channel, payload);
+          const delivery = await sendNotification(channel, payload, {
+            guildId: guildData.guildId,
+            platform: 'tiktok',
+            account: username,
+            eventType: 'video_published',
+            eventId: result.latestVideoId
+          });
+          const delivered = delivery.sent || (delivery.duplicate && ['sent', 'ended'].includes(delivery.event?.status));
+          if (!delivered) throw delivery.error || new Error('No se pudo enviar la alerta');
           guildVideos[username] = result.latestVideoId;
-          newVideos++;
+          if (delivery.sent) newVideos++;
           monitor('TikTok', 'New Video', guildData.guildId, {
             username,
             views: result.latestVideoPlayCount || 0
