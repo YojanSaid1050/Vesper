@@ -1,6 +1,8 @@
 const { Events, EmbedBuilder, AuditLogEvent, ChannelType } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { createLog } = require('../../utils/logCache');
+const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
 
 module.exports = {
   name: Events.ChannelCreate,
@@ -24,9 +26,7 @@ module.exports = {
 
     let creator = 'Desconocido';
     try {
-      const fetchedLogs = await channel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelCreate });
-      const createLogEntry = fetchedLogs.entries.first();
-      if (createLogEntry?.executor) creator = createLogEntry.executor.tag;
+      creator = auditExecutor(await findRecentAuditEntry(channel.guild, AuditLogEvent.ChannelCreate, channel.id));
     } catch {}
 
     const embed = new EmbedBuilder()
@@ -38,6 +38,6 @@ module.exports = {
         { name: '🛠️ Creado por', value: creator, inline: true }
       )
       .setTimestamp();
-    await logChannel.send({ embeds: [embed] });
+    await sendBrandedMessage(logChannel, { embeds: [embed] });
   }
 };

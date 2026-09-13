@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
+const { getGuildConfig, removeGuildListItem } = require('../../database/mongoManager');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 const { clearUserState } = require('../../platforms/tiktok/monitors');
 
@@ -24,8 +24,8 @@ module.exports = {
         return interaction.editReply({ content: `❌ El usuario \`${input}\` no está en la lista de monitoreo.\n\nUsa \`/tiktok-list\` para ver los usuarios actuales.` });
       }
 
-      const newUsers = currentUsers.filter(u => u.toLowerCase() !== input);
-      await updateGuildSection(interaction.guildId, 'tiktok', { ...config.tiktok, users: newUsers });
+      const updated = await removeGuildListItem(interaction.guildId, 'tiktok', 'users', existingUser);
+      const newUsers = updated?.tiktok?.users || [];
 
       await clearUserState(interaction.guildId, existingUser);
 

@@ -3,6 +3,11 @@ const { updateGuildConfig, getGuildConfig } = require('../../database/mongoManag
 const CacheManager = require('../../core/CacheManager');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 const { clearGuildCache: clearTikTokGuildCache } = require('../../platforms/tiktok/monitors');
+const { clearGuildCache: clearTwitchGuildCache } = require('../../platforms/twitch/monitors');
+const { clearGuildCache: clearYouTubeGuildCache } = require('../../platforms/youtube/monitors');
+const { CAPABILITIES, requireCapability } = require('../../core/PermissionService');
+const { createDefaultGuildConfig } = require('../../config/defaultGuild');
+const { moduleDefaults } = require('../../config/guildPolicy');
 
 // Inicializar limpiadores de caché
 const twitchCache = new CacheManager('./data/twitch');
@@ -58,8 +63,12 @@ module.exports = {
     const hasTwitch = config.twitch?.users?.length > 0 || config.twitch?.liveChannel;
     const hasYouTube = config.youtube?.users?.length > 0 || config.youtube?.liveChannel || config.youtube?.videoChannel || config.youtube?.shortChannel;
     const hasBranding = config.branding?.name || config.branding?.avatar;
+    const hasCommunity = config.community?.tickets?.panelChannel || config.community?.tickets?.staffRoles?.length ||
+      config.community?.suggestions?.channel || config.community?.selfRoles?.roles?.length || config.community?.starboard?.channel;
+    const defaults = moduleDefaults();
+    const hasModuleChanges = Object.keys(defaults).some(name => config.features?.[name] !== undefined && config.features[name] !== defaults[name]);
     
-    if (!hasGeneral && !hasTikTok && !hasTwitch && !hasYouTube && !hasBranding) {
+    if (!hasGeneral && !hasTikTok && !hasTwitch && !hasYouTube && !hasBranding && !hasCommunity && !hasModuleChanges) {
       return interaction.reply({ 
         content: '📋 No hay configuración para resetear. El servidor ya está limpio.', 
         flags: 64 
@@ -76,7 +85,9 @@ module.exports = {
         { name: '🎭 TikTok', value: hasTikTok ? `✅ ${config.tiktok?.users?.length || 0} usuarios, canales configurados` : '❌ Sin datos', inline: true },
         { name: '📺 Twitch', value: hasTwitch ? `✅ ${config.twitch?.users?.length || 0} streamers, canal configurado` : '❌ Sin datos', inline: true },
         { name: '📀 YouTube', value: hasYouTube ? `✅ ${config.youtube?.users?.length || 0} canales, canales configurados` : '❌ Sin datos', inline: true },
-        { name: '🎨 Branding', value: hasBranding ? '✅ Nombre/Avatar configurado' : '❌ Sin datos', inline: true }
+        { name: '🎨 Branding', value: hasBranding ? '✅ Nombre/Avatar configurado' : '❌ Sin datos', inline: true },
+        { name: '🌐 Comunidad', value: hasCommunity ? '✅ Módulos configurados' : '❌ Sin datos', inline: true },
+        { name: '🧩 Módulos', value: hasModuleChanges ? '✅ Estados personalizados' : '❌ Valores iniciales', inline: true }
       )
       .setFooter({ text: 'Esta acción no se puede deshacer. Se eliminarán: canales, usuarios monitoreados, branding y caché.' });
 
@@ -97,58 +108,23 @@ module.exports = {
     const collector = response.createMessageComponentCollector({ filter, time: 30000, max: 1 });
 
     collector.on('collect', async i => {
+      if (!await requireCapability(i, CAPABILITIES.GUILD_ADMIN)) return;
       if (i.customId === 'confirm_reset_config') {
         await i.deferUpdate();
         
         try {
           // Resetear toda la configuración
-          const resetConfig = {
-            general: {
-              welcomeChannel: null,
-              goodbyeChannel: null,
-              logChannel: null,
-              botLogChannel: null,
-              botRole: null
-            },
-            dashboard: {
-              channel: null,
-              message: null,
-              enabled: false,
-              currentPanel: 'main',
-              currentMode: 'default'
-            },
-            tiktok: {
-              liveChannel: null,
-              videoChannel: null,
-              users: [],
-              showUsers: false
-            },
-            twitch: {
-              liveChannel: null,
-              users: [],
-              showUsers: false
-            },
-            youtube: {
-              liveChannel: null,
-              videoChannel: null,
-              shortChannel: null,
-              users: [],
-              showUsers: false
-            },
-            branding: {
-              name: null,
-              avatar: null
-            },
-            testPanel: {
-              activeSection: 'general'
-            }
-          };
+          const resetConfig = createDefaultGuildConfig();
           
           await updateGuildConfig(interaction.guildId, resetConfig);
           
           // Limpiar toda la caché del guild
           cleanAllGuildCache(interaction.guildId);
-          await clearTikTokGuildCache(interaction.guildId);
+          await Promise.all([
+            clearTikTokGuildCache(interaction.guildId),
+            clearTwitchGuildCache(interaction.guildId),
+            clearYouTubeGuildCache(interaction.guildId)
+          ]);
           
           // Limpiar webhook cache
           const { clearWebhookCache } = require('../../utils/webhookSender');

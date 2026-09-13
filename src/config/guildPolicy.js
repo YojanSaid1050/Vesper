@@ -6,7 +6,11 @@ const MODULE_DEFAULTS = Object.freeze({
   goodbye: true,
   logs: true,
   music: false,
-  moderation: false
+  moderation: false,
+  tickets: false,
+  suggestions: false,
+  selfroles: false,
+  starboard: false
 });
 
 function csvSet(value) {
@@ -26,13 +30,28 @@ function getApprovedGuildIds() {
   return csvSet(process.env.APPROVED_GUILD_IDS);
 }
 
+function getThemedMainGuildIds() {
+  return csvSet(process.env.THEMED_MAIN_GUILD_IDS);
+}
+
+function isThemedMainGuild(guildId) {
+  return Boolean(guildId && getThemedMainGuildIds().has(String(guildId)) && !isMainGuild(guildId));
+}
+
+function guildTier(guildId) {
+  if (isMainGuild(guildId)) return 'primary_main';
+  if (isThemedMainGuild(guildId)) return 'themed_main';
+  if (getApprovedGuildIds().has(String(guildId || ''))) return 'satellite';
+  return 'external';
+}
+
 function isApprovedGuild(guildId) {
   if (!guildId) return false;
   if (isMainGuild(guildId)) return true;
+  if (isThemedMainGuild(guildId)) return true;
   const approved = getApprovedGuildIds();
-  // Compatibilidad: si todavía no existe una lista, no se expulsan servidores
-  // ya instalados. Al definirla, la política pasa a ser una lista cerrada.
-  return approved.size === 0 || approved.has(String(guildId));
+  if (approved.has(String(guildId))) return true;
+  return String(process.env.ALLOW_UNLISTED_GUILDS || 'false').toLowerCase() === 'true';
 }
 
 function moduleDefaults() {
@@ -49,7 +68,8 @@ function commandAvailable(command, guildId) {
   const scope = command?.scope || 'all';
   if (!isApprovedGuild(guildId)) return false;
   if (scope === 'main') return isMainGuild(guildId);
-  if (scope === 'satellite') return !isMainGuild(guildId);
+  if (scope === 'themed_main') return isThemedMainGuild(guildId);
+  if (scope === 'satellite') return guildTier(guildId) === 'satellite';
   return true;
 }
 
@@ -58,7 +78,10 @@ module.exports = {
   csvSet,
   getMainGuildId,
   getApprovedGuildIds,
+  getThemedMainGuildIds,
   isMainGuild,
+  isThemedMainGuild,
+  guildTier,
   isApprovedGuild,
   moduleDefaults,
   isModuleEnabledConfig,

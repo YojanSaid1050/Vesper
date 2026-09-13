@@ -1,11 +1,10 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { CAPABILITIES } = require('../../core/PermissionService');
-const { createCase } = require('../../core/ModerationService');
+const { createCase, caseIdentifier } = require('../../core/ModerationService');
 const { getGuildConfig } = require('../../database/mongoManager');
 const { isModuleEnabledConfig } = require('../../config/guildPolicy');
 
 module.exports = {
-  scope: 'main',
   capability: CAPABILITIES.MODERATE,
   data: new SlashCommandBuilder()
     .setName('aislar')
@@ -17,12 +16,15 @@ module.exports = {
     const config = await getGuildConfig(interaction.guildId);
     if (!isModuleEnabledConfig(config, 'moderation')) return interaction.reply({ content: 'El módulo de moderación está desactivado.', flags: 64 });
     const user = interaction.options.getUser('usuario');
+    if (user.id === interaction.user.id || user.id === interaction.client.user.id || user.bot) {
+      return interaction.reply({ content: 'No puedes aislarte a ti mismo ni aislar a un bot.', flags: 64 });
+    }
     const member = await interaction.guild.members.fetch(user.id).catch(() => null);
     if (!member?.moderatable) return interaction.reply({ content: 'No puedo aplicar timeout a ese miembro. Comprueba la jerarquía de roles.', flags: 64 });
     const minutes = interaction.options.getInteger('minutos');
     const reason = interaction.options.getString('motivo');
     await member.timeout(minutes * 60 * 1000, reason);
-    await createCase({ guildId: interaction.guildId, userId: user.id, moderatorId: interaction.user.id, action: 'timeout', reason, expiresAt: new Date(Date.now() + minutes * 60 * 1000) });
-    await interaction.reply({ content: `Timeout aplicado a ${user} durante ${minutes} minuto(s).`, allowedMentions: { parse: [] } });
+    const record = await createCase({ guildId: interaction.guildId, userId: user.id, moderatorId: interaction.user.id, action: 'timeout', reason, expiresAt: new Date(Date.now() + minutes * 60 * 1000) });
+    await interaction.reply({ content: `Timeout **#${caseIdentifier(record)}** aplicado a ${user} durante ${minutes} minuto(s).`, allowedMentions: { parse: [] } });
   }
 };

@@ -1,13 +1,13 @@
 // src/platforms/twitch/monitors.js
 const { getAllGuildConfigs, getGuildConfig } = require('../../database/mongoManager');
 const { sendNotification, completeActiveLive } = require('../../core/NotificationService');
-const CacheManager = require('../../core/CacheManager');
+const PersistentStateStore = require('../../core/PersistentStateStore');
 const { checkStreamers } = require('./checks');
 const { twitchLive } = require('../messageFactory');
 const { monitor, monitorError } = require('../../utils/logger');
 const { isModuleEnabledConfig } = require('../../config/guildPolicy');
 
-const cache = new CacheManager('./data/twitch');
+const stateStore = new PersistentStateStore('twitch');
 
 const CONFIG = {
   MAX_RETRIES: 3,
@@ -65,8 +65,8 @@ async function monitorStreams(client) {
     console.log('🎮 [Twitch] Starting stream monitoring cycle...');
     const startTime = Date.now();
     
-    const streamStatus = cache.load('status', {});
-    const guilds = await getAllGuildConfigs();
+    const streamStatus = await stateStore.load('status', {});
+    const guilds = await getAllGuildConfigs({ approvedOnly: true });
     
     let totalGuilds = 0, totalStreamers = 0, totalStreams = 0, totalErrors = 0;
     const guildEntries = Object.entries(guilds);
@@ -91,14 +91,14 @@ async function monitorStreams(client) {
       if (i + batchSize < guildEntries.length) await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    cache.save('status', streamStatus);
+    await stateStore.save('status', streamStatus);
     
     const duration = Date.now() - startTime;
     monitor('Twitch', 'Stream Monitoring Complete', null, {
       guilds: totalGuilds, streamers: totalStreamers, streams: totalStreams, errors: totalErrors, duration: `${duration}ms`
     });
     
-    return { success: true, guilds: totalGuilds, streamers: totalStreamers, streams: totalStreams, errors: totalErrors, duration };
+    return { success: !(totalErrors > 0 && totalGuilds === 0), guilds: totalGuilds, streamers: totalStreamers, streams: totalStreams, errors: totalErrors, duration };
   } catch (error) {
     monitorError('Twitch', 'Stream Monitor Fatal', null, error);
     return { success: false, error: error.message };
@@ -123,17 +123,13 @@ async function processGuildStreams(guildId, config, client, streamStatus) {
   try {
     const channel = await withRetry(() => client.channels.fetch(liveChannelId), `Fetch channel ${liveChannelId}`).catch(() => null);
     if (!channel) {
-      const error = new Error(`Channel ${liveChannelId} not found`);
-      recordError(guildId, error);
-      return null;
+      throw new Error(`Channel ${liveChannelId} not found`);
     }
 
     const botMember = channel.guild.members.me;
     const permissions = channel.permissionsFor(botMember);
     if (!permissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
-      const error = new Error('Missing permissions');
-      recordError(guildId, error);
-      return null;
+      throw new Error('Missing permissions');
     }
 
     if (!streamStatus[guildId]) streamStatus[guildId] = {};
@@ -234,19 +230,28 @@ async function processGuildStreams(guildId, config, client, streamStatus) {
   } catch (error) {
     monitorError('Twitch', 'Process Guild Streams', guildId, error);
     recordError(guildId, error);
-    return null;
+    throw error;
   }
 }
 
 async function clearGuildCache(guildId) {
-  const streamStatus = cache.load('status', {});
+  const streamStatus = await stateStore.load('status', {});
   delete streamStatus[guildId];
-  cache.save('status', streamStatus);
+  await stateStore.save('status', streamStatus);
   monitor('Twitch', 'Cache Cleared', guildId, { action: 'Manual cache clear' });
 }
 
+async function clearUserState(guildId, username) {
+  const streamStatus = await stateStore.load('status', {});
+  if (streamStatus[guildId]) {
+    delete streamStatus[guildId][String(username).toLowerCase()];
+    if (Object.keys(streamStatus[guildId]).length === 0) delete streamStatus[guildId];
+  }
+  await stateStore.save('status', streamStatus);
+}
+
 async function getMonitorStats() {
-  const streamStatus = cache.load('status', {});
+  const streamStatus = await stateStore.load('status', {});
   let totalStreamEntries = 0;
   for (const guild of Object.values(streamStatus)) totalStreamEntries += Object.keys(guild).length;
   
@@ -259,4 +264,4 @@ async function getMonitorStats() {
   };
 }
 
-module.exports = { monitorStreams, clearGuildCache, getMonitorStats };
+module.exports = { monitorStreams, clearGuildCache, clearUserState, getMonitorStats };

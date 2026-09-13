@@ -1,19 +1,34 @@
 const WebSocket = require('ws');
-const { GatewayOpcodes, GatewayDispatchEvents } = require('discord.js');
+const { GatewayOpcodes, GatewayDispatchEvents, PermissionFlagsBits } = require('discord.js');
 const { getGuildConfig } = require('../database/mongoManager');
 const { isModuleEnabledConfig } = require('../config/guildPolicy');
 
+function normalizeLavalinkUrl(value) {
+  return String(value || '')
+    .trim()
+    .replace(/^ws:/i, 'http:')
+    .replace(/^wss:/i, 'https:')
+    .replace(/\/+$/, '');
+}
+
 function lavalinkConfig() {
-  const rawUrl = String(process.env.LAVALINK_URL || '').replace(/\/$/, '');
+  const embedded = String(process.env.LAVALINK_EMBEDDED || '').toLowerCase() === 'true';
+  const rawUrl = normalizeLavalinkUrl(process.env.LAVALINK_URL || (embedded ? 'http://127.0.0.1:2333' : ''));
   return {
     url: rawUrl,
     password: process.env.LAVALINK_PASSWORD || '',
-    configured: Boolean(rawUrl && process.env.LAVALINK_PASSWORD)
+    configured: Boolean(rawUrl && process.env.LAVALINK_PASSWORD),
+    mode: embedded ? 'integrado' : 'externo'
   };
 }
 
 function wsUrl(httpUrl) {
   return httpUrl.replace(/^http:/, 'ws:').replace(/^https:/, 'wss:') + '/v4/websocket';
+}
+
+function reconnectDelay(attempt) {
+  const base = Math.min(60_000, 2_000 * (2 ** Math.max(0, attempt)));
+  return base + Math.floor(Math.random() * Math.max(250, base * 0.2));
 }
 
 function sessionDefaults(config = {}) {
@@ -30,16 +45,31 @@ function sessionDefaults(config = {}) {
   };
 }
 
+function voicePermissionIssues(guild, voiceChannel) {
+  const me = guild?.members?.me;
+  const permissions = me && voiceChannel?.permissionsFor?.(me);
+  if (!permissions) return ['No pude comprobar los permisos del bot en el canal'];
+
+  const required = [
+    [PermissionFlagsBits.ViewChannel, 'Ver canal'],
+    [PermissionFlagsBits.Connect, 'Conectar'],
+    [PermissionFlagsBits.Speak, 'Hablar']
+  ];
+  return required.filter(([permission]) => !permissions.has(permission)).map(([, label]) => label);
+}
+
 class MusicService {
   constructor(client) {
     this.client = client;
     this.socket = null;
     this.sessionId = null;
+    this.resumeSessionId = null;
     this.players = new Map();
     this.voiceStates = new Map();
     this.reconnectTimer = null;
     this.lastError = null;
     this.started = false;
+    this.reconnectAttempts = 0;
   }
 
   async start() {
@@ -56,23 +86,35 @@ class MusicService {
 
   connect() {
     const config = lavalinkConfig();
-    if (!config.configured || !this.client.user || this.socket?.readyState === WebSocket.OPEN) return;
+    if (!config.configured || !this.client.user || [WebSocket.OPEN, WebSocket.CONNECTING].includes(this.socket?.readyState)) return;
+    const headers = {
+      Authorization: config.password,
+      'User-Id': this.client.user.id,
+      'Client-Name': 'Vesper/2.8.0'
+    };
+    if (this.resumeSessionId) headers['Session-Id'] = this.resumeSessionId;
     this.socket = new WebSocket(wsUrl(config.url), {
-      headers: {
-        Authorization: config.password,
-        'User-Id': this.client.user.id,
-        'Client-Name': 'Vesper/2.4.0'
+      headers
+    });
+    this.socket.on('message', data => {
+      try {
+        const payload = JSON.parse(String(data));
+        Promise.resolve(this.handlePayload(payload)).catch(error => { this.lastError = error.message; });
+      } catch (error) {
+        this.lastError = `Respuesta Lavalink inválida: ${error.message}`;
       }
     });
-    this.socket.on('message', data => this.handlePayload(JSON.parse(String(data))));
     this.socket.on('error', error => { this.lastError = error.message; });
     this.socket.on('close', () => {
+      if (this.sessionId) this.resumeSessionId = this.sessionId;
       this.sessionId = null;
+      this.socket = null;
       if (this.started && !this.reconnectTimer) {
+        const delay = reconnectDelay(this.reconnectAttempts++);
         this.reconnectTimer = setTimeout(() => {
           this.reconnectTimer = null;
           this.connect();
-        }, 10_000);
+        }, delay);
       }
     });
   }
@@ -80,6 +122,8 @@ class MusicService {
   async handlePayload(payload) {
     if (payload.op === 'ready') {
       this.sessionId = payload.sessionId;
+      this.resumeSessionId = payload.sessionId;
+      this.reconnectAttempts = 0;
       this.lastError = null;
       await this.request(`/v4/sessions/${this.sessionId}`, {
         method: 'PATCH',
@@ -124,15 +168,20 @@ class MusicService {
   async request(path, { method = 'GET', body } = {}) {
     const config = lavalinkConfig();
     if (!config.configured) throw new Error('Lavalink no está configurado');
+    const timeoutMs = Math.max(1_000, Number(process.env.LAVALINK_REQUEST_TIMEOUT_MS || 15_000));
     const response = await fetch(`${config.url}${path}`, {
       method,
       headers: {
         Authorization: config.password,
         'Content-Type': 'application/json'
       },
-      body: body === undefined ? undefined : JSON.stringify(body)
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs)
     });
-    if (!response.ok) throw new Error(`Lavalink respondió HTTP ${response.status}`);
+    if (!response.ok) {
+      const detail = String(await response.text().catch(() => '')).replace(/\s+/g, ' ').trim().slice(0, 180);
+      throw new Error(`Lavalink respondió HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+    }
     if (response.status === 204) return null;
     return response.json();
   }
@@ -168,13 +217,34 @@ class MusicService {
     const config = await getGuildConfig(interaction.guildId);
     if (!isModuleEnabledConfig(config, 'music')) throw new Error('El módulo de música está desactivado para este servidor');
     if (!lavalinkConfig().configured) throw new Error('Lavalink no está configurado en el alojamiento');
-    if (!this.sessionId) throw new Error('El servidor de música todavía no está conectado');
+    if (!this.sessionId) await this.waitUntilReady();
     const voiceChannel = interaction.member?.voice?.channel;
     if (!voiceChannel) throw new Error('Debes estar en un canal de voz');
+    if (config.music?.preferredVoiceChannel && voiceChannel.id !== config.music.preferredVoiceChannel) {
+      throw new Error(`La música de este servidor está configurada para <#${config.music.preferredVoiceChannel}>`);
+    }
+    const missingPermissions = voicePermissionIssues(interaction.guild, voiceChannel);
+    if (missingPermissions.length) throw new Error(`A Vesper le faltan permisos en ${voiceChannel}: ${missingPermissions.join(', ')}`);
+    const alreadyInside = interaction.guild?.members?.me?.voice?.channelId === voiceChannel.id;
+    if (!alreadyInside && voiceChannel.userLimit > 0 && voiceChannel.members?.size >= voiceChannel.userLimit) {
+      throw new Error(`El canal ${voiceChannel} está lleno`);
+    }
     if (config.music?.requestChannel && interaction.channelId !== config.music.requestChannel) {
       throw new Error(`Las solicitudes de música solo se aceptan en <#${config.music.requestChannel}>`);
     }
     return { config, voiceChannel };
+  }
+
+  async waitUntilReady(timeoutMs = 10_000) {
+    if (this.sessionId) return true;
+    this.connect();
+    const deadline = Date.now() + Math.max(250, Number(timeoutMs) || 10_000);
+    while (Date.now() < deadline) {
+      if (this.sessionId) return true;
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+    const detail = this.lastError ? ` Último error: ${this.lastError}` : '';
+    throw new Error(`El servidor de música no respondió a tiempo.${detail}`);
   }
 
   async join(guild, voiceChannel, textChannelId, musicConfig) {
@@ -287,7 +357,14 @@ class MusicService {
 
   status() {
     const config = lavalinkConfig();
-    return { configured: config.configured, connected: Boolean(this.sessionId && this.socket?.readyState === WebSocket.OPEN), players: this.players.size, lastError: this.lastError };
+    return {
+      configured: config.configured,
+      connected: Boolean(this.sessionId && this.socket?.readyState === WebSocket.OPEN),
+      mode: config.mode,
+      players: this.players.size,
+      reconnectAttempts: this.reconnectAttempts,
+      lastError: this.lastError
+    };
   }
 
   async shutdown() {
@@ -297,7 +374,8 @@ class MusicService {
     this.socket?.close();
     this.socket = null;
     this.sessionId = null;
+    this.resumeSessionId = null;
   }
 }
 
-module.exports = { MusicService, lavalinkConfig, wsUrl, sessionDefaults };
+module.exports = { MusicService, lavalinkConfig, normalizeLavalinkUrl, wsUrl, reconnectDelay, sessionDefaults, voicePermissionIssues };

@@ -1,19 +1,17 @@
 // src/handlers/modals.js
-const { updateGuildSection, getGuildConfig, updateGuildConfig } = require('../database/mongoManager');
+const { updateGuildSection, getGuildConfig, addGuildListItem, removeGuildListItem } = require('../database/mongoManager');
 const { brandingPanel, tiktokPanel, twitchPanel, youtubePanel } = require('../dashboard/panels');
 const { updateDashboard, getActivePanel } = require('../dashboard/updater');
 const { checkUser } = require('../platforms/tiktok/checks');
 const { verifyStreamer } = require('../platforms/twitch/utils');
 const { verifyChannel } = require('../platforms/youtube/utils');
 const { clearWebhookCache } = require('../utils/webhookSender');
-const CacheManager = require('../core/CacheManager');
 const { EmbedBuilder } = require('discord.js');
 const { requireAdministrator, requireMainGuild } = require('../utils/interactionGuards');
 const { isValidImageUrl } = require('../utils/imageUrlValidator');
 const { clearUserState: clearTikTokUserState } = require('../platforms/tiktok/monitors');
-
-const twitchCache = new CacheManager('./data/twitch');
-const youtubeCache = new CacheManager('./data/youtube');
+const { clearUserState: clearTwitchUserState } = require('../platforms/twitch/monitors');
+const { cleanYouTubeChannelCache } = require('../platforms/youtube/monitors');
 
 // ==================================================
 // FUNCIÓN PARA ACTUALIZAR EL DASHBOARD DIRECTAMENTE (como safeUpdate pero para modales)
@@ -94,33 +92,6 @@ function normalizeUserArray(users, platform = 'general') {
   return [...new Set(users.map(u => u.toLowerCase()))];
 }
 
-function cleanTwitchStatus(guildId, username) {
-  const data = twitchCache.load('status', {});
-  const key = `${guildId}_${username}`;
-  if (data[key] !== undefined) delete data[key];
-  twitchCache.save('status', data);
-}
-
-function cleanTwitchGuild(guildId) {
-  const data = twitchCache.load('status', {});
-  for (const key of Object.keys(data)) {
-    if (key.startsWith(`${guildId}_`)) delete data[key];
-  }
-  twitchCache.save('status', data);
-}
-
-function cleanYouTubeGuild(guildId) {
-  const liveStatus = youtubeCache.load('liveStatus', {});
-  delete liveStatus[guildId];
-  youtubeCache.save('liveStatus', liveStatus);
-  const videos = youtubeCache.load('videos', {});
-  delete videos[guildId];
-  youtubeCache.save('videos', videos);
-  const shorts = youtubeCache.load('shorts', {});
-  delete shorts[guildId];
-  youtubeCache.save('shorts', shorts);
-}
-
 async function handleModal(interaction, client) {
   if (!interaction.isModalSubmit()) return;
   if (!interaction.guild) {
@@ -128,6 +99,11 @@ async function handleModal(interaction, client) {
       await interaction.reply({ content: '❌ Este comando solo puede usarse en un servidor.', flags: 64 });
     } catch (e) {}
     return;
+  }
+
+  if (interaction.customId.startsWith('community_')) {
+    const { handleCommunityModal } = require('../core/CommunityService');
+    if (await handleCommunityModal(interaction, client)) return;
   }
 
   if (!await requireMainGuild(interaction)) return;
@@ -215,9 +191,7 @@ async function handleModal(interaction, client) {
         return { message: `⚠️ El usuario **@${realUser}** ya está en la lista de monitoreo.` };
       }
       
-      config.tiktok.users.push(realUser);
-      config.tiktok.users = normalizeUserArray(config.tiktok.users, 'tiktok');
-      await updateGuildConfig(guildId, config);
+      config = await addGuildListItem(guildId, 'tiktok', 'users', realUser);
       
       const embed = new EmbedBuilder()
         .setTitle('✅ Usuario añadido')
@@ -256,8 +230,7 @@ async function handleModal(interaction, client) {
         return { message: `❌ El usuario **@${username}** no está en la lista de monitoreo.\n\nUsa /tiktok-list para ver los usuarios actuales.` };
       }
       
-      config.tiktok.users = config.tiktok.users.filter(u => u !== username);
-      await updateGuildConfig(guildId, config);
+      config = await removeGuildListItem(guildId, 'tiktok', 'users', existingUser);
       await clearTikTokUserState(guildId, existingUser);
       
       return { message: `✅ **@${existingUser}** eliminado de la lista de monitoreo.\n\n📋 Usuarios restantes: ${config.tiktok.users.length}` };
@@ -291,9 +264,7 @@ async function handleModal(interaction, client) {
         return { message: `⚠️ El streamer **${data.name}** ya está en la lista de monitoreo.` };
       }
       
-      config.twitch.users.push(username);
-      config.twitch.users = normalizeUserArray(config.twitch.users, 'twitch');
-      await updateGuildConfig(guildId, config);
+      config = await addGuildListItem(guildId, 'twitch', 'users', username);
       
       const embed = new EmbedBuilder()
         .setTitle('✅ Streamer añadido')
@@ -333,9 +304,8 @@ async function handleModal(interaction, client) {
         return { message: `❌ El streamer **${username}** no está en la lista de monitoreo.\n\nUsa /twitch-list para ver los streamers actuales.` };
       }
       
-      config.twitch.users = config.twitch.users.filter(u => u !== username);
-      await updateGuildConfig(guildId, config);
-      cleanTwitchStatus(guildId, existingUser);
+      config = await removeGuildListItem(guildId, 'twitch', 'users', existingUser);
+      await clearTwitchUserState(guildId, existingUser);
       
       return { message: `✅ **${existingUser}** eliminado de la lista de monitoreo.\n\n📋 Streamers restantes: ${config.twitch.users.length}` };
     });
@@ -371,9 +341,7 @@ async function handleModal(interaction, client) {
         return { message: `⚠️ El canal **${channel.name}** ya está en la lista de monitoreo.` };
       }
       
-      config.youtube.users.push(channelId);
-      config.youtube.users = normalizeUserArray(config.youtube.users, 'youtube');
-      await updateGuildConfig(guildId, config);
+      config = await addGuildListItem(guildId, 'youtube', 'users', channelId);
       
       console.log(`[YouTube] Canal guardado con ID: ${channelId} (original: ${channel.id})`);
       
@@ -433,11 +401,9 @@ async function handleModal(interaction, client) {
         return { message: `❌ No se encontró el canal **${input}** en la lista de monitoreo.\n\nUsa /youtube-list para ver los canales actuales.` };
       }
       
-      config.youtube.users = config.youtube.users.filter(u => u !== foundChannelId);
-      await updateGuildConfig(guildId, config);
+      config = await removeGuildListItem(guildId, 'youtube', 'users', foundChannelId);
       
-      const { cleanYouTubeChannelCache } = require('../platforms/youtube/monitors');
-      cleanYouTubeChannelCache(guildId, foundChannelId);
+      await cleanYouTubeChannelCache(guildId, foundChannelId);
       
       return { message: `✅ **${foundChannelName || foundChannelId}** eliminado de la lista de monitoreo.\n\n📋 Canales restantes: ${config.youtube.users.length}` };
     });

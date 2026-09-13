@@ -3,6 +3,25 @@ const { isMainGuild, commandAvailable } = require('../config/guildPolicy');
 const { CAPABILITIES, requireCapability } = require('../core/PermissionService');
 const { colorRoles, countryRoles, gameRoles, platformRoles } = require('../config/mainGuild');
 
+const COLLECTOR_ONLY_COMPONENT_IDS = new Set([
+  'tiktok_clear_confirm', 'tiktok_clear_cancel',
+  'twitch_clear_confirm', 'twitch_clear_cancel',
+  'youtube_clear_confirm', 'youtube_clear_cancel',
+  'confirm_reset_config', 'cancel_reset_config',
+  'resetalldb_confirm', 'resetalldb_cancel'
+]);
+
+function inferredCapability(commandName) {
+  if (commandName === 'resetalldb') return CAPABILITIES.GLOBAL_OWNER;
+  if (/^(tiktok|twitch|youtube)-/.test(commandName)) return CAPABILITIES.SOCIAL_MANAGE;
+  if (['clear', 'advertir', 'aislar', 'sanciones'].includes(commandName)) return CAPABILITIES.MODERATE;
+  if (['branding', 'cache', 'config-dashboard', 'forcecheck', 'resetbranding', 'resetconfig', 'serverconfig',
+    'setbotavatar', 'setbotlog', 'setbotname', 'setbotrole', 'setgoodbye', 'setlog', 'setwelcome', 'testbranding'].includes(commandName)) {
+    return CAPABILITIES.GUILD_ADMIN;
+  }
+  return null;
+}
+
 // ==================================================
 // ROLES PARA COLORES, PAÍSES, JUEGOS Y PLATAFORMAS
 // ==================================================
@@ -90,8 +109,7 @@ module.exports = {
         if (!commandAvailable(command, interaction.guildId)) {
           return interaction.reply({ content: 'Este comando no está disponible en este servidor.', flags: 64 }).catch(() => null);
         }
-        const capability = command.capability ||
-          (/^(tiktok|twitch|youtube)-/.test(command.data.name) ? CAPABILITIES.SOCIAL_MANAGE : null);
+        const capability = command.capability || inferredCapability(command.data.name);
         if (capability && !await requireCapability(interaction, capability)) return;
 
         try {
@@ -112,6 +130,9 @@ module.exports = {
       // BOTONES
       // ==================================================
       if (interaction.isButton()) {
+        // Estos botones pertenecen a collectors efímeros creados por comandos.
+        // El listener del collector hará la validación de usuario y expiración.
+        if (COLLECTOR_ONLY_COMPONENT_IDS.has(interaction.customId)) return;
         const { handleButton } = require('../handlers/buttons');
         return await handleButton(interaction, client);
       }
@@ -142,3 +163,6 @@ module.exports = {
     }
   }
 };
+
+module.exports.COLLECTOR_ONLY_COMPONENT_IDS = COLLECTOR_ONLY_COMPONENT_IDS;
+module.exports.inferredCapability = inferredCapability;

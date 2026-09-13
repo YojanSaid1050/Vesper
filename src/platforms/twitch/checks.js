@@ -281,7 +281,7 @@ async function scheduledCleanup() {
   console.log('🔍 [Twitch] Iniciando limpieza periódica de streamers inexistentes (cada 7 días)...');
   
   const { getAllGuildConfigs, updateGuildSection } = require('../../database/mongoManager');
-  const guilds = await getAllGuildConfigs();
+  const guilds = await getAllGuildConfigs({ approvedOnly: true });
   let totalRemoved = 0;
   
   for (const [guildId, config] of Object.entries(guilds)) {
@@ -309,7 +309,7 @@ async function cleanOrphanedCache() {
   console.log('🔍 [Twitch] Iniciando limpieza de caché huérfana (cada 6 horas)...');
   
   const { getAllGuildConfigs } = require('../../database/mongoManager');
-  const guilds = await getAllGuildConfigs();
+  const guilds = await getAllGuildConfigs({ approvedOnly: true });
   
   // Recopilar todos los streamers activos de MongoDB
   const activeStreamers = new Set();
@@ -341,16 +341,18 @@ async function cleanOrphanedCache() {
 
 // Limpieza de existencia: cada 7 días (primer ejecución en 1 hora)
 const scheduledCleanupTimer = setTimeout(() => {
-  scheduledCleanup();
-  const timer = setInterval(scheduledCleanup, 7 * 24 * 60 * 60 * 1000);
+  const runCleanup = () => scheduledCleanup().catch(error => console.error('[Twitch] Error en limpieza programada:', error));
+  runCleanup();
+  const timer = setInterval(runCleanup, 7 * 24 * 60 * 60 * 1000);
   timer.unref?.();
 }, 60 * 60 * 1000);
 scheduledCleanupTimer.unref?.();
 
 // Limpieza de caché huérfana: cada 6 horas (primer ejecución en 30 minutos)
 const orphanCleanupTimer = setTimeout(() => {
-  cleanOrphanedCache();
-  const timer = setInterval(cleanOrphanedCache, 6 * 60 * 60 * 1000);
+  const runCleanup = () => Promise.resolve(cleanOrphanedCache()).catch(error => console.error('[Twitch] Error limpiando caché huérfana:', error));
+  runCleanup();
+  const timer = setInterval(runCleanup, 6 * 60 * 60 * 1000);
   timer.unref?.();
 }, 30 * 60 * 1000);
 orphanCleanupTimer.unref?.();

@@ -1,6 +1,6 @@
 // src/commands/youtube/remove.js
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
+const { getGuildConfig, removeGuildListItem } = require('../../database/mongoManager');
 const { verifyChannel } = require('../../platforms/youtube/utils');
 const { cleanYouTubeChannelCache } = require('../../platforms/youtube/monitors'); // NUEVA importación
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
@@ -39,11 +39,11 @@ module.exports = {
         return interaction.editReply({ content: `❌ No se encontró el canal \`${input}\` en la lista de monitoreo.\n\nUsa \`/youtube-list\` para ver los canales actuales.` });
       }
 
-      const newUsers = currentUsers.filter(u => u !== foundChannelId);
-      await updateGuildSection(interaction.guildId, 'youtube', { ...config.youtube, users: newUsers });
+      const updated = await removeGuildListItem(interaction.guildId, 'youtube', 'users', foundChannelId);
+      const newUsers = updated?.youtube?.users || [];
 
       // NUEVO: Limpiar SOLO la caché del canal eliminado, no todo el guild
-      cleanYouTubeChannelCache(interaction.guildId, foundChannelId);
+      await cleanYouTubeChannelCache(interaction.guildId, foundChannelId);
 
       await interaction.editReply({ content: `✅ Se eliminó **${foundChannelName || foundChannelId}** de la lista de monitoreo.\n\n📋 Canales restantes: ${newUsers.length}` });
       

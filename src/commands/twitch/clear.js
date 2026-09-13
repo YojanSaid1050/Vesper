@@ -1,19 +1,8 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
-const CacheManager = require('../../core/CacheManager');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
-
-const twitchCache = new CacheManager('./data/twitch');
-
-function cleanTwitchGuild(guildId) {
-  const data = twitchCache.load('status', {});
-  for (const key of Object.keys(data)) {
-    if (key.startsWith(`${guildId}_`)) {
-      delete data[key];
-    }
-  }
-  twitchCache.save('status', data);
-}
+const { CAPABILITIES, requireCapability } = require('../../core/PermissionService');
+const { clearGuildCache } = require('../../platforms/twitch/monitors');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -52,9 +41,10 @@ module.exports = {
 
       collector.on('collect', async i => {
         try {
+          if (!await requireCapability(i, CAPABILITIES.SOCIAL_MANAGE)) return;
           if (i.customId === 'twitch_clear_confirm') {
-            await updateGuildSection(interaction.guildId, 'twitch', { ...config.twitch, users: [] });
-            cleanTwitchGuild(interaction.guildId);
+            await updateGuildSection(interaction.guildId, 'twitch', { users: [] });
+            await clearGuildCache(interaction.guildId);
             await i.update({ content: `✅ Se eliminaron **${currentCount}** streamers del monitoreo de Twitch.`, embeds: [], components: [] });
             
             // Refrescar dashboard automáticamente

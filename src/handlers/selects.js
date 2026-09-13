@@ -14,6 +14,11 @@ async function getPanelMode(guildId, platform) {
 async function handleSelect(interaction, client) {
   if (!interaction.guild) return;
 
+  if (interaction.customId === 'community_selfroles') {
+    const { handleSelfRoles } = require('../core/CommunityService');
+    return handleSelfRoles(interaction, client);
+  }
+
   if (!await requireMainGuild(interaction)) return;
   if (!await requireAdministrator(interaction)) return;
 

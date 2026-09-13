@@ -4,6 +4,7 @@ const express = require('express');
 const BotClient = require('./core/BotClient');
 const { stopAllMonitors, getMonitorStats } = require('./platforms');
 const { connectMongo, disconnectMongo, getMongoStatus } = require('./database/mongoManager');
+const { mountWebDashboard } = require('./web/routes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,21 +17,42 @@ app.get('/', (req, res) => res.json({
   uptime: client?.uptime || 0
 }));
 
-app.get('/health', (req, res) => {
+function runtimeHealth() {
   const botReady = client?.isReady() || false;
   const database = getMongoStatus();
-  const healthy = botReady && database.connected && !isShuttingDown;
+  const monitors = getMonitorStats();
+  const music = client?.music?.status?.() || { configured: false, connected: false, players: 0 };
+  const monitorsHealthy = monitors.every(item => !item.disabledUntil);
+  const musicRequired = String(process.env.MUSIC_REQUIRED || 'false').toLowerCase() === 'true';
+  const musicHealthy = !musicRequired || !music.configured || music.connected;
+  const healthy = botReady && database.connected && monitorsHealthy && musicHealthy && !isShuttingDown;
 
-  return res.status(healthy ? 200 : 503).json({
-    status: healthy ? 'healthy' : 'unhealthy',
-    bot: botReady,
-    database,
+  return { healthy, botReady, database, monitors, music, monitorsHealthy, musicRequired, musicHealthy };
+}
+
+app.get('/live', (req, res) => {
+  const alive = !isShuttingDown;
+  return res.status(alive ? 200 : 503).json({ status: alive ? 'alive' : 'stopping', uptime: client?.uptime || 0 });
+});
+
+app.get(['/health', '/ready'], (req, res) => {
+  const state = runtimeHealth();
+
+  return res.status(state.healthy ? 200 : 503).json({
+    status: state.healthy ? 'ready' : 'degraded',
+    bot: state.botReady,
+    database: state.database,
     shuttingDown: isShuttingDown,
     uptime: client?.uptime || 0,
-    monitors: getMonitorStats(),
-    music: client?.music?.status?.() || { configured: false, connected: false, players: 0 }
+    monitors: state.monitors,
+    monitorsHealthy: state.monitorsHealthy,
+    music: state.music,
+    musicRequired: state.musicRequired,
+    musicHealthy: state.musicHealthy
   });
 });
+
+mountWebDashboard(app, { getClient: () => client, runtimeHealth });
 
 const server = app.listen(PORT, () => console.log(`🌐 Web activa en puerto ${PORT}`));
 

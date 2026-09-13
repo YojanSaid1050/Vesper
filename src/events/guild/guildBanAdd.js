@@ -2,6 +2,7 @@ const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const { createLog } = require('../../utils/logCache');
+const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
 
 module.exports = {
   name: Events.GuildBanAdd,
@@ -17,9 +18,7 @@ module.exports = {
 
     let executor = 'Desconocido';
     try {
-      const fetchedLogs = await ban.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberBanAdd });
-      const entry = fetchedLogs.entries.first();
-      if (entry) executor = entry.executor.tag;
+      executor = auditExecutor(await findRecentAuditEntry(ban.guild, AuditLogEvent.MemberBanAdd, ban.user.id));
     } catch {}
 
     const embed = new EmbedBuilder()

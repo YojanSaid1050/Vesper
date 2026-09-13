@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
+const { getGuildConfig, addGuildListItem } = require('../../database/mongoManager');
 const { verifyStreamer } = require('../../platforms/twitch/utils');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 
@@ -28,8 +28,8 @@ module.exports = {
         return interaction.editReply({ content: `⚠️ El streamer **${streamer.name}** ya está siendo monitoreado.` });
       }
 
-      const newUsers = [...currentUsers, streamer.login];
-      await updateGuildSection(interaction.guildId, 'twitch', { ...config.twitch, users: newUsers });
+      const updated = await addGuildListItem(interaction.guildId, 'twitch', 'users', streamer.login);
+      const newUsers = updated.twitch?.users || [];
 
       await interaction.editReply({ content: `✅ Se añadió **${streamer.name}** a la lista de monitoreo.\n\n📺 ID: \`${streamer.id}\`\n📋 Total de streamers: ${newUsers.length}` });
       

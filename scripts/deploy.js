@@ -2,6 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const { REST, Routes } = require('discord.js');
+const { commandVisible, webAdminMode } = require('../src/core/CommandVisibilityService');
 
 // Configuración
 const CLIENT_ID = process.env.CLIENT_ID;
@@ -98,6 +99,10 @@ for (const filePath of commandFiles) {
     const command = require(filePath);
     
     if (command.data && typeof command.data.toJSON === 'function') {
+      if (!commandVisible(command)) {
+        console.log(`🌐 Comando administrado desde la web: ${command.data.name}`);
+        continue;
+      }
       const jsonCommand = command.data.toJSON();
       const cleanedCommand = cleanCommand(jsonCommand);
       if (command.scope === 'main') mainOnlyCommands.push(cleanedCommand);
@@ -120,6 +125,7 @@ if (commands.length === 0) {
 
 console.log(`\n📋 Comandos comunes: ${commands.length}`);
 console.log(`🏠 Comandos exclusivos Main: ${mainOnlyCommands.length}`);
+console.log(`🌐 Modo administración web: ${webAdminMode() ? 'activo' : 'inactivo'}`);
 commands.slice(0, 20).forEach(cmd => console.log(`   - /${cmd.name}`));
 if (commands.length > 20) console.log(`   ... y ${commands.length - 20} más`);
 

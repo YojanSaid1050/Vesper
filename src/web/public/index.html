@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#100c18">
+  <title>Vesper · Panel de control</title>
+  <link rel="stylesheet" href="/panel/assets/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+
+  <main id="login-view" class="login-view" hidden>
+    <section class="login-card">
+      <div class="sigil" aria-hidden="true">V</div>
+      <p class="eyebrow">THE VOID CONSOLE</p>
+      <h1>Vesper</h1>
+      <p class="lead">Configura tus servidores, revisa casos y modera con permisos verificados en Discord.</p>
+      <div id="auth-error" class="notice danger" hidden></div>
+      <div id="auth-actions" class="auth-actions"></div>
+      <p class="privacy">Vesper no recibe tu contraseña. El acceso utiliza OAuth y sesiones protegidas.</p>
+    </section>
+  </main>
+
+  <div id="app-view" class="app-shell" hidden>
+    <aside class="sidebar">
+      <a class="brand" href="/panel" aria-label="Inicio de Vesper">
+        <span class="brand-mark">V</span>
+        <span><strong id="panel-brand-name">Vesper</strong><small id="panel-brand-mode">Void Console</small></span>
+      </a>
+      <p class="nav-label">Servidores</p>
+      <nav id="guild-list" class="guild-list" aria-label="Servidores disponibles"></nav>
+      <div id="identity-card" class="identity-card"></div>
+    </aside>
+
+    <div class="workspace">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">CENTRO DE CONTROL</p>
+          <h1 id="page-title">Selecciona un servidor</h1>
+        </div>
+        <div class="top-actions">
+          <span id="connection-pill" class="pill">Comprobando…</span>
+          <button id="refresh-button" class="button ghost" type="button">Actualizar</button>
+        </div>
+      </header>
+
+      <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+      <section id="empty-state" class="empty-state">
+        <div class="sigil small" aria-hidden="true">V</div>
+        <h2>Elige un servidor</h2>
+        <p>Solo aparecerán servidores aprobados donde Vesper pueda comprobar tu membresía.</p>
+      </section>
+
+      <main id="guild-view" hidden>
+        <section id="summary-grid" class="summary-grid"></section>
+        <div class="tabs" role="tablist" aria-label="Secciones del panel">
+          <button class="tab active" data-tab="overview" type="button">Resumen</button>
+          <button class="tab" data-tab="config" type="button">Configuración</button>
+          <button class="tab" data-tab="moderation" type="button">Moderación</button>
+          <button class="tab" data-tab="audit" type="button">Auditoría</button>
+        </div>
+        <section id="tab-overview" class="tab-panel"></section>
+        <section id="tab-config" class="tab-panel" hidden></section>
+        <section id="tab-moderation" class="tab-panel" hidden></section>
+        <section id="tab-audit" class="tab-panel" hidden></section>
+      </main>
+    </div>
+  </div>
+
+  <script src="/panel/assets/app.js" defer></script>
+</body>
+</html>

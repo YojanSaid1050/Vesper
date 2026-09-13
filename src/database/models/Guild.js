@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 
 const guildSchema = new mongoose.Schema({
   guildId: { type: String, required: true, unique: true, index: true },
+  schemaVersion: { type: Number, default: 4, min: 1 },
   general: {
     welcomeChannel: { type: String, default: null },
     goodbyeChannel: { type: String, default: null },
@@ -42,6 +43,18 @@ const guildSchema = new mongoose.Schema({
     name: { type: String, default: null },
     avatar: { type: String, default: null }
   },
+  profile: {
+    theme: { type: String, enum: ['void', 'cinnamoroll', 'neutral', 'custom'], default: 'neutral' },
+    displayName: { type: String, default: null, maxlength: 80 },
+    avatar: { type: String, default: null, maxlength: 500 },
+    primaryColor: { type: String, default: '#5865F2', maxlength: 7 },
+    secondaryColor: { type: String, default: '#747F8D', maxlength: 7 },
+    welcomeTitle: { type: String, default: null, maxlength: 120 },
+    welcomeMessage: { type: String, default: null, maxlength: 1500 },
+    goodbyeTitle: { type: String, default: null, maxlength: 120 },
+    goodbyeMessage: { type: String, default: null, maxlength: 1500 },
+    memberRole: { type: String, default: null }
+  },
   features: {
     tiktok: { type: Boolean, default: true },
     twitch: { type: Boolean, default: true },
@@ -50,7 +63,11 @@ const guildSchema = new mongoose.Schema({
     goodbye: { type: Boolean, default: true },
     logs: { type: Boolean, default: true },
     music: { type: Boolean, default: false },
-    moderation: { type: Boolean, default: false }
+    moderation: { type: Boolean, default: false },
+    tickets: { type: Boolean, default: false },
+    suggestions: { type: Boolean, default: false },
+    selfroles: { type: Boolean, default: false },
+    starboard: { type: Boolean, default: false }
   },
   permissions: {
     socialManagerRoles: { type: [String], default: [] },
@@ -60,6 +77,8 @@ const guildSchema = new mongoose.Schema({
   moderation: {
     filterLinks: { type: Boolean, default: false },
     allowedDomains: { type: [String], default: [] },
+    exemptChannels: { type: [String], default: [] },
+    exemptRoles: { type: [String], default: [] },
     blockInvites: { type: Boolean, default: true },
     maxMentions: { type: Number, default: 5 },
     repeatLimit: { type: Number, default: 4 },
@@ -67,11 +86,45 @@ const guildSchema = new mongoose.Schema({
   },
   music: {
     requestChannel: { type: String, default: null },
+    preferredVoiceChannel: { type: String, default: null },
     defaultVolume: { type: Number, min: 1, max: 100, default: 50 },
     maxQueue: { type: Number, min: 1, max: 500, default: 100 },
     maxPerUser: { type: Number, min: 1, max: 25, default: 3 },
     maxTrackMinutes: { type: Number, min: 1, max: 180, default: 15 },
     idleSeconds: { type: Number, min: 30, max: 3600, default: 180 }
+  },
+  community: {
+    tickets: {
+      panelChannel: { type: String, default: null },
+      category: { type: String, default: null },
+      transcriptChannel: { type: String, default: null },
+      staffRoles: { type: [String], default: [] },
+      maxOpenPerUser: { type: Number, min: 1, max: 5, default: 1 },
+      panelMessage: { type: String, default: null }
+    },
+    suggestions: {
+      channel: { type: String, default: null }
+    },
+    selfRoles: {
+      panelChannel: { type: String, default: null },
+      panelMessage: { type: String, default: null },
+      roles: {
+        type: [{
+          roleId: { type: String, required: true },
+          label: { type: String, required: true, maxlength: 80 },
+          emoji: { type: String, default: null, maxlength: 100 },
+          description: { type: String, default: null, maxlength: 100 },
+          _id: false
+        }],
+        default: []
+      }
+    },
+    starboard: {
+      channel: { type: String, default: null },
+      threshold: { type: Number, min: 2, max: 50, default: 3 },
+      emoji: { type: String, default: '⭐', maxlength: 100 },
+      ignoredChannels: { type: [String], default: [] }
+    }
   },
   testPanel: {
     activeSection: { type: String, default: 'general' }

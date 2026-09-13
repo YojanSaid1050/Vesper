@@ -13,6 +13,7 @@
 
 require('dotenv').config();
 const { connectMongo, getAllGuildConfigs, deleteGuild, cleanDuplicateUsers, updateGuildConfig } = require('../src/database/mongoManager');
+const { createDefaultGuildConfig } = require('../src/config/defaultGuild');
 
 const colors = {
     reset: '\x1b[0m',
@@ -113,47 +114,7 @@ async function resetGuildConfig(guildId) {
     console.log(`\n${colors.yellow}⚠️ RESETEANDO CONFIGURACIÓN DEL SERVIDOR: ${guildId}${colors.reset}`);
     console.log(`${colors.gray}═══════════════════════════════════════════════════════════════${colors.reset}`);
     
-    const defaultConfig = {
-        general: {
-            welcomeChannel: null,
-            goodbyeChannel: null,
-            logChannel: null,
-            botLogChannel: null,
-            botRole: null
-        },
-        dashboard: {
-            channel: null,
-            message: null,
-            enabled: false,
-            currentPanel: 'main',
-            currentMode: 'default'
-        },
-        tiktok: {
-            liveChannel: null,
-            videoChannel: null,
-            users: [],
-            showUsers: false
-        },
-        twitch: {
-            liveChannel: null,
-            users: [],
-            showUsers: false
-        },
-        youtube: {
-            liveChannel: null,
-            videoChannel: null,
-            shortChannel: null,
-            users: [],
-            showUsers: false
-        },
-        branding: {
-            name: null,
-            avatar: null
-        },
-        testPanel: {
-            activeSection: 'general'
-        }
-    };
+    const defaultConfig = createDefaultGuildConfig();
     
     await updateGuildConfig(guildId, defaultConfig);
     console.log(`\n${colors.green}✅ Configuración del servidor ${guildId} reseteada${colors.reset}`);

@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
+const { getGuildConfig, addGuildListItem } = require('../../database/mongoManager');
 const { verifyChannel } = require('../../platforms/youtube/utils');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 
@@ -26,8 +26,8 @@ module.exports = {
       return interaction.editReply({ content: `⚠️ El canal **${channel.name}** ya está siendo monitoreado.` });
     }
 
-    const newUsers = [...currentUsers, channel.id];
-    await updateGuildSection(interaction.guildId, 'youtube', { ...config.youtube, users: newUsers });
+    const updated = await addGuildListItem(interaction.guildId, 'youtube', 'users', channel.id);
+    const newUsers = updated.youtube?.users || [];
 
     await interaction.editReply({ content: `✅ Se añadió **${channel.name}** a la lista de monitoreo.\n\n📺 ID: \`${channel.id}\`\n👥 Suscriptores: ${channel.subscribers.toLocaleString()}\n📋 Total de canales: ${newUsers.length}` });
 // Refrescar dashboard automáticamente

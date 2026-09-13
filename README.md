@@ -1,9 +1,10 @@
-# Vesper Bot 2.4
+# Vesper Bot 2.8.0
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
-YouTube y TikTok. La versión 2.4 conserva la presentación visual original con
+YouTube y TikTok. La versión 2.8 conserva la presentación visual original con
 Componentes V2, separa el servidor Main de los satélites e incorpora control
-central, historial, moderación opcional y música autohospedada.
+central, historial, moderación opcional, música autohospedada, funciones de
+comunidad y un panel web con permisos verificados en Discord.
 
 ## Requisitos
 
@@ -30,37 +31,135 @@ Variables mínimas:
 TOKEN=
 CLIENT_ID=
 MONGODB_URI=
+MAIN_GUILD_ID=
 ```
 
 Se recomienda además configurar `BOT_OWNER_IDS` con uno o varios IDs separados
 por coma. Si queda vacío, nadie puede ejecutar operaciones globales como
 `/resetalldb`.
 
-## Servidor Main y satélites
+## Main principal, Main temáticos y satélites
 
 Configura `MAIN_GUILD_ID` con el ID de Embers Void. El dashboard, diagnóstico,
 auditoría, historial, roles especiales, personalidad original y comandos de
 administración avanzada solo funcionan y se registran en ese servidor.
 
-`APPROVED_GUILD_IDS` acepta IDs secundarios separados por coma. Fuera del Main,
+`APPROVED_GUILD_IDS` acepta IDs secundarios separados por coma. La lista es
+cerrada por defecto: cualquier servidor no incluido queda ignorado también por
+los monitores. `ALLOW_UNLISTED_GUILDS=true` existe solo para migraciones
+temporales. Fuera del Main,
 Vesper usa mensajes neutrales y no procesa roles, botones ni referencias
 internas de Embers Void. Los módulos de los satélites se administran desde el
-Main mediante `/vesper-modulo`.
+Main o desde el panel web.
+
+`THEMED_MAIN_GUILD_IDS` contiene servidores con identidad propia y administración
+local, pero sin acceso al control global. Esta distribución incluye
+**Ankerie Dimension** (`1124871897688055818`) con el perfil **AnkeBot**. Sus
+mensajes, colores, rol automático, apodo y panel pastel no modifican Embers Void.
 
 El centro de control se abre con `/vesper-control`. Sus botones permiten revisar
 la configuración, diagnóstico, módulos e historial sin mostrar credenciales.
+
+## Configuración guiada
+
+Ejecuta `/vesper-setup estado` dentro de cualquier servidor aprobado para ver
+su progreso. El asistente permite:
+
+- Asignar canales generales y de TikTok, Twitch y YouTube.
+- Definir el canal de solicitudes musicales y el rol automático de bots.
+- Activar o desactivar módulos.
+- Añadir o retirar roles de gestión de redes, moderación y DJ.
+- Excluir canales, categorías o roles de la moderación automática.
+
+Solo un administrador del servidor puede modificar esta configuración.
+
+## Panel web nativo
+
+Vesper sirve una interfaz adaptable en `/panel` desde el mismo proceso Node.js.
+No necesita WordPress, otro servidor frontend ni una base de datos adicional.
+La interfaz incluye:
+
+- Estado del bot y preparación de cada servidor.
+- Configuración de módulos, canales, roles, música y filtros automáticos.
+- Configuración web de tickets, sugerencias, autorroles y starboard.
+- Publicación de paneles de tickets/autorroles y revisión de sugerencias desde la web.
+- Creación y administración de advertencias y aislamientos.
+- Vista privada para que cada usuario consulte únicamente sus propios casos.
+- Auditoría de todos los cambios realizados desde la web.
+- Perfil temático por servidor, textos de bienvenida y rol automático.
+- Selección por nombre de categorías, canales de texto, canales de voz y roles.
+- Altas y bajas verificadas de cuentas TikTok, Twitch y YouTube.
+
+Con `WEB_ADMIN_MODE=true`, 40 comandos administrativos y de configuración dejan
+de registrarse en Discord. El código se conserva como recuperación: basta volver
+a `false` y registrar los comandos. Permanecen los comandos de uso cotidiano,
+moderación rápida, música, tickets, sugerencias, diagnóstico TikTok y `/panel`.
+El modo reducido solo se activa si el panel y Discord OAuth tienen una
+configuración válida; si falta una variable crítica, conserva automáticamente
+los comandos de recuperación.
+
+Discord es la identidad principal: Vesper vuelve a consultar la membresía,
+permisos y roles del usuario al abrir cada servidor. Google es opcional y sirve
+para autorizar al propietario global. Una cuenta iniciada solo con Google puede
+configurar si su correo está permitido, pero debe vincular Discord antes de
+aplicar sanciones.
+
+Cuando un usuario vincula Google y Discord desde la misma sesión, la asociación
+se conserva en MongoDB. En accesos posteriores puede iniciar con cualquiera de
+las dos cuentas y Vesper recuperará la identidad vinculada; también puede
+separarlas desde su tarjeta de cuenta. Nunca se conservan los access tokens.
+
+Configuración mínima del panel:
+
+```dotenv
+WEB_DASHBOARD_ENABLED=true
+WEB_BASE_URL=https://tu-servicio.example
+WEB_SESSION_SECRET=una_clave_aleatoria_de_al_menos_32_caracteres
+DISCORD_OAUTH_CLIENT_SECRET=secreto_oauth_de_la_aplicacion
+```
+
+En **Discord Developer Portal → OAuth2**, añade exactamente:
+
+```text
+https://tu-servicio.example/auth/discord/callback
+```
+
+El panel reutiliza `CLIENT_ID`; `DISCORD_OAUTH_CLIENT_ID` solo es necesario si
+se usa una aplicación OAuth diferente. Para generar una clave de sesión:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+```
+
+Google se activa solamente si se configuran todas estas variables:
+
+```dotenv
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_OWNER_EMAILS=correo1@gmail.com,correo2@dominio.com
+```
+
+En Google Cloud añade `https://tu-servicio.example/auth/google/callback` como
+URI de redirección autorizada. Vesper solo solicita `openid`, `email` y
+`profile`; no guarda el token de Google después del inicio de sesión.
+
+Las sesiones duran 24 horas por defecto y se almacenan en MongoDB como huellas
+HMAC. Las mutaciones requieren CSRF y la auditoría web se conserva durante 180
+días, ambos periodos configurables.
 
 ## Permisos por capacidad
 
 - `BOT_OWNER_IDS`: operaciones globales y acceso total al Main.
 - Administrador del Main: centro de control, módulos y configuración avanzada.
-- `SOCIAL_MANAGER_ROLE_IDS`: TikTok, Twitch y YouTube dentro del Main.
+- `SOCIAL_MANAGER_ROLE_IDS`: TikTok, Twitch y YouTube como respaldo global.
 - `MODERATOR_ROLE_IDS` o permiso **Moderar miembros**: advertencias y timeouts.
 - `MUSIC_DJ_ROLE_IDS` o permiso **Gestionar canales**: controles avanzados de música.
 - Miembros: solicitudes, cola y votación de salto cuando música está habilitada.
 
-Los comandos sociales conservan el permiso Administrador como valor inicial de
-Discord. Para que un rol gestor no administrativo pueda verlos, habilita ese rol
+Los roles de gestores sociales, moderadores y DJ también se leen desde la
+configuración persistente de cada servidor. Los comandos sociales conservan el
+permiso Administrador como valor inicial de Discord. Para que un rol gestor no
+administrativo pueda verlos, habilita ese rol
 en **Integraciones → Vesper → Comandos**; Vesper volverá a comprobar la capacidad
 internamente al ejecutarlos.
 
@@ -76,16 +175,17 @@ bot continúa funcionando.
 
 ## Despliegue
 
-El proyecto expone `/health`. Este endpoint responde `200` únicamente cuando
-Discord y MongoDB están conectados; durante una caída responde `503` y muestra
-el estado de cada monitor.
+El proyecto incluye un `Dockerfile` reproducible con Chromium y Lavalink, y
+expone `/live`, `/ready` y `/health`. La disponibilidad exige Discord, MongoDB
+y monitores sanos. Lavalink solo bloquea `/ready` si `MUSIC_REQUIRED=true`.
 
 El alojamiento queda a elección del propietario. Vesper requiere un proceso
-Node.js persistente, acceso a MongoDB y, si se activa música, un proceso Lavalink.
+persistente y acceso a MongoDB. En Docker y Render, el proceso Lavalink puede
+iniciarse dentro del mismo contenedor con `LAVALINK_EMBEDDED=true`.
 
 ## Seguridad
 
-- Los botones, selectores y modales del dashboard vuelven a validar permisos de
+- Los comandos, botones, selectores y modales sensibles vuelven a validar permisos de
   administrador en cada interacción.
 - Las operaciones globales requieren un propietario configurado.
 - Las URLs de avatar deben usar HTTPS y no pueden apuntar a redes privadas.
@@ -95,6 +195,10 @@ Node.js persistente, acceso a MongoDB y, si se activa música, un proceso Lavali
   permanente.
 - Cada alerta se reserva mediante una clave única en MongoDB antes de enviarse.
 - Los reintentos no vuelven a mencionar roles y respetan fallos temporales.
+- El panel nunca expone credenciales de OAuth ni el token del bot al navegador.
+- Cada acción web revalida permisos, roles y jerarquía directamente en Discord.
+- Google no puede ejecutar moderación hasta que la sesión tenga Discord vinculado.
+- Las sesiones rotan al completar OAuth, usan cookies `HttpOnly` y caducan en MongoDB.
 
 ## Historial y ciclo de directos
 
@@ -114,21 +218,55 @@ dominios permitidos, menciones masivas y mensajes repetidos. Las acciones
 automáticas eliminan y registran; el timeout automático es opcional y no existe
 autoban.
 
-Los comandos `/advertir`, `/aislar` y `/sanciones` se registran únicamente en el
-Main. Los roles de gestores, moderadores y DJ pueden definirse en el `.env`.
+Los comandos `/advertir`, `/aislar`, `/sanciones` y `/caso` están disponibles
+en todos los servidores aprobados. Cada registro recibe un ID y puede ser
+consultado, resuelto, revocado, reabierto o documentado con notas internas. Al
+revocar un aislamiento activo, Vesper intenta retirar también el timeout real.
+
+Los roles de gestores, moderadores y DJ pueden definirse por servidor; el
+`.env` se conserva como respaldo para instalaciones existentes.
+
+## Comunidad
+
+Los cuatro módulos comunitarios comienzan desactivados. Se administran con
+`/vesper-comunidad` o desde la configuración web:
+
+- **Tickets:** canales privados, roles de soporte, límite por usuario, cierre
+  sin borrado automático y transcripción HTML escapada de hasta 500 mensajes.
+- **Sugerencias:** `/sugerir`, votos y revisión administrativa con estado y nota.
+- **Autorroles:** selector de hasta 25 roles que Vesper pueda administrar.
+- **Starboard:** umbral y emoji configurables, exclusiones por canal y rechazo
+  de votos de bots o del propio autor.
+
+Los paneles interactivos de tickets y autorroles se publican explícitamente
+desde Discord para evitar envíos accidentales. Consulta `COMMUNITY_SETUP.md`
+para la configuración y los permisos necesarios.
 
 ## Música gratuita
 
-La música usa Lavalink 4.2.2 y el complemento oficial de YouTube 1.18.2. No
-requiere una API de pago, pero consume CPU y memoria del alojamiento propio.
+La música usa Lavalink 4.2.2 y el complemento de YouTube 1.18.2. No requiere
+una API de pago, pero consume CPU y memoria del alojamiento propio.
+
+### Docker o Render: modo integrado
+
+El `Dockerfile` de Vesper inicia Node.js y Lavalink juntos. Define una contraseña
+larga en `LAVALINK_PASSWORD`, conserva `LAVALINK_EMBEDDED=true` y deja
+`MUSIC_REQUIRED=false` para que una avería musical no detenga las demás funciones.
+No es necesario desplegar `docker-compose.music.yml` en este modo.
+
+### Desarrollo local o Lavalink externo
 
 ```bash
 docker compose -f docker-compose.music.yml up -d
 ```
 
-Configura la misma contraseña en `LAVALINK_PASSWORD` y activa el módulo desde
-el Main. `/vesper-musica-config` permite fijar canal de solicitudes, volumen,
-cola, límite por usuario, duración e inactividad.
+Usa la misma contraseña en Vesper y Lavalink. Para un servidor externo define
+`LAVALINK_EMBEDDED=false` y su URL HTTP(S) en `LAVALINK_URL`.
+
+Activa el módulo con `/vesper-setup modulos` o desde el panel web. El canal se
+asigna con `/vesper-setup canales`; los límites avanzados se ajustan desde el
+panel o con `/vesper-musica-config` en el Main. El rol de Vesper necesita los
+permisos **Ver canal**, **Conectar** y **Hablar** en el canal de voz.
 
 Reglas incorporadas:
 
@@ -141,8 +279,8 @@ Reglas incorporadas:
 - Salto por voto del 50 % o inmediato para DJ.
 - Desconexión automática después de 180 segundos sin audiencia o sin canciones.
 
-Comandos: `/musica reproducir`, `pausar`, `continuar`, `saltar`, `cola`,
-`actual`, `bucle`, `volumen` y `detener`.
+Comandos: `/musica diagnostico`, `reproducir`, `pausar`, `continuar`, `saltar`,
+`cola`, `actual`, `bucle`, `volumen` y `detener`.
 
 ## Pruebas
 
@@ -185,8 +323,8 @@ Usa `/tiktok-test` para comprobar una cuenta, el acceso público y el estado del
 navegador local. El navegador solo arranca cuando se consulta un video y se
 cierra junto con Vesper.
 
-El estado de últimos videos y cambios live se conserva en MongoDB, con respaldo
-local. Los fallos de red, bloqueo temporal o cambios de TikTok no se interpretan
+El estado de últimos videos y cambios live de TikTok, Twitch y YouTube se
+conserva en MongoDB, con respaldo local. Los fallos de red, bloqueo temporal o cambios de TikTok no se interpretan
 como cuentas borradas ni como transmisiones finalizadas. La integración usa
 rutas web no oficiales, por lo que TikTok puede modificarlas; el monitor entra
 en cooldown y el resto del bot continúa funcionando si eso sucede.

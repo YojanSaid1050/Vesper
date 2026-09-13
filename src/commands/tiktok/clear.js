@@ -2,6 +2,7 @@ const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder
 const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 const { clearGuildCache } = require('../../platforms/tiktok/monitors');
+const { CAPABILITIES, requireCapability } = require('../../core/PermissionService');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -40,8 +41,9 @@ module.exports = {
 
       collector.on('collect', async i => {
         try {
+          if (!await requireCapability(i, CAPABILITIES.SOCIAL_MANAGE)) return;
           if (i.customId === 'tiktok_clear_confirm') {
-            await updateGuildSection(interaction.guildId, 'tiktok', { ...config.tiktok, users: [] });
+            await updateGuildSection(interaction.guildId, 'tiktok', { users: [] });
             await clearGuildCache(interaction.guildId);
             await i.update({ content: `✅ Se eliminaron **${currentCount}** usuarios del monitoreo de TikTok.`, embeds: [], components: [] });
             

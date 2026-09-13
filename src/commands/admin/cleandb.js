@@ -33,6 +33,7 @@ module.exports = {
         const collector = response.createMessageComponentCollector({ filter, time: 30000, max: 1 });
 
         collector.on('collect', async i => {
+            if (!await requireBotOwner(i)) return;
             if (i.customId === 'resetalldb_cancel') {
                 await i.update({ content: '❌ Operación cancelada.', embeds: [], components: [] });
                 return;

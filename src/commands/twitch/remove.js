@@ -1,18 +1,7 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
-const CacheManager = require('../../core/CacheManager');
+const { getGuildConfig, removeGuildListItem } = require('../../database/mongoManager');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
-
-const twitchCache = new CacheManager('./data/twitch');
-
-function cleanTwitchStatus(guildId, username) {
-  const data = twitchCache.load('status', {});
-  const key = `${guildId}_${username}`;
-  if (data[key] !== undefined) {
-    delete data[key];
-    twitchCache.save('status', data);
-  }
-}
+const { clearUserState } = require('../../platforms/twitch/monitors');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -35,10 +24,10 @@ module.exports = {
         return interaction.editReply({ content: `❌ El streamer \`${input}\` no está en la lista de monitoreo.\n\nUsa \`/twitch-list\` para ver los streamers actuales.` });
       }
 
-      const newUsers = currentUsers.filter(u => u.toLowerCase() !== input);
-      await updateGuildSection(interaction.guildId, 'twitch', { ...config.twitch, users: newUsers });
+      const updated = await removeGuildListItem(interaction.guildId, 'twitch', 'users', existingUser);
+      const newUsers = updated?.twitch?.users || [];
 
-      cleanTwitchStatus(interaction.guildId, existingUser);
+      await clearUserState(interaction.guildId, existingUser);
 
       await interaction.editReply({ content: `✅ Se eliminó **${existingUser}** de la lista de monitoreo.\n\n📋 Streamers restantes: ${newUsers.length}` });
       
