@@ -24,6 +24,7 @@ function mockGuild(permissionList = [], memberRoles = []) {
   };
   const role = { id: '223456789012345678', name: 'Moderador', managed: false, position: 1 };
   const member = {
+    id: '444',
     permissions: { has: permission => permissionList.includes(permission) },
     roles: { cache: cache(memberRoles.map(id => ({ id }))), highest: { position: 10 } }
   };
@@ -34,6 +35,9 @@ function mockGuild(permissionList = [], memberRoles = []) {
     roles: { cache: cache([role]) },
     members: {
       me: { permissions: { has: () => true }, roles: { highest: { position: 10 } } },
+      // El panel lee primero la caché y solo llama a la API si falta el
+      // miembro, para no gastar peticiones en cada carga.
+      cache: cache([member]),
       fetch: async () => member
     }
   };
@@ -208,4 +212,64 @@ test('la vista de usuario oculta evidencia y notas internas', () => {
   assert.equal(memberView.evidence, undefined);
   assert.equal(memberView.moderatorId, undefined);
   assert.equal(moderatorView.notes.length, 1);
+});
+
+test('el editor de embeds valida lo que llega del panel', () => {
+  const previousMain = process.env.MAIN_GUILD_ID;
+  process.env.MAIN_GUILD_ID = '323456789012345678';
+  const guild = mockGuild();
+
+  const result = sanitizeGuildPatch({
+    embeds: {
+      welcome: {
+        title: '  # Hola {username}  ',
+        message: 'Bienvenido a {server}',
+        color: '#ff00aa',
+        image: 'https://example.com/a.gif',
+        thumbnail: false
+      },
+      goodbye: { title: null, color: null }
+    }
+  }, guild);
+
+  assert.equal(result.embeds.welcome.title, '# Hola {username}');
+  assert.equal(result.embeds.welcome.color, '#FF00AA', 'el color se normaliza a mayúsculas');
+  assert.equal(result.embeds.welcome.image, 'https://example.com/a.gif');
+  assert.equal(result.embeds.welcome.thumbnail, false);
+  assert.equal(result.embeds.goodbye.title, null, 'null restablece el valor original');
+  assert.equal(result.embeds.goodbye.color, null);
+
+  assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { color: 'rojo' } } }, guild), ValidationError);
+  assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { image: 'http://inseguro/a.gif' } } }, guild), ValidationError);
+  assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { message: 'x'.repeat(3001) } } }, guild), ValidationError);
+  assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { thumbnail: 'sí' } } }, guild), ValidationError);
+
+  if (previousMain === undefined) delete process.env.MAIN_GUILD_ID; else process.env.MAIN_GUILD_ID = previousMain;
+});
+
+test('la identidad se puede editar en ambos Main pero no en un satélite', () => {
+  const previousMain = process.env.MAIN_GUILD_ID;
+  const previousThemed = process.env.THEMED_MAIN_GUILD_IDS;
+  const guild = mockGuild();
+
+  // Main principal (Embers Void)
+  process.env.MAIN_GUILD_ID = '323456789012345678';
+  process.env.THEMED_MAIN_GUILD_IDS = '';
+  const principal = sanitizeGuildPatch({ profile: { theme: 'void', displayName: 'Vesper' } }, guild);
+  assert.equal(principal.profile.theme, 'void');
+  assert.throws(() => sanitizeGuildPatch({ profile: { theme: 'cinnamoroll' } }, guild), ValidationError);
+
+  // Main temático (Ankerie Dimension)
+  process.env.MAIN_GUILD_ID = '999999999999999999';
+  process.env.THEMED_MAIN_GUILD_IDS = '323456789012345678';
+  const tematico = sanitizeGuildPatch({ profile: { theme: 'cinnamoroll', displayName: 'AnkeBot' } }, guild);
+  assert.equal(tematico.profile.displayName, 'AnkeBot');
+
+  // Satélite: sin identidad propia
+  process.env.MAIN_GUILD_ID = '999999999999999999';
+  process.env.THEMED_MAIN_GUILD_IDS = '';
+  assert.throws(() => sanitizeGuildPatch({ profile: { displayName: 'Otro' } }, guild), ValidationError);
+
+  if (previousMain === undefined) delete process.env.MAIN_GUILD_ID; else process.env.MAIN_GUILD_ID = previousMain;
+  if (previousThemed === undefined) delete process.env.THEMED_MAIN_GUILD_IDS; else process.env.THEMED_MAIN_GUILD_IDS = previousThemed;
 });

@@ -34,7 +34,7 @@ async function satelliteMemberAdd(member, config) {
   }
   if (isModuleEnabledConfig(config, 'welcome') && general.welcomeChannel) {
     const channel = member.guild.channels.cache.get(general.welcomeChannel);
-    if (channel) await sendBrandedMessage(channel, themed ? themedWelcomePayload(member, config.profile) : neutralWelcomePayload(member));
+    if (channel) await sendBrandedMessage(channel, themed ? themedWelcomePayload(member, config) : neutralWelcomePayload(member));
   }
   if (isModuleEnabledConfig(config, 'logs') && general.logChannel) {
     const channel = member.guild.channels.cache.get(general.logChannel);
@@ -54,7 +54,7 @@ async function satelliteMemberRemove(member, config) {
   const themed = isThemedMainGuild(member.guild.id);
   if (isModuleEnabledConfig(config, 'goodbye') && general.goodbyeChannel) {
     const channel = member.guild.channels.cache.get(general.goodbyeChannel);
-    if (channel) await sendBrandedMessage(channel, themed ? themedGoodbyePayload(member, config.profile) : neutralGoodbyePayload(member));
+    if (channel) await sendBrandedMessage(channel, themed ? themedGoodbyePayload(member, config) : neutralGoodbyePayload(member));
   }
   if (isModuleEnabledConfig(config, 'logs') && general.logChannel) {
     const channel = member.guild.channels.cache.get(general.logChannel);
@@ -95,7 +95,7 @@ async function mainMemberAdd(member, config) {
     const channel = member.guild.channels.cache.get(general.welcomeChannel);
     if (channel) {
       const { sendWelcome } = require('../events/guild/memberAdd');
-      await sendWelcome(member, channel);
+      await sendWelcome(member, channel, config);
     }
   }
   if (isModuleEnabledConfig(config, 'logs') && general.logChannel) {
@@ -121,7 +121,7 @@ async function mainMemberRemove(member, config) {
     const channel = member.guild.channels.cache.get(general.goodbyeChannel);
     if (channel) {
       const { sendGoodbye } = require('../events/guild/memberRemove');
-      await sendGoodbye(member, channel);
+      await sendGoodbye(member, channel, config);
     }
   }
   if (isModuleEnabledConfig(config, 'logs') && general.logChannel) {

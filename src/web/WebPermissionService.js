@@ -23,7 +23,14 @@ async function guildAccess(client, guildId, session, config = {}) {
 
   const owner = isGlobalOwner(session);
   let member = null;
-  if (session?.discord?.id) member = await guild.members.fetch({ user: session.discord.id, force: true }).catch(() => null);
+  if (session?.discord?.id) {
+    // `force: true` hacía una llamada a la API de Discord por servidor y por
+    // petición: al listar servidores se multiplicaba y agotaba el límite de
+    // peticiones. La caché de miembros se mantiene actualizada por el evento
+    // guildMemberUpdate, así que basta con recurrir a la API cuando falta.
+    member = guild.members.cache?.get?.(String(session.discord.id))
+      || await guild.members.fetch({ user: session.discord.id }).catch(() => null);
+  }
   const administrator = member?.permissions?.has(PermissionFlagsBits.Administrator) === true;
   const manageGuild = member?.permissions?.has(PermissionFlagsBits.ManageGuild) === true;
   const moderateNative = member?.permissions?.has(PermissionFlagsBits.ModerateMembers) === true;

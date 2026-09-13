@@ -2,7 +2,7 @@ const { Events } = require('discord.js');
 const { startAllMonitors } = require('../platforms');
 const { updateDashboard } = require('../dashboard/updater');
 const { connectMongo, getGuildConfig } = require('../database/mongoManager'); // Añadido para verificar conexión
-const { getMainGuildId, isThemedMainGuild } = require('../config/guildPolicy');
+const { getMainGuildId, isAnyMainGuild } = require('../config/guildPolicy');
 const { auditGuild } = require('../core/DiagnosticsService');
 
 module.exports = {
@@ -61,11 +61,14 @@ module.exports = {
     }
 
     for (const guild of client.guilds.cache.values()) {
-      if (!isThemedMainGuild(guild.id)) continue;
+      if (!isAnyMainGuild(guild.id)) continue;
       const config = await getGuildConfig(guild.id).catch(() => null);
       const displayName = config?.profile?.displayName;
-      if (displayName && guild.members.me?.displayName !== displayName) {
-        await guild.members.me.setNickname(displayName, 'Perfil Main temático de Vesper').catch(error => {
+      // guild.members.me puede ser null si el miembro del bot aún no está en
+      // caché. Sin esta comprobación el arranque lanzaba un TypeError.
+      const me = guild.members.me || await guild.members.fetchMe().catch(() => null);
+      if (displayName && me && me.displayName !== displayName) {
+        await me.setNickname(displayName, 'Perfil del servidor Main configurado en Vesper').catch(error => {
           console.warn(`⚠️ No fue posible aplicar el apodo ${displayName} en ${guild.name}: ${error.message}`);
         });
       }

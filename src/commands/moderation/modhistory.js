@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { CAPABILITIES } = require('../../core/PermissionService');
 const { history, caseIdentifier } = require('../../core/ModerationService');
 
@@ -7,6 +7,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('sanciones')
     .setDescription('Consulta el historial de moderación de un usuario.')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .addUserOption(option => option.setName('usuario').setDescription('Usuario consultado').setRequired(true)),
   async execute(interaction) {
     const user = interaction.options.getUser('usuario');

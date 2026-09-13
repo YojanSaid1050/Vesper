@@ -47,6 +47,8 @@ services:
       - key: MONGODB_URI
         sync: false
         required: true
+      - key: GUILD_CONFIG_CACHE_MS
+        value: "30000"
       - key: LAVALINK_URL
         sync: false
         required: false
@@ -90,6 +92,9 @@ services:
         value: "false"
       - key: LOG_ERRORS
         value: "true"
+    # /health es tolerante a fallos transitorios (un monitor en pausa, una
+    # reconexión de MongoDB) a propósito: con /ready aquí, Render reiniciaba el
+    # contenedor en bucle. Para diagnóstico estricto, consulta /ready a mano.
     healthCheckPath: /health
     autoDeploy: true
     plan: free

@@ -59,12 +59,15 @@ class ErrorHandler {
 
   static async handleInteraction(interaction, error) {
     const message = this.handle(error, 'Interaction');
-    
+    const EPHEMERAL = 64; // MessageFlags.Ephemeral; `ephemeral: true` está obsoleto.
+
     try {
       if (interaction.deferred && !interaction.replied) {
         await interaction.editReply({ content: message });
-      } else if (!interaction.replied) {
-        await interaction.reply({ content: message, ephemeral: true });
+      } else if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: message, flags: EPHEMERAL });
+      } else {
+        await interaction.reply({ content: message, flags: EPHEMERAL });
       }
     } catch (err) {
       console.error('Error al responder al usuario:', err.message);

@@ -1,6 +1,7 @@
 const { moduleDefaults, isMainGuild, isThemedMainGuild } = require('./guildPolicy');
+const { defaultEmbedsConfig } = require('../core/EmbedTemplateService');
 
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 function defaultProfileConfig(guildId = null) {
   if (isThemedMainGuild(guildId)) {
@@ -58,6 +59,7 @@ function createDefaultGuildConfig(guildId = null) {
     youtube: { liveChannel: null, videoChannel: null, shortChannel: null, users: [], showUsers: false, pingRole: null },
     branding: { name: null, avatar: null },
     profile: defaultProfileConfig(guildId),
+    embeds: defaultEmbedsConfig(),
     features: moduleDefaults(),
     permissions: { socialManagerRoles: [], moderatorRoles: [], musicDjRoles: [] },
     moderation: {
@@ -76,4 +78,4 @@ function createDefaultGuildConfig(guildId = null) {
   };
 }
 
-module.exports = { CURRENT_SCHEMA_VERSION, createDefaultGuildConfig, defaultCommunityConfig, defaultProfileConfig };
+module.exports = { CURRENT_SCHEMA_VERSION, createDefaultGuildConfig, defaultCommunityConfig, defaultProfileConfig, defaultEmbedsConfig };

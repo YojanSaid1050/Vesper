@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { CAPABILITIES } = require('../../core/PermissionService');
 const { createCase, caseIdentifier } = require('../../core/ModerationService');
 const { getGuildConfig } = require('../../database/mongoManager');
@@ -9,6 +9,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('advertir')
     .setDescription('Registra una advertencia de moderación.')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .addUserOption(option => option.setName('usuario').setDescription('Usuario advertido').setRequired(true))
     .addStringOption(option => option.setName('motivo').setDescription('Motivo de la advertencia').setRequired(true).setMaxLength(1000)),
   async execute(interaction) {

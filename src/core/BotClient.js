@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { REST, Routes } = require('discord.js');
 const { executeEventWithPolicy } = require('./EventPolicy');
-const { getMainGuildId } = require('../config/guildPolicy');
+const { getMainGuildId, getThemedMainGuildIds } = require('../config/guildPolicy');
 const { MusicService } = require('./MusicService');
 const { commandVisible } = require('./CommandVisibilityService');
 
@@ -131,15 +131,24 @@ class BotClient extends Client {
     const mainCommands = this.commands
       .filter(command => command.scope === 'main' && commandVisible(command))
       .map(command => command.data.toJSON());
-    const mainGuildId = getMainGuildId();
+    // Los comandos de Main se publican en Embers Void y también en cada Main
+    // temático: ambos servidores tienen el mismo conjunto de funciones.
+    const mainGuildIds = [getMainGuildId(), ...getThemedMainGuildIds()].filter(Boolean);
+    const uniqueMainGuildIds = [...new Set(mainGuildIds)];
     const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
 
     try {
       await rest.put(Routes.applicationCommands(this.application.id), { body: globalCommands });
       console.log(`✅ ${globalCommands.length} comandos comunes registrados globalmente`);
-      if (mainGuildId) {
-        await rest.put(Routes.applicationGuildCommands(this.application.id, mainGuildId), { body: mainCommands });
-        console.log(`✅ ${mainCommands.length} comandos exclusivos registrados en el Main`);
+      for (const guildId of uniqueMainGuildIds) {
+        // Un Main puede no estar disponible todavía: que falle uno no debe
+        // impedir el registro en los demás.
+        try {
+          await rest.put(Routes.applicationGuildCommands(this.application.id, guildId), { body: mainCommands });
+          console.log(`✅ ${mainCommands.length} comandos de Main registrados en ${guildId}`);
+        } catch (guildError) {
+          console.error(`⚠️ No se pudieron registrar los comandos de Main en ${guildId}: ${guildError.message}`);
+        }
       }
     } catch (error) {
       console.error('❌ Error registrando comandos:', error);
