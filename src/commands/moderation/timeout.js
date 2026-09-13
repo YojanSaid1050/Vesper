@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { CAPABILITIES } = require('../../core/PermissionService');
 const { createCase, caseIdentifier } = require('../../core/ModerationService');
 const { getGuildConfig } = require('../../database/mongoManager');
@@ -9,6 +9,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('aislar')
     .setDescription('Aplica un timeout temporal a un miembro.')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ModerateMembers)
     .addUserOption(option => option.setName('usuario').setDescription('Miembro objetivo').setRequired(true))
     .addIntegerOption(option => option.setName('minutos').setDescription('Duración entre 1 y 40320 minutos').setMinValue(1).setMaxValue(40320).setRequired(true))
     .addStringOption(option => option.setName('motivo').setDescription('Motivo').setRequired(true).setMaxLength(1000)),

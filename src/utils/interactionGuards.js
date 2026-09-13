@@ -1,7 +1,7 @@
 // Administrator corresponde al bit 1 << 3 en Discord. Mantener la constante
 // local permite probar las guardas sin inicializar un cliente de Discord.
 const ADMINISTRATOR_PERMISSION = 8n;
-const { isMainGuild } = require('../config/guildPolicy');
+const { isAnyMainGuild } = require('../config/guildPolicy');
 
 function getOwnerIds() {
   return new Set(
@@ -38,8 +38,8 @@ async function requireAdministrator(interaction) {
 }
 
 async function requireMainGuild(interaction) {
-  if (isMainGuild(interaction?.guildId || interaction?.guild?.id)) return true;
-  await deny(interaction, 'Esta función está disponible únicamente en el servidor principal de Vesper.');
+  if (isAnyMainGuild(interaction?.guildId || interaction?.guild?.id)) return true;
+  await deny(interaction, 'Esta función está disponible únicamente en los servidores Main de Vesper.');
   return false;
 }
 

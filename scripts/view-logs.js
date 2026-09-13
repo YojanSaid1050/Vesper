@@ -252,6 +252,7 @@ function parseArgs() {
       case '-h':
         showHelp();
         process.exit(0);
+        break;
       default:
         if (!arg.startsWith('-')) {
           options.type = arg;

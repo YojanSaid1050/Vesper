@@ -1,4 +1,4 @@
-# Vesper Bot 2.8.0
+# Vesper Bot 2.8.1
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión 2.8 conserva la presentación visual original con
@@ -40,9 +40,13 @@ por coma. Si queda vacío, nadie puede ejecutar operaciones globales como
 
 ## Main principal, Main temáticos y satélites
 
-Configura `MAIN_GUILD_ID` con el ID de Embers Void. El dashboard, diagnóstico,
-auditoría, historial, roles especiales, personalidad original y comandos de
-administración avanzada solo funcionan y se registran en ese servidor.
+Configura `MAIN_GUILD_ID` con el ID de Embers Void y `THEMED_MAIN_GUILD_IDS`
+con el de Ankerie Dimension. **Desde 2.8.1 los dos son Main con las mismas
+funciones**: el dashboard de Discord, el centro de control, el historial, los
+módulos y la configuración de identidad están disponibles en ambos, y los
+comandos `scope: 'main'` se registran en los dos servidores. Lo único que no se
+comparte es la personalización: cada uno tiene sus propios textos, colores y
+embeds.
 
 `APPROVED_GUILD_IDS` acepta IDs secundarios separados por coma. La lista es
 cerrada por defecto: cualquier servidor no incluido queda ignorado también por
@@ -86,7 +90,16 @@ La interfaz incluye:
 - Creación y administración de advertencias y aislamientos.
 - Vista privada para que cada usuario consulte únicamente sus propios casos.
 - Auditoría de todos los cambios realizados desde la web.
-- Perfil temático por servidor, textos de bienvenida y rol automático.
+- **Editor de embeds de bienvenida y despedida con vista previa en vivo**,
+  variables (`{user}`, `{username}`, `{displayName}`, `{server}`,
+  `{memberCount}`, `{userId}`) y botón para restablecer el diseño original.
+  En Embers Void se conserva la estructura Components V2 y solo se editan el
+  texto, el color del borde y la imagen; en Ankerie Dimension se añaden pie de
+  página, imagen y miniatura.
+- **Resumen completo de la configuración del servidor**, con los IDs ya
+  resueltos a nombres de canal y de rol, y botón para copiarlo como JSON.
+- Identidad del bot por servidor: nombre visible, avatar de webhooks, colores y
+  rol automático de miembros.
 - Selección por nombre de categorías, canales de texto, canales de voz y roles.
 - Altas y bajas verificadas de cuentas TikTok, Twitch y YouTube.
 
@@ -285,10 +298,32 @@ Comandos: `/musica diagnostico`, `reproducir`, `pausar`, `continuar`, `saltar`,
 ## Pruebas
 
 ```bash
-npm test
+npm test          # 81 pruebas
+npm run lint      # errores reales, no estilo
+npm run verify:visual   # el diseño protegido no cambió
+npm run qa        # las tres a la vez
 ```
 
-La validación continua comprueba pruebas y sintaxis en Node.js 24.
+La validación continua ejecuta lint, pruebas, verificación visual y comprobación
+de sintaxis en Node.js 24.
+
+Entre las pruebas hay una que compara el mensaje de bienvenida y el de despedida
+de Embers Void, sin configuración guardada, contra el diseño original carácter a
+carácter. Si alguien cambia la estructura del embed sin querer, falla.
+
+## Comprobaciones de salud
+
+| Ruta | Qué responde | Para qué sirve |
+| --- | --- | --- |
+| `/live` | 200 mientras el proceso no se esté apagando | Sonda de vida |
+| `/health` | 200 si el bot está conectado y no se está apagando | **La que debe usar el alojamiento** |
+| `/ready` | 200 solo si además la base de datos, los monitores y la música están bien | Diagnóstico y validación de despliegue |
+
+`/health` es deliberadamente tolerante: un monitor en pausa por errores de
+TikTok o una reconexión de MongoDB son situaciones que Vesper resuelve solo. Si
+el alojamiento consultara la comprobación estricta, reiniciaría el contenedor en
+bucle por un fallo pasajero. El cuerpo de la respuesta incluye `ready` y el
+detalle de cada monitor, así que no se pierde información.
 
 ## TikTok autohospedado y gratuito
 

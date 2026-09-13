@@ -8,7 +8,11 @@ const { escapeHtml, qualifyingStarCount, renderTranscript, safeChannelName, tick
 test('los módulos comunitarios son opt-in y la configuración nace completa', () => {
   const modules = moduleDefaults();
   const config = createDefaultGuildConfig('guild');
-  assert.equal(CURRENT_SCHEMA_VERSION, 4);
+  assert.equal(CURRENT_SCHEMA_VERSION, 5);
+  // El editor de embeds nace vacío: sin valores guardados, cada servidor
+  // conserva su diseño original.
+  assert.deepEqual(config.embeds.welcome, { title: null, message: null, color: null, image: null, footer: null, thumbnail: true });
+  assert.deepEqual(config.embeds.goodbye, { title: null, message: null, color: null, image: null, footer: null, thumbnail: true });
   assert.equal(modules.tickets, false);
   assert.equal(modules.suggestions, false);
   assert.equal(modules.selfroles, false);

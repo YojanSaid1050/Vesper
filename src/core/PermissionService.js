@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require('discord.js');
-const { csvSet, isMainGuild } = require('../config/guildPolicy');
+const { csvSet, isAnyMainGuild } = require('../config/guildPolicy');
 const { isBotOwner } = require('../utils/interactionGuards');
 const { getGuildConfig } = require('../database/mongoManager');
 
@@ -31,7 +31,7 @@ function hasPermission(interaction, permission) {
 
 function can(interaction, capability) {
   if (!interaction?.inGuild?.()) return false;
-  const main = isMainGuild(interaction.guildId || interaction.guild?.id);
+  const main = isAnyMainGuild(interaction.guildId || interaction.guild?.id);
   const owner = isBotOwner(interaction.user?.id);
   const administrator = hasPermission(interaction, PermissionFlagsBits.Administrator);
 

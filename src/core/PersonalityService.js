@@ -1,4 +1,5 @@
 const { isMainGuild, isThemedMainGuild } = require('../config/guildPolicy');
+const { resolveEmbedTemplate } = require('./EmbedTemplateService');
 
 const TEXT = Object.freeze({
   neutral: {
@@ -40,30 +41,66 @@ function profileMessage(template, member) {
     .replaceAll('{server}', member.guild.name);
 }
 
-function themedWelcomePayload(member, profile = {}) {
-  return {
-    embeds: [{
-      title: profile.welcomeTitle || '☁️ ¡Una nueva estrella llegó!',
-      description: profileMessage(profile.welcomeMessage || 'Hola {user}, bienvenido a **{server}**. Tu aventura entre nubes comienza aquí. ✨', member),
-      color: colorNumber(profile.primaryColor, 0x8DDCF4),
-      thumbnail: { url: member.user.displayAvatarURL() },
-      footer: { text: `${profile.displayName || 'AnkeBot'} • Ankerie Dimension` },
-      timestamp: new Date().toISOString()
-    }]
+const THEMED_DEFAULTS = Object.freeze({
+  welcomeTitle: '☁️ ¡Una nueva estrella llegó!',
+  welcomeMessage: 'Hola {user}, bienvenido a **{server}**. Tu aventura entre nubes comienza aquí. ✨',
+  goodbyeTitle: '🌙 Hasta pronto',
+  goodbyeMessage: '**{username}** dejó {server}. Que las nubes acompañen su próximo viaje.',
+  primaryColor: 0x8DDCF4,
+  secondaryColor: 0xF8C8DC,
+  displayName: 'AnkeBot',
+  guildLabel: 'Ankerie Dimension'
+});
+
+// Construye el embed temático. El orden de prioridad es:
+// 1) lo guardado en `embeds.<kind>` desde el editor del panel,
+// 2) los campos antiguos de `profile` (compatibilidad con configuraciones ya
+//    existentes, para no perder lo que el administrador ya había escrito),
+// 3) el texto original del bot.
+function themedPayload(member, kind, config = {}) {
+  const profile = config?.profile || {};
+  const welcome = kind === 'welcome';
+  const legacyTitle = welcome ? profile.welcomeTitle : profile.goodbyeTitle;
+  const legacyMessage = welcome ? profile.welcomeMessage : profile.goodbyeMessage;
+  const legacyColor = welcome ? profile.primaryColor : profile.secondaryColor;
+  const displayName = profile.displayName || THEMED_DEFAULTS.displayName;
+
+  const template = resolveEmbedTemplate(config, kind, member, {
+    title: legacyTitle || (welcome ? THEMED_DEFAULTS.welcomeTitle : THEMED_DEFAULTS.goodbyeTitle),
+    message: profileMessage(legacyMessage || (welcome ? THEMED_DEFAULTS.welcomeMessage : THEMED_DEFAULTS.goodbyeMessage), member),
+    footer: `${displayName} • ${member?.guild?.name || THEMED_DEFAULTS.guildLabel}`,
+    color: colorNumber(legacyColor, welcome ? THEMED_DEFAULTS.primaryColor : THEMED_DEFAULTS.secondaryColor),
+    image: null,
+    thumbnail: true
+  });
+
+  const embed = {
+    title: template.title,
+    description: template.message,
+    color: template.color,
+    timestamp: new Date().toISOString()
   };
+  if (template.thumbnail) embed.thumbnail = { url: member.user.displayAvatarURL() };
+  if (template.image) embed.image = { url: template.image };
+  if (template.footer) embed.footer = { text: template.footer };
+  return { embeds: [embed] };
 }
 
-function themedGoodbyePayload(member, profile = {}) {
-  return {
-    embeds: [{
-      title: profile.goodbyeTitle || '🌙 Hasta pronto',
-      description: profileMessage(profile.goodbyeMessage || '**{username}** dejó {server}. Que las nubes acompañen su próximo viaje.', member),
-      color: colorNumber(profile.secondaryColor, 0xF8C8DC),
-      thumbnail: { url: member.user.displayAvatarURL() },
-      footer: { text: `${profile.displayName || 'AnkeBot'} • Ankerie Dimension` },
-      timestamp: new Date().toISOString()
-    }]
-  };
+// Se sigue aceptando un `profile` suelto como segundo argumento por
+// compatibilidad con las llamadas antiguas.
+function normalizeThemedConfig(configOrProfile) {
+  if (!configOrProfile || typeof configOrProfile !== 'object') return {};
+  return configOrProfile.profile || configOrProfile.embeds
+    ? configOrProfile
+    : { profile: configOrProfile };
+}
+
+function themedWelcomePayload(member, configOrProfile = {}) {
+  return themedPayload(member, 'welcome', normalizeThemedConfig(configOrProfile));
+}
+
+function themedGoodbyePayload(member, configOrProfile = {}) {
+  return themedPayload(member, 'goodbye', normalizeThemedConfig(configOrProfile));
 }
 
 function neutralWelcomePayload(member) {
@@ -98,5 +135,7 @@ module.exports = {
   neutralWelcomePayload,
   neutralGoodbyePayload,
   themedWelcomePayload,
-  themedGoodbyePayload
+  themedGoodbyePayload,
+  themedPayload,
+  THEMED_DEFAULTS
 };

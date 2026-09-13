@@ -66,12 +66,15 @@ async function completeOAuth(req, res, provider, state, identity) {
     ? await WebIdentityLink.findOne({ 'discord.id': identity.id }).lean()
     : await WebIdentityLink.findOne({ 'google.id': identity.id }).lean();
   if (linked) {
-    if ((provider === 'discord' && existingGoogleId && linked.google.id !== existingGoogleId) ||
-        (provider === 'google' && existingDiscordId && linked.discord.id !== existingDiscordId)) {
+    // Un vínculo guardado a medias (sin una de las dos identidades) hacía
+    // que esta comprobación lanzara un TypeError y bloqueara el inicio de
+    // sesión con un error 500 en vez de un mensaje claro.
+    if ((provider === 'discord' && existingGoogleId && linked.google?.id !== existingGoogleId) ||
+        (provider === 'google' && existingDiscordId && linked.discord?.id !== existingDiscordId)) {
       throw Object.assign(new Error('Esa cuenta ya está vinculada a una identidad diferente.'), { statusCode: 409 });
     }
-    session.discord = linked.discord;
-    session.google = linked.google;
+    if (linked.discord) session.discord = linked.discord;
+    if (linked.google) session.google = linked.google;
     if (provider === 'discord') session.discord = identity;
     else session.google = identity;
   }
@@ -81,7 +84,7 @@ async function completeOAuth(req, res, provider, state, identity) {
       WebIdentityLink.findOne({ 'discord.id': session.discord.id }).lean(),
       WebIdentityLink.findOne({ 'google.id': session.google.id }).lean()
     ]);
-    if ((discordLink && discordLink.google.id !== session.google.id) || (googleLink && googleLink.discord.id !== session.discord.id)) {
+    if ((discordLink && discordLink.google?.id !== session.google.id) || (googleLink && googleLink.discord?.id !== session.discord.id)) {
       throw Object.assign(new Error('Una de estas cuentas ya está vinculada a otra identidad.'), { statusCode: 409 });
     }
     await WebIdentityLink.findOneAndUpdate(

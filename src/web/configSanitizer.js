@@ -1,6 +1,7 @@
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
-const { MODULE_DEFAULTS, isThemedMainGuild } = require('../config/guildPolicy');
+const { MODULE_DEFAULTS, isAnyMainGuild, isMainGuild } = require('../config/guildPolicy');
 const { normalizeAllowedDomain } = require('../core/ModerationService');
+const { EMBED_KINDS, EMBED_FIELD_LIMITS } = require('../core/EmbedTemplateService');
 
 class ValidationError extends Error {
   constructor(message) {
@@ -115,12 +116,15 @@ function sanitizeGuildPatch(input, guild) {
   const updates = {};
 
   if (input.profile !== undefined) {
-    if (!isThemedMainGuild(guild.id)) throw new ValidationError('El perfil temático solo puede editarse en un Main temático autorizado.');
+    // Embers Void y los Main temáticos son servidores de primer nivel: ambos
+    // pueden definir su identidad. Los satélites no.
+    if (!isAnyMainGuild(guild.id)) throw new ValidationError('La identidad del bot solo puede editarse en un servidor Main autorizado.');
     const source = input.profile;
     if (!source || typeof source !== 'object' || Array.isArray(source)) throw new ValidationError('profile no es válido.');
     const target = {};
     if (source.theme !== undefined) {
-      if (!['cinnamoroll', 'custom'].includes(source.theme)) throw new ValidationError('profile.theme no es válido para este servidor.');
+      const allowedThemes = isMainGuild(guild.id) ? ['void', 'custom'] : ['cinnamoroll', 'custom'];
+      if (!allowedThemes.includes(source.theme)) throw new ValidationError('profile.theme no es válido para este servidor.');
       target.theme = source.theme;
     }
     if (source.displayName !== undefined) target.displayName = optionalText(source.displayName, 80, 'profile.displayName');
@@ -135,6 +139,31 @@ function sanitizeGuildPatch(input, guild) {
       ? null
       : assignableRoleValue(guild, source.memberRole, 'profile.memberRole');
     if (Object.keys(target).length) updates.profile = target;
+  }
+
+  // Editor de embeds de bienvenida y despedida. Disponible en cualquier
+  // servidor: cada Main tiene su propio diseño y sus propios textos.
+  if (input.embeds !== undefined) {
+    const source = input.embeds;
+    if (!source || typeof source !== 'object' || Array.isArray(source)) throw new ValidationError('embeds no es válido.');
+    const target = {};
+    for (const kind of EMBED_KINDS) {
+      if (source[kind] === undefined) continue;
+      const block = source[kind];
+      if (!block || typeof block !== 'object' || Array.isArray(block)) throw new ValidationError(`embeds.${kind} no es válido.`);
+      const result = {};
+      for (const field of ['title', 'message', 'footer']) {
+        if (block[field] === undefined) continue;
+        result[field] = optionalText(block[field], EMBED_FIELD_LIMITS[field], `embeds.${kind}.${field}`);
+      }
+      if (block.image !== undefined) result.image = imageUrlValue(block.image, `embeds.${kind}.image`);
+      if (block.color !== undefined) {
+        result.color = block.color === null || block.color === '' ? null : colorValue(block.color, `embeds.${kind}.color`);
+      }
+      if (block.thumbnail !== undefined) result.thumbnail = booleanValue(block.thumbnail, `embeds.${kind}.thumbnail`);
+      if (Object.keys(result).length) target[kind] = result;
+    }
+    if (Object.keys(target).length) updates.embeds = target;
   }
 
   if (input.features !== undefined) {

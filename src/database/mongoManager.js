@@ -2,10 +2,48 @@
 const mongoose = require('mongoose');
 const Guild = require('./models/Guild');
 const { isApprovedGuild } = require('../config/guildPolicy');
-const { CURRENT_SCHEMA_VERSION, createDefaultGuildConfig, defaultCommunityConfig, defaultProfileConfig } = require('../config/defaultGuild');
+const { CURRENT_SCHEMA_VERSION, createDefaultGuildConfig, defaultCommunityConfig, defaultProfileConfig, defaultEmbedsConfig } = require('../config/defaultGuild');
 
 let isConnected = false;
 let connectionPromise = null;
+
+// Caché de configuración por servidor. Sin ella, cada mensaje, cada evento y
+// cada interacción provocaban una consulta a MongoDB Atlas: en un servidor
+// activo son miles de consultas por minuto. El TTL es corto para que los
+// cambios hechos fuera del bot se reflejen pronto, y toda escritura que pase
+// por este módulo invalida la entrada al instante.
+const CONFIG_CACHE_TTL_MS = Math.max(0, Number(process.env.GUILD_CONFIG_CACHE_MS ?? 30_000));
+const CONFIG_CACHE_MAX = 500;
+const configCache = new Map();
+
+function cacheGet(guildId) {
+  if (CONFIG_CACHE_TTL_MS <= 0) return null;
+  const entry = configCache.get(String(guildId));
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    configCache.delete(String(guildId));
+    return null;
+  }
+  return entry.value;
+}
+
+function cacheSet(guildId, value) {
+  if (CONFIG_CACHE_TTL_MS <= 0 || !value) return value;
+  const key = String(guildId);
+  configCache.delete(key);
+  configCache.set(key, { value, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS });
+  while (configCache.size > CONFIG_CACHE_MAX) {
+    const oldest = configCache.keys().next().value;
+    if (oldest === undefined) break;
+    configCache.delete(oldest);
+  }
+  return value;
+}
+
+function invalidateGuildConfig(guildId) {
+  if (guildId === undefined || guildId === null) configCache.clear();
+  else configCache.delete(String(guildId));
+}
 
 async function connectMongo() {
   if (isConnected) return;
@@ -62,16 +100,21 @@ mongoose.connection.on('reconnected', () => {
   console.log('✅ MongoDB reconectado');
 });
 
-async function getGuildConfig(guildId) {
+async function getGuildConfig(guildId, { fresh = false } = {}) {
   if (!guildId) {
     throw new Error('guildId es requerido');
   }
-  
+
+  if (!fresh) {
+    const cached = cacheGet(guildId);
+    if (cached) return cached;
+  }
+
   await connectMongo();
-  
+
   try {
     let guild = await Guild.findOne({ guildId });
-    
+
     if (!guild) {
       guild = await Guild.create(createDefaultGuildConfig(guildId));
     } else if (guild.$isDefault?.('schemaVersion') || Number(guild.schemaVersion || 0) < CURRENT_SCHEMA_VERSION) {
@@ -79,14 +122,24 @@ async function getGuildConfig(guildId) {
       if (!Array.isArray(guild.moderation?.exemptChannels)) guild.set('moderation.exemptChannels', []);
       if (!Array.isArray(guild.moderation?.exemptRoles)) guild.set('moderation.exemptRoles', []);
       if (!guild.community) guild.set('community', defaultCommunityConfig());
+      if (!guild.embeds) guild.set('embeds', defaultEmbedsConfig());
       if (!Array.isArray(guild.community?.tickets?.staffRoles)) guild.set('community.tickets.staffRoles', []);
       if (!Array.isArray(guild.community?.selfRoles?.roles)) guild.set('community.selfRoles.roles', []);
       if (!Array.isArray(guild.community?.starboard?.ignoredChannels)) guild.set('community.starboard.ignoredChannels', []);
-      guild.set('profile', defaultProfileConfig(guildId));
+      // La migración solo rellena lo que falta. Antes reemplazaba el perfil
+      // completo y cada subida de schemaVersion borraba el nombre, los colores
+      // y los mensajes personalizados de los Main temáticos.
+      const defaults = defaultProfileConfig(guildId);
+      const currentProfile = guild.profile ? (guild.profile.toObject?.() || guild.profile) : {};
+      for (const [key, value] of Object.entries(defaults)) {
+        if (currentProfile[key] === undefined || currentProfile[key] === null) {
+          guild.set(`profile.${key}`, value);
+        }
+      }
       await guild.save();
     }
-    
-    return guild.toObject();
+
+    return cacheSet(guildId, guild.toObject());
   } catch (error) {
     console.error(`Error obteniendo configuración para guild ${guildId}:`, error.message);
     return createDefaultGuildConfig(guildId);
@@ -101,7 +154,7 @@ async function updateGuildConfig(guildId, updates) {
   await connectMongo();
   
   try {
-    const allowedSections = ['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'features', 'permissions', 'moderation', 'music', 'community', 'testPanel'];
+    const allowedSections = ['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'features', 'permissions', 'moderation', 'music', 'community', 'testPanel'];
     const sanitizedUpdates = {};
     for (const section of allowedSections) {
       if (updates?.[section] === undefined) continue;
@@ -115,6 +168,7 @@ async function updateGuildConfig(guildId, updates) {
       { $set: sanitizedUpdates, $setOnInsert: { guildId } },
       { returnDocument: 'after', upsert: true }
     );
+    invalidateGuildConfig(guildId);
     return result.toObject();
   } catch (error) {
     console.error(`Error actualizando configuración para guild ${guildId}:`, error.message);
@@ -139,6 +193,7 @@ async function addGuildListItem(guildId, section, key, value) {
     { $addToSet: { [path]: value }, $setOnInsert: { guildId } },
     { returnDocument: 'after', upsert: true }
   );
+  invalidateGuildConfig(guildId);
   return result.toObject();
 }
 
@@ -159,6 +214,7 @@ async function removeGuildListItem(guildId, section, key, value) {
     { $pull: { [path]: value } },
     { returnDocument: 'after' }
   );
+  invalidateGuildConfig(guildId);
   return result ? result.toObject() : null;
 }
 
@@ -170,7 +226,7 @@ async function updateGuildSection(guildId, section, values) {
   await connectMongo();
   
   try {
-    const allowedSections = new Set(['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'features', 'permissions', 'moderation', 'music', 'testPanel']);
+    const allowedSections = new Set(['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'features', 'permissions', 'moderation', 'music', 'testPanel']);
     if (!allowedSections.has(section)) throw new Error(`Sección de configuración no permitida: ${section}`);
 
     const update = {};
@@ -183,6 +239,7 @@ async function updateGuildSection(guildId, section, values) {
       { $set: update },
       { returnDocument: 'after', upsert: true }
     );
+    invalidateGuildConfig(guildId);
     return result.toObject();
   } catch (error) {
     console.error(`Error actualizando sección ${section} para guild ${guildId}:`, error.message);
@@ -212,6 +269,7 @@ async function updateCommunitySection(guildId, subsection, values) {
     { $set: update, $setOnInsert: { guildId } },
     { returnDocument: 'after', upsert: true }
   );
+  invalidateGuildConfig(guildId);
   return result.toObject();
 }
 
@@ -238,6 +296,7 @@ async function getGeneralConfig(guildId) {
 
 async function deleteGuild(guildId) {
   await connectMongo();
+  invalidateGuildConfig(guildId);
   return await Guild.deleteOne({ guildId });
 }
 
@@ -276,6 +335,7 @@ async function cleanDuplicateUsers() {
     
     if (modified) {
       await guild.save();
+      invalidateGuildConfig(guild.guildId);
       cleaned++;
     }
   }
@@ -298,5 +358,6 @@ module.exports = {
   deleteGuild,
   cleanDuplicateUsers,
   getMongoStatus,
-  disconnectMongo
+  disconnectMongo,
+  invalidateGuildConfig
 };

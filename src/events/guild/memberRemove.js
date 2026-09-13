@@ -1,35 +1,53 @@
 const { Events, EmbedBuilder } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { resolveEmbedTemplate } = require('../../core/EmbedTemplateService');
 
-function buildGoodbyePayload(member) {
+// Mismo criterio que en memberAdd: la estructura del diseño es intocable y
+// solo los textos, el color de acento y la imagen salen a la configuración.
+const GOODBYE_DEFAULT_TITLE = '# ☾°.⋆༺ 𝑇ℎ𝑒 𝑣𝑜𝑖𝑑 𝑐𝑙𝑎𝑖𝑚𝑠 𝑎𝑛𝑜𝑡ℎ𝑒𝑟 𝑠𝑜𝑢𝑙 ༻⋆.°☽';
+const GOODBYE_DEFAULT_IMAGE = 'https://i.redd.it/vru2z0kl9uaf1.gif';
+const GOODBYE_DEFAULT_COLOR = 0x000000; // ⚫ NEGRO
+
+function goodbyeDefaultMessage(member) {
+  return `### 𝑭𝒂𝒓𝒆𝒘𝒆𝒍𝒍, ${member.user.username}...\n\n𝑨𝒏𝒐𝒕𝒉𝒆𝒓 𝒆𝒄𝒉𝒐 𝒇𝒂𝒍𝒍𝒔 𝒔𝒊𝒍𝒆𝒏𝒕.\n\n༺𓆩~~𝑀𝑎𝑦 𝑖𝑡𝑠 𝑒𝑚𝑏𝑒𝑟𝑠 𝑐𝑜𝑛𝑡𝑖𝑛𝑢𝑒 𝑡𝑜 𝑏𝑢𝑟𝑛 𝑏𝑒𝑦𝑜𝑛𝑑 𝑡ℎ𝑒 𝑣𝑜𝑖𝑑.~~𓆪༻`;
+}
+
+function buildGoodbyePayload(member, config = null) {
+  const template = resolveEmbedTemplate(config, 'goodbye', member, {
+    title: GOODBYE_DEFAULT_TITLE,
+    message: goodbyeDefaultMessage(member),
+    color: GOODBYE_DEFAULT_COLOR,
+    image: GOODBYE_DEFAULT_IMAGE
+  });
+
   return {
     flags: 32768,
     components: [{
       type: 17,
-      accent_color: 0x000000,  // ⚫ NEGRO
+      accent_color: template.color,
       spoiler: false,
       components: [
         {
           type: 10,
-          content: '# ☾°.⋆༺ 𝑇ℎ𝑒 𝑣𝑜𝑖𝑑 𝑐𝑙𝑎𝑖𝑚𝑠 𝑎𝑛𝑜𝑡ℎ𝑒𝑟 𝑠𝑜𝑢𝑙 ༻⋆.°☽'
+          content: template.title
         },
         { type: 14, spacing: 1 },
         {
           type: 10,
-          content: `### 𝑭𝒂𝒓𝒆𝒘𝒆𝒍𝒍, ${member.user.username}...\n\n𝑨𝒏𝒐𝒕𝒉𝒆𝒓 𝒆𝒄𝒉𝒐 𝒇𝒂𝒍𝒍𝒔 𝒔𝒊𝒍𝒆𝒏𝒕.\n\n༺𓆩~~𝑀𝑎𝑦 𝑖𝑡𝑠 𝑒𝑚𝑏𝑒𝑟𝑠 𝑐𝑜𝑛𝑡𝑖𝑛𝑢𝑒 𝑡𝑜 𝑏𝑢𝑟𝑛 𝑏𝑒𝑦𝑜𝑛𝑑 𝑡ℎ𝑒 𝑣𝑜𝑖𝑑.~~𓆪༻`
+          content: template.message
         },
         {
           type: 12,
-          items: [{ media: { url: 'https://i.redd.it/vru2z0kl9uaf1.gif' } }]
+          items: [{ media: { url: template.image } }]
         }
       ]
     }]
   };
 }
 
-async function sendGoodbye(member, canal) {
-  return sendBrandedMessage(canal, buildGoodbyePayload(member));
+async function sendGoodbye(member, canal, config = null) {
+  return sendBrandedMessage(canal, buildGoodbyePayload(member, config));
 }
 
 module.exports = {
@@ -41,7 +59,7 @@ module.exports = {
     const goodbyeChannelId = general.goodbyeChannel;
     if (goodbyeChannelId) {
       const goodbyeChannel = member.guild.channels.cache.get(goodbyeChannelId);
-      if (goodbyeChannel) await sendGoodbye(member, goodbyeChannel);
+      if (goodbyeChannel) await sendGoodbye(member, goodbyeChannel, guildConfig);
     }
 
     const logChannelId = general.logChannel;
@@ -62,5 +80,9 @@ module.exports = {
     }
   },
   sendGoodbye,
-  buildGoodbyePayload
+  buildGoodbyePayload,
+  GOODBYE_DEFAULT_TITLE,
+  GOODBYE_DEFAULT_IMAGE,
+  GOODBYE_DEFAULT_COLOR,
+  goodbyeDefaultMessage
 };

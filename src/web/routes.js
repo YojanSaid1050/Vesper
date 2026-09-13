@@ -6,7 +6,7 @@ const Suggestion = require('../database/models/Suggestion');
 const WebAuditLog = require('../database/models/WebAuditLog');
 const { getGuildConfig, updateGuildSection, updateCommunitySection, addGuildListItem, removeGuildListItem } = require('../database/mongoManager');
 const { setupChecks } = require('../core/SetupService');
-const { isModuleEnabledConfig, guildTier, isThemedMainGuild } = require('../config/guildPolicy');
+const { isModuleEnabledConfig, guildTier, isAnyMainGuild } = require('../config/guildPolicy');
 const {
   createCase,
   getCase,
@@ -45,6 +45,7 @@ const { normalizeUsername } = require('../platforms/tiktok/utils');
 const { verifyStreamer } = require('../platforms/twitch/utils');
 const { verifyChannel } = require('../platforms/youtube/utils');
 const { publishSelfRolePanel, publishTicketPanel, reviewSuggestion } = require('../core/CommunityService');
+const { defaultEmbedTemplate } = require('../core/EmbedTemplateService');
 
 const publicDir = path.join(__dirname, 'public');
 const authLimiter = createRateLimiter({ windowMs: 5 * 60 * 1000, max: 20 });
@@ -114,11 +115,82 @@ function serializedConfig(config) {
     youtube: { ...(config.youtube || {}), users: config.youtube?.users || [] },
     branding: config.branding || {},
     profile: config.profile || {},
+    embeds: {
+      welcome: { ...defaultEmbedTemplate(), ...(config.embeds?.welcome || {}) },
+      goodbye: { ...defaultEmbedTemplate(), ...(config.embeds?.goodbye || {}) }
+    },
     features: config.features || {},
     permissions: config.permissions || {},
     moderation: config.moderation || {},
     music: config.music || {},
     community: config.community || {}
+  };
+}
+
+// Miembro ficticio cuyo texto son las propias variables del editor. Permite
+// leer el mensaje por defecto directamente del código que lo envía, sin
+// duplicar las cadenas en el panel: lo que se muestra como marcador de
+// posición es exactamente lo que el bot publicaría.
+function templateMember(guildName) {
+  return {
+    id: '{userId}',
+    displayName: '{displayName}',
+    user: { username: '{username}', displayAvatarURL: () => '' },
+    guild: { name: guildName || '{server}', memberCount: '{memberCount}' },
+    toString() { return '{user}'; }
+  };
+}
+
+// Valores originales de cada servidor, para mostrarlos como marcador de
+// posición en el editor y permitir «restablecer» sin inventar textos.
+function embedDefaultsFor(guildId, guildName) {
+  const tier = guildTier(guildId);
+  const sample = templateMember(guildName);
+
+  if (tier === 'primary_main') {
+    const memberAdd = require('../events/guild/memberAdd');
+    const memberRemove = require('../events/guild/memberRemove');
+    return {
+      layout: 'components_v2',
+      note: 'Este servidor usa el diseño original en formato Components V2. La estructura (contenedor, separador y tipografía) no cambia: solo puedes sustituir el texto, el color del borde y la imagen.',
+      supportsFooter: false,
+      supportsThumbnail: false,
+      welcome: {
+        title: memberAdd.WELCOME_DEFAULT_TITLE,
+        message: memberAdd.welcomeDefaultMessage(sample),
+        color: `#${memberAdd.WELCOME_DEFAULT_COLOR.toString(16).padStart(6, '0').toUpperCase()}`,
+        image: memberAdd.WELCOME_DEFAULT_IMAGE
+      },
+      goodbye: {
+        title: memberRemove.GOODBYE_DEFAULT_TITLE,
+        message: memberRemove.goodbyeDefaultMessage(sample),
+        color: `#${memberRemove.GOODBYE_DEFAULT_COLOR.toString(16).padStart(6, '0').toUpperCase()}`,
+        image: memberRemove.GOODBYE_DEFAULT_IMAGE
+      }
+    };
+  }
+
+  const { THEMED_DEFAULTS } = require('../core/PersonalityService');
+  const themed = tier === 'themed_main';
+  return {
+    layout: 'embed',
+    note: themed
+      ? 'Embed clásico de Discord. Puedes cambiar título, mensaje, color, imagen, pie de página y si se muestra el avatar del miembro.'
+      : 'Embed neutro para servidores satélite.',
+    supportsFooter: true,
+    supportsThumbnail: true,
+    welcome: {
+      title: themed ? THEMED_DEFAULTS.welcomeTitle : '¡Bienvenido!',
+      message: themed ? THEMED_DEFAULTS.welcomeMessage : 'Hola {user}. Esperamos que disfrutes tu estancia en **{server}**.',
+      color: themed ? '#8DDCF4' : '#5865F2',
+      image: null
+    },
+    goodbye: {
+      title: themed ? THEMED_DEFAULTS.goodbyeTitle : 'Hasta pronto',
+      message: themed ? THEMED_DEFAULTS.goodbyeMessage : '**{username}** ha salido del servidor.',
+      color: themed ? '#F8C8DC' : '#747F8D',
+      image: null
+    }
   };
 }
 
@@ -223,7 +295,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     discordEnabled: dashboardEnabled() && sessionConfigured() && discordConfigured(),
     googleEnabled: dashboardEnabled() && sessionConfigured() && googleConfigured(),
     webAdminMode: webAdminMode(),
-    version: '2.8.0'
+    version: '2.8.1'
   }));
 
   app.get('/auth/discord', authLimiter, requireDashboard, async (req, res, next) => {
@@ -345,6 +417,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         health: runtimeHealth(),
         setup: setupChecks(config),
         modules: { moderation: isModuleEnabledConfig(config, 'moderation') },
+        embedDefaults: access.configure ? embedDefaultsFor(req.params.guildId, access.guild.name) : null,
         config: access.configure ? serializedConfig(config) : null,
         channels,
         voiceChannels,
@@ -367,10 +440,18 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
       for (const [section, values] of Object.entries(updates)) {
         if (section === 'community') {
           for (const [subsection, fields] of Object.entries(values)) await updateCommunitySection(req.params.guildId, subsection, fields);
+        } else if (section === 'embeds') {
+          // Se guarda campo a campo (embeds.welcome.title, …) para que un
+          // formulario parcial no borre el resto del bloque.
+          const flattened = {};
+          for (const [kind, fields] of Object.entries(values)) {
+            for (const [field, value] of Object.entries(fields)) flattened[`${kind}.${field}`] = value;
+          }
+          await updateGuildSection(req.params.guildId, section, flattened);
         } else await updateGuildSection(req.params.guildId, section, values);
       }
       let nicknameWarning = null;
-      if (isThemedMainGuild(req.params.guildId) && updates.profile?.displayName !== undefined) {
+      if (isAnyMainGuild(req.params.guildId) && updates.profile?.displayName !== undefined) {
         await context.access.guild.members.me?.setNickname(updates.profile.displayName || null, 'Perfil actualizado desde el panel web')
           .catch(error => { nicknameWarning = `La configuración se guardó, pero no pude actualizar el apodo: ${error.message}`; });
       }
@@ -524,7 +605,10 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
       if (!actorCanTarget(context.access, member)) return res.status(403).json({ error: 'La jerarquía de roles no te permite actuar sobre ese miembro.' });
       let expiresAt = null;
       if (action === 'timeout') {
-        const minutes = Math.min(40320, Math.max(1, Number(req.body.minutes || 0)));
+        // Antes, un valor con decimales (10.5) se rechazaba con un error poco
+        // claro en vez de ajustarse al minuto más cercano.
+        const requested = Number(req.body.minutes);
+        const minutes = Number.isFinite(requested) ? Math.min(40320, Math.max(1, Math.floor(requested))) : NaN;
         if (!Number.isInteger(minutes) || !member.moderatable) return res.status(400).json({ error: 'Duración inválida o jerarquía insuficiente para aislar al miembro.' });
         await member.timeout(minutes * 60 * 1000, `${reason} · Panel web · ${req.webSession.discord.id}`);
         expiresAt = new Date(Date.now() + minutes * 60 * 1000);
@@ -604,4 +688,4 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
   });
 }
 
-module.exports = { mountWebDashboard, publicCase, publicSuggestion, serializedConfig, identity, actorCanTarget };
+module.exports = { mountWebDashboard, publicCase, publicSuggestion, serializedConfig, identity, actorCanTarget, embedDefaultsFor, templateMember };

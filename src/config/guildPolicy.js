@@ -38,6 +38,13 @@ function isThemedMainGuild(guildId) {
   return Boolean(guildId && getThemedMainGuildIds().has(String(guildId)) && !isMainGuild(guildId));
 }
 
+// Embers Void y Ankerie Dimension son ambos Main: el primero es el principal
+// y el segundo un Main temático con identidad propia. Las dos tienen el mismo
+// conjunto de funciones; lo único que cambia es la personalización.
+function isAnyMainGuild(guildId) {
+  return isMainGuild(guildId) || isThemedMainGuild(guildId);
+}
+
 function guildTier(guildId) {
   if (isMainGuild(guildId)) return 'primary_main';
   if (isThemedMainGuild(guildId)) return 'themed_main';
@@ -67,7 +74,10 @@ function isModuleEnabledConfig(config, moduleName) {
 function commandAvailable(command, guildId) {
   const scope = command?.scope || 'all';
   if (!isApprovedGuild(guildId)) return false;
-  if (scope === 'main') return isMainGuild(guildId);
+  // 'main' significa «cualquier Main», principal o temático.
+  if (scope === 'main') return isAnyMainGuild(guildId);
+  // 'primary_main' queda para lo que solo tiene sentido en Embers Void.
+  if (scope === 'primary_main') return isMainGuild(guildId);
   if (scope === 'themed_main') return isThemedMainGuild(guildId);
   if (scope === 'satellite') return guildTier(guildId) === 'satellite';
   return true;
@@ -81,6 +91,7 @@ module.exports = {
   getThemedMainGuildIds,
   isMainGuild,
   isThemedMainGuild,
+  isAnyMainGuild,
   guildTier,
   isApprovedGuild,
   moduleDefaults,

@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 const guildSchema = new mongoose.Schema({
   guildId: { type: String, required: true, unique: true, index: true },
-  schemaVersion: { type: Number, default: 4, min: 1 },
+  schemaVersion: { type: Number, default: 5, min: 1 },
   general: {
     welcomeChannel: { type: String, default: null },
     goodbyeChannel: { type: String, default: null },
@@ -54,6 +54,24 @@ const guildSchema = new mongoose.Schema({
     goodbyeTitle: { type: String, default: null, maxlength: 120 },
     goodbyeMessage: { type: String, default: null, maxlength: 1500 },
     memberRole: { type: String, default: null }
+  },
+  embeds: {
+    welcome: {
+      title: { type: String, default: null, maxlength: 240 },
+      message: { type: String, default: null, maxlength: 3000 },
+      color: { type: String, default: null, maxlength: 7 },
+      image: { type: String, default: null, maxlength: 500 },
+      footer: { type: String, default: null, maxlength: 200 },
+      thumbnail: { type: Boolean, default: true }
+    },
+    goodbye: {
+      title: { type: String, default: null, maxlength: 240 },
+      message: { type: String, default: null, maxlength: 3000 },
+      color: { type: String, default: null, maxlength: 7 },
+      image: { type: String, default: null, maxlength: 500 },
+      footer: { type: String, default: null, maxlength: 200 },
+      thumbnail: { type: Boolean, default: true }
+    }
   },
   features: {
     tiktok: { type: Boolean, default: true },

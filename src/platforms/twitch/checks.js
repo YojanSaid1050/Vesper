@@ -1,6 +1,6 @@
 // src/platforms/twitch/checks.js
 const axios = require('axios');
-const { getAccessToken, normalize, getStreamerInfo } = require('./utils');
+const { getAccessToken, withTwitchAuth, normalize, getStreamerInfo } = require('./utils');
 const { recordRequest } = require('../../core/ProviderMetrics');
 
 // Cache para streamers
@@ -15,26 +15,32 @@ function getCachedStreamer(identifier) {
   return null;
 }
 
+// Sin límite, este Map crecía indefinidamente en procesos de larga duración.
+const STREAMER_CACHE_MAX = 1000;
+
 function setCachedStreamer(identifier, data) {
+  streamerCache.delete(identifier);
   streamerCache.set(identifier, {
     data,
     timestamp: Date.now()
   });
+  while (streamerCache.size > STREAMER_CACHE_MAX) {
+    const oldest = streamerCache.keys().next().value;
+    if (oldest === undefined) break;
+    streamerCache.delete(oldest);
+  }
 }
 
 async function checkStreamerStatus(userId) {
-  const token = await getAccessToken();
-  if (!token) return { success: false, error: 'No token' };
-
   try {
-    const response = await axios.get('https://api.twitch.tv/helix/streams', {
+    const response = await withTwitchAuth(token => axios.get('https://api.twitch.tv/helix/streams', {
       params: { user_id: userId },
       headers: {
         'Client-ID': process.env.TWITCH_CLIENT_ID,
         'Authorization': `Bearer ${token}`
       },
       timeout: 10000
-    });
+    }));
     recordRequest('twitch', 1, {
       remaining: response.headers?.['ratelimit-remaining'],
       limit: response.headers?.['ratelimit-limit'],
@@ -64,22 +70,41 @@ async function checkStreamerStatus(userId) {
   }
 }
 
-async function fetchStreamerBatch(users) {
-  const token = await getAccessToken();
-  if (!token) throw new Error('No se pudo obtener el token de Twitch');
+// La API de Twitch acepta como máximo 100 valores de `login`/`user_id` por
+// petición. Con más cuentas devolvía 400 y el monitor entero fallaba.
+const TWITCH_BATCH_LIMIT = 100;
 
-  const headers = {
+function chunk(items, size) {
+  const result = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
+}
+
+async function fetchStreamerBatch(users) {
+  const list = Array.isArray(users) ? users : [];
+  if (list.length === 0) return [];
+  if (list.length > TWITCH_BATCH_LIMIT) {
+    const results = [];
+    for (const group of chunk(list, TWITCH_BATCH_LIMIT)) {
+      results.push(...await fetchStreamerBatch(group));
+    }
+    return results;
+  }
+
+  const headersFor = token => ({
     'Client-ID': process.env.TWITCH_CLIENT_ID,
     'Authorization': `Bearer ${token}`
-  };
-  const userParams = new URLSearchParams();
-  users.forEach(user => userParams.append('login', normalize(user)));
-
-  const userResponse = await axios.get('https://api.twitch.tv/helix/users', {
-    params: userParams,
-    headers,
-    timeout: 10000
   });
+  const userParams = new URLSearchParams();
+  list.forEach(user => userParams.append('login', normalize(user)));
+
+  const userResponse = await withTwitchAuth(token => axios.get('https://api.twitch.tv/helix/users', {
+    params: userParams,
+    headers: headersFor(token),
+    timeout: 10000
+  }));
   recordRequest('twitch', 1, {
     remaining: userResponse.headers?.['ratelimit-remaining'],
     limit: userResponse.headers?.['ratelimit-limit'],
@@ -99,11 +124,11 @@ async function fetchStreamerBatch(users) {
   info.forEach(user => streamParams.append('user_id', user.id));
   streamParams.set('first', String(Math.min(info.length, 100)));
 
-  const streamResponse = await axios.get('https://api.twitch.tv/helix/streams', {
+  const streamResponse = await withTwitchAuth(token => axios.get('https://api.twitch.tv/helix/streams', {
     params: streamParams,
-    headers,
+    headers: headersFor(token),
     timeout: 10000
-  });
+  }));
   recordRequest('twitch', 1, {
     remaining: streamResponse.headers?.['ratelimit-remaining'],
     limit: streamResponse.headers?.['ratelimit-limit'],

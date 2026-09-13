@@ -1,4 +1,4 @@
-const { Events } = require('discord.js');
+const { Events, MessageFlags } = require('discord.js');
 const { isMainGuild, commandAvailable } = require('../config/guildPolicy');
 const { CAPABILITIES, requireCapability } = require('../core/PermissionService');
 const { colorRoles, countryRoles, gameRoles, platformRoles } = require('../config/mainGuild');
@@ -30,12 +30,17 @@ function inferredCapability(commandName) {
 // ==================================================
 async function handleColorRoles(interaction) {
   if (!isMainGuild(interaction.guildId || interaction.guild?.id)) return false;
-  const handled = interaction.customId === 'select_color' ||
-    interaction.customId === 'select_country' ||
-    colorRoles[interaction.customId] ||
-    countryRoles[interaction.customId] ||
-    gameRoles[interaction.customId] ||
-    platformRoles[interaction.customId];
+  // Object.hasOwn evita que customIds como "constructor" o "toString"
+  // coincidan con propiedades heredadas del prototipo y se traguen
+  // interacciones que pertenecen a otros manejadores.
+  const customId = String(interaction.customId ?? '');
+  const inMap = (map) => Object.hasOwn(map, customId);
+  const handled = customId === 'select_color' ||
+    customId === 'select_country' ||
+    inMap(colorRoles) ||
+    inMap(countryRoles) ||
+    inMap(gameRoles) ||
+    inMap(platformRoles);
 
   if (!handled) return false;
 
@@ -63,8 +68,8 @@ async function handleColorRoles(interaction) {
     return true;
   }
 
-  if (interaction.isButton() && gameRoles[interaction.customId]) {
-    const roleId = gameRoles[interaction.customId];
+  if (interaction.isButton() && inMap(gameRoles)) {
+    const roleId = gameRoles[customId];
     if (interaction.member.roles.cache.has(roleId)) {
       await interaction.member.roles.remove(roleId);
     } else {
@@ -73,8 +78,8 @@ async function handleColorRoles(interaction) {
     return true;
   }
 
-  if (interaction.isButton() && platformRoles[interaction.customId]) {
-    const roleId = platformRoles[interaction.customId];
+  if (interaction.isButton() && inMap(platformRoles)) {
+    const roleId = platformRoles[customId];
     if (interaction.member.roles.cache.has(roleId)) {
       await interaction.member.roles.remove(roleId);
     } else {
@@ -116,11 +121,19 @@ module.exports = {
           await command.execute(interaction, client);
         } catch (error) {
           console.error(`Error en comando ${interaction.commandName}:`, error);
-          const reply = { content: '❌ Error ejecutando el comando.', ephemeral: true };
-          if (interaction.deferred) {
-            await interaction.editReply(reply);
-          } else {
-            await interaction.reply(reply);
+          // Si el comando ya respondió, reply() lanzaría InteractionAlreadyReplied
+          // y el error real quedaba oculto tras un fallo secundario.
+          const content = '❌ Error ejecutando el comando.';
+          try {
+            if (interaction.deferred && !interaction.replied) {
+              await interaction.editReply({ content });
+            } else if (interaction.replied || interaction.deferred) {
+              await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+            } else {
+              await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+            }
+          } catch (replyError) {
+            console.error('No se pudo notificar el error al usuario:', replyError.message);
           }
         }
         return;
@@ -157,7 +170,7 @@ module.exports = {
       console.error('❌ Error en interactionCreate:', error);
       try {
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: '❌ Error inesperado.', ephemeral: true });
+          await interaction.reply({ content: '❌ Error inesperado.', flags: MessageFlags.Ephemeral });
         }
       } catch {}
     }

@@ -1,3 +1,71 @@
+# Changelog
+
+## 2.8.1 — Auditoría, editor de embeds y paridad entre Main
+
+### Corregido (crítico)
+- **`/health` ya no tumba el servicio.** Devolvía 503 si un monitor entraba en
+  pausa o si MongoDB se reconectaba, y Render reiniciaba el contenedor en bucle.
+  Ahora `/health` solo mira si el proceso debe seguir vivo y `/ready` es la
+  comprobación estricta.
+- **La migración de esquema ya no borra el perfil del servidor.** Cada subida de
+  `schemaVersion` reemplazaba `profile` entero y se perdían nombre, colores y
+  mensajes personalizados. Ahora solo rellena lo que falta.
+- **Token de Twitch**: sin margen de expiración, sin reintento ante un 401, sin
+  tiempo de espera y sin deduplicación. Un token revocado dejaba los avisos
+  caídos hasta 60 días sin error visible. Corregidos los cuatro problemas.
+- **Arranque**: `guild.members.me` podía ser `null` y lanzaba un TypeError al
+  aplicar el apodo del perfil.
+- **Errores de comando**: si un comando ya había respondido, el manejador de
+  errores lanzaba `InteractionAlreadyReplied` y ocultaba el error real.
+- **Reintento de arranque**: cada reintento por MongoDB creaba un `BotClient`
+  nuevo sin destruir el anterior, acumulando sockets y listeners.
+
+### Corregido (rendimiento y estabilidad)
+- **Caché de configuración por servidor** (`GUILD_CONFIG_CACHE_MS`, 30 s por
+  defecto). Antes había una consulta a Atlas por cada mensaje del servidor.
+- **Twitch en lotes de 100.** Con más cuentas la API devolvía 400 y el monitor
+  entero fallaba.
+- El panel hacía `members.fetch({ force: true })` por servidor y por petición.
+- Cachés sin límite en el monitor de Twitch.
+- Las trazas `[DEBUG]` del dashboard se emitían siempre en producción.
+- `ephemeral: true` (obsoleto en discord.js 14.27) sustituido por `flags`.
+- Los mapas de roles se consultaban sin `Object.hasOwn`, así que un `customId`
+  como `constructor` se tragaba interacciones de otros manejadores.
+
+### Añadido
+- **Editor de embeds de bienvenida y despedida en el panel**, con vista previa
+  en vivo, variables (`{user}`, `{username}`, `{displayName}`, `{server}`,
+  `{memberCount}`, `{userId}`) y botón de restablecer.
+  - En **Embers Void** se conserva la estructura Components V2 original
+    (contenedor, separador, tipografía): solo salen a configuración el texto, el
+    color del borde y la imagen. Sin nada guardado, el mensaje publicado es
+    idéntico carácter a carácter al de antes, y hay pruebas que lo verifican.
+  - En **Ankerie Dimension** el editor incluye además pie de página, imagen y
+    miniatura. Los textos guardados antes en `profile` se siguen respetando.
+- **Paridad entre Main.** Los comandos `scope: 'main'` ahora se registran en
+  Embers Void y en Ankerie Dimension, el dashboard de Discord funciona en ambos
+  y la identidad del bot se edita en los dos.
+- **Resumen completo de configuración** en el panel, con los IDs ya resueltos a
+  nombres de canal y de rol, y botón para copiarlo como JSON.
+- `COMANDOS.md`: quién ve cada comando y cuáles ya cubre el panel.
+
+### Corregido (panel web)
+- El panel desbordaba en horizontal en pantallas estrechas, en todas las
+  pestañas. Verificado a 360, 420, 768, 1024 y 1400 px.
+- La vista previa usaba un atributo `style` en línea, que la CSP del propio
+  panel bloquea; el color se aplica ahora por CSSOM.
+- Los módulos se listaban por su clave interna (`selfroles`, `starboard`); ahora
+  llevan nombre y descripción en español.
+- Un fallo de red al arrancar el panel se mostraba como «el panel no está
+  habilitado», que mandaba a revisar lo que no era.
+- La insignia de estado decía «operativo» con monitores en pausa; ahora nombra
+  el monitor afectado.
+- El botón que se deshabilitaba al guardar se deducía de `document.activeElement`
+  y podía ser el equivocado.
+- Las pestañas no declaraban `role="tab"` ni `aria-selected`.
+- `/advertir`, `/aislar` y `/sanciones` aparecían en el menú de cualquier
+  miembro; ahora Discord los oculta a quien no modera.
+
 # Historial de cambios
 
 ## 2.8.0

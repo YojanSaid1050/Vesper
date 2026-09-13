@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const {
   isMainGuild,
   isThemedMainGuild,
+  isAnyMainGuild,
   guildTier,
   isApprovedGuild,
   moduleDefaults,
@@ -27,8 +28,15 @@ test('separa Main, satélites aprobados y servidores externos', () => {
   assert.equal(guildTier('sat-1'), 'satellite');
   assert.equal(isApprovedGuild('external'), false);
   assert.equal(commandAvailable({ scope: 'main' }, 'sat-1'), false);
+  // Embers Void y Ankerie Dimension son ambos Main: comparten funciones.
   assert.equal(commandAvailable({ scope: 'main' }, 'main'), true);
-  assert.equal(commandAvailable({ scope: 'main' }, 'anke'), false);
+  assert.equal(commandAvailable({ scope: 'main' }, 'anke'), true);
+  assert.equal(isAnyMainGuild('main'), true);
+  assert.equal(isAnyMainGuild('anke'), true);
+  assert.equal(isAnyMainGuild('sat-1'), false);
+  // 'primary_main' sigue reservado a Embers Void.
+  assert.equal(commandAvailable({ scope: 'primary_main' }, 'main'), true);
+  assert.equal(commandAvailable({ scope: 'primary_main' }, 'anke'), false);
   assert.equal(commandAvailable({ scope: 'themed_main' }, 'anke'), true);
   assert.equal(commandAvailable({ scope: 'satellite' }, 'anke'), false);
   assert.equal(commandAvailable({}, 'sat-1'), true);
