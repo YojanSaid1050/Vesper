@@ -194,6 +194,37 @@ function embedDefaultsFor(guildId, guildName) {
   };
 }
 
+// Identidad con la que el bot publica en un servidor concreto. Replica la
+// misma prioridad que utils/webhookSender: perfil → branding → cuenta real del
+// bot. El panel la muestra como vista previa para que se vea el resultado sin
+// tener que provocar un mensaje de prueba.
+function effectiveIdentity(config, client, guild) {
+  const profile = config.profile || {};
+  const branding = config.branding || {};
+  const botUser = client?.user;
+  const botAvatar = botUser?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null;
+
+  return {
+    // Cuenta real del bot: global, igual en todos los servidores.
+    account: {
+      username: botUser?.username || 'Vesper',
+      avatar: botAvatar
+    },
+    // Apodo del bot en este servidor (lo aplica Vesper desde profile.displayName).
+    nickname: guild?.members?.me?.nickname || null,
+    // Lo que aparece como autor de los mensajes con webhook.
+    webhook: {
+      name: profile.displayName || branding.name || botUser?.username || 'Vesper',
+      avatar: profile.avatar || branding.avatar || botAvatar,
+      source: {
+        name: profile.displayName ? 'profile' : branding.name ? 'branding' : 'account',
+        avatar: profile.avatar ? 'profile' : branding.avatar ? 'branding' : 'account'
+      }
+    },
+    guildIcon: guild?.iconURL?.({ extension: 'png', size: 128 }) || null
+  };
+}
+
 function actorId(session) {
   return session.discord?.id || null;
 }
@@ -295,7 +326,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     discordEnabled: dashboardEnabled() && sessionConfigured() && discordConfigured(),
     googleEnabled: dashboardEnabled() && sessionConfigured() && googleConfigured(),
     webAdminMode: webAdminMode(),
-    version: '2.8.1'
+    version: '2.8.2'
   }));
 
   app.get('/auth/discord', authLimiter, requireDashboard, async (req, res, next) => {
@@ -418,6 +449,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         setup: setupChecks(config),
         modules: { moderation: isModuleEnabledConfig(config, 'moderation') },
         embedDefaults: access.configure ? embedDefaultsFor(req.params.guildId, access.guild.name) : null,
+        identity: effectiveIdentity(config, client, access.guild),
         config: access.configure ? serializedConfig(config) : null,
         channels,
         voiceChannels,
@@ -454,6 +486,12 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
       if (isAnyMainGuild(req.params.guildId) && updates.profile?.displayName !== undefined) {
         await context.access.guild.members.me?.setNickname(updates.profile.displayName || null, 'Perfil actualizado desde el panel web')
           .catch(error => { nicknameWarning = `La configuración se guardó, pero no pude actualizar el apodo: ${error.message}`; });
+      }
+      if (updates.profile || updates.branding) {
+        // El webhook se cachea 5 minutos. Sin esto, cambiar el nombre o el
+        // avatar desde el panel no se notaba hasta que la caché expiraba.
+        const { clearWebhookCache } = require('../utils/webhookSender');
+        clearWebhookCache(req.params.guildId);
       }
       if (updates.features?.music === false) await context.client.music?.stop?.(req.params.guildId).catch(() => null);
       await recordAudit(req, req.params.guildId, 'config.update', null, {
@@ -688,4 +726,4 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
   });
 }
 
-module.exports = { mountWebDashboard, publicCase, publicSuggestion, serializedConfig, identity, actorCanTarget, embedDefaultsFor, templateMember };
+module.exports = { mountWebDashboard, publicCase, publicSuggestion, serializedConfig, identity, actorCanTarget, embedDefaultsFor, templateMember, effectiveIdentity };

@@ -14,7 +14,8 @@ const browserGlobals = {
   document: 'readonly', window: 'readonly', location: 'readonly', history: 'readonly',
   navigator: 'readonly', fetch: 'readonly', FormData: 'readonly', Intl: 'readonly',
   confirm: 'readonly', prompt: 'readonly', alert: 'readonly',
-  setTimeout: 'readonly', clearTimeout: 'readonly', URLSearchParams: 'readonly',
+  setTimeout: 'readonly', clearTimeout: 'readonly', setInterval: 'readonly',
+  clearInterval: 'readonly', URLSearchParams: 'readonly', FormData: 'readonly',
   localStorage: 'readonly', console: 'readonly'
 };
 

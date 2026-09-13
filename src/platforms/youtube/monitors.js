@@ -190,7 +190,12 @@ async function processGuildLives(guildId, config, client, liveStatus) {
       throw new Error(`Channel ${liveChannelId} not found`);
     }
 
-    const botMember = channel.guild.members.me;
+    // Un ID mal configurado puede devolver un canal sin servidor (por ejemplo
+    // un DM). Sin esta comprobación, el ciclo entero del monitor se caía.
+    const botMember = channel.guild?.members?.me;
+    if (!botMember) {
+      throw new Error(`El canal ${channel.id} no pertenece a un servidor`);
+    }
     const permissions = channel.permissionsFor(botMember);
     if (!permissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
       throw new Error('Missing permissions');
@@ -367,7 +372,12 @@ async function processGuildVideos(guildId, config, client, videos) {
       throw new Error(`Channel ${videoChannelId} not found`);
     }
 
-    const botMember = channel.guild.members.me;
+    // Un ID mal configurado puede devolver un canal sin servidor (por ejemplo
+    // un DM). Sin esta comprobación, el ciclo entero del monitor se caía.
+    const botMember = channel.guild?.members?.me;
+    if (!botMember) {
+      throw new Error(`El canal ${channel.id} no pertenece a un servidor`);
+    }
     const permissions = channel.permissionsFor(botMember);
     if (!permissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
       throw new Error('Missing permissions');
@@ -539,7 +549,12 @@ async function processGuildShorts(guildId, config, client, shorts) {
       throw new Error(`Channel ${shortChannelId} not found`);
     }
 
-    const botMember = channel.guild.members.me;
+    // Un ID mal configurado puede devolver un canal sin servidor (por ejemplo
+    // un DM). Sin esta comprobación, el ciclo entero del monitor se caía.
+    const botMember = channel.guild?.members?.me;
+    if (!botMember) {
+      throw new Error(`El canal ${channel.id} no pertenece a un servidor`);
+    }
     const permissions = channel.permissionsFor(botMember);
     if (!permissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
       throw new Error('Missing permissions');

@@ -48,7 +48,10 @@ module.exports = {
               duration, 
               error: result.error || result.reason || 'Falló la verificación'
             });
-            errors.push({ name, error: result.error || result.reason });
+            // Sin este respaldo, un monitor que falle sin mensaje dejaba
+            // `error: undefined` y el resumen final reventaba con
+            // "Cannot read properties of undefined (reading 'substring')".
+            errors.push({ name, error: result.error || result.reason || 'Falló la verificación' });
           } else {
             // Mostrar estadísticas si están disponibles
             const stats = [];
@@ -162,7 +165,7 @@ module.exports = {
         results.map(r => {
           let value = `⏱️ ${r.duration}ms`;
           if (r.details) value += `\n📊 ${r.details}`;
-          if (r.error) value += `\n❌ \`${r.error}\``;
+          if (r.error) value += `\n❌ \`${String(r.error).slice(0, 150)}\``;
           return {
             name: `${r.status} ${r.name}`,
             value: value,
@@ -175,7 +178,7 @@ module.exports = {
     if (errors.length > 0) {
       embed.addFields({
         name: '📋 Resumen de errores',
-        value: errors.map(e => `**${e.name}:** ${e.error.substring(0, 100)}`).join('\n'),
+        value: errors.map(e => `**${e.name}:** ${String(e.error ?? 'Error desconocido').substring(0, 100)}`).join('\n'),
         inline: false
       });
     }

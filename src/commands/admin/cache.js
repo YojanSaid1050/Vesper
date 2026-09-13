@@ -28,9 +28,12 @@ module.exports = {
       .setTitle('📊 Estado de Caché')
       .setColor('#ffffff')
       .addFields(
-        { name: '📹 TikTok Videos', value: `Guilds: ${tiktokStats.guilds.videos || Object.keys(tiktokVideos).length}\nUsuarios con estado: ${tiktokStats.entries.videos}`, inline: true },
-        { name: '🔴 TikTok Lives', value: `Guilds: ${tiktokStats.guilds.live || Object.keys(tiktokLive).length}\nUsuarios con estado: ${tiktokStats.entries.live}`, inline: true },
-        { name: '💰 TikTok gratuito', value: `API: US$0.00\nNavegador local: ${tiktokStats.provider.browser.ready ? 'listo' : tiktokStats.provider.browser.installed ? 'en espera' : 'no detectado'}`, inline: true },
+        { name: '📹 TikTok Videos', value: `Guilds: ${tiktokStats.guilds?.videos ?? Object.keys(tiktokVideos).length}\nUsuarios con estado: ${tiktokStats.entries?.videos ?? 0}`, inline: true },
+        { name: '🔴 TikTok Lives', value: `Guilds: ${tiktokStats.guilds?.live ?? Object.keys(tiktokLive).length}\nUsuarios con estado: ${tiktokStats.entries?.live ?? 0}`, inline: true },
+        // Si el proveedor de TikTok todavía no ha arrancado, estas claves
+        // pueden faltar; sin los encadenamientos opcionales el comando entero
+        // se caía con "Cannot read properties of undefined".
+        { name: '💰 TikTok gratuito', value: `API: US$0.00\nNavegador local: ${tiktokStats.provider?.browser?.ready ? 'listo' : tiktokStats.provider?.browser?.installed ? 'en espera' : 'no detectado'}`, inline: true },
         { name: '📺 Twitch Streams', value: `Guilds: ${Object.keys(twitchStatus).length}`, inline: true },
         { name: '📹 YouTube Videos', value: `Guilds: ${Object.keys(youtubeVideos).length}\nCanales con caché: ${Object.values(youtubeVideos).reduce((a, b) => a + Object.keys(b).length, 0)}`, inline: true },
         { name: '📱 YouTube Shorts', value: `Guilds: ${Object.keys(youtubeShorts).length}\nCanales con caché: ${Object.values(youtubeShorts).reduce((a, b) => a + Object.keys(b).length, 0)}`, inline: true },

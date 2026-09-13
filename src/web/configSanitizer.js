@@ -141,6 +141,18 @@ function sanitizeGuildPatch(input, guild) {
     if (Object.keys(target).length) updates.profile = target;
   }
 
+  // Branding por servidor: nombre y avatar con los que el bot publica a través
+  // de webhooks. Lo gestionaban /setbotname, /setbotavatar y /branding, que el
+  // panel declara reemplazar, pero no había forma de editarlo desde la web.
+  if (input.branding !== undefined) {
+    const source = input.branding;
+    if (!source || typeof source !== 'object' || Array.isArray(source)) throw new ValidationError('branding no es válido.');
+    const target = {};
+    if (source.name !== undefined) target.name = optionalText(source.name, 80, 'branding.name');
+    if (source.avatar !== undefined) target.avatar = imageUrlValue(source.avatar, 'branding.avatar');
+    if (Object.keys(target).length) updates.branding = target;
+  }
+
   // Editor de embeds de bienvenida y despedida. Disponible en cualquier
   // servidor: cada Main tiene su propio diseño y sus propios textos.
   if (input.embeds !== undefined) {

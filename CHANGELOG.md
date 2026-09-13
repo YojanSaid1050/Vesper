@@ -1,5 +1,57 @@
 # Changelog
 
+## 2.8.2 — Panel reconstruido y verificación completa del bot
+
+### Panel web: rehecho de cero
+- **Nueva estética y nueva navegación.** Se sustituyen las cuatro pestañas (una
+  de ellas con veinte formularios dentro) por diez secciones con su propia
+  pantalla: Inicio, Identidad, Bienvenidas, Avisos de redes, Moderación,
+  Comunidad, Música, Módulos y permisos, Configuración y Auditoría.
+- **Todo el panel es dinámico.** El color de acento, el modo claro u oscuro, el
+  nombre y el avatar de la barra lateral salen de la configuración del servidor
+  que estés editando. Si cambias el color principal, el panel entero se repinta
+  mientras mueves el selector, y el color del texto sobre el acento se calcula
+  por contraste para que nunca quede ilegible.
+- **Vista previa de la identidad.** Una tarjeta muestra cómo verá un miembro los
+  mensajes del bot: avatar, nombre y etiqueta. Se actualiza mientras escribes y
+  dice de dónde sale cada valor (identidad, branding o cuenta del bot).
+- **Vista previa de los embeds** con el aspecto real de Discord, incluida la
+  estructura Components V2 de Embers Void.
+- **Branding editable.** `branding.name` y `branding.avatar` no se podían tocar
+  desde el panel pese a que este declaraba reemplazar `/setbotname`,
+  `/setbotavatar` y `/branding`. Ahora sí.
+- **La caché de webhooks se vacía al guardar** identidad o branding: antes el
+  cambio tardaba hasta cinco minutos en verse en Discord.
+- Aviso de cambios sin guardar al salir de una pantalla o cerrar la pestaña.
+- Estados de carga, de error y vacíos en todas las secciones.
+- Menú lateral plegable en móvil, con foco y tecla Escape.
+
+### Corregido
+- **`/` ya no devuelve un JSON.** Un navegador que abra la raíz es redirigido a
+  `/panel`; un monitor que pida `Accept: application/json` sigue recibiendo el
+  estado de siempre.
+- **`[hidden]` no ocultaba nada.** Las clases con `display` explícito ganaban al
+  atributo, así que la pantalla de inicio de sesión se pintaba encima del panel.
+- **`/forcecheck` se rompía** al resumir un monitor que fallaba sin mensaje:
+  `errors.push({ error: undefined })` y luego `undefined.substring(...)`.
+- **El manejador de botones se rompía** si la interacción no traía `customId`.
+- **Los monitores se caían** si un canal configurado no pertenecía a un servidor
+  (`channel.guild.members.me` sin comprobar).
+- **`/cache` se rompía** si las estadísticas del proveedor de TikTok llegaban
+  incompletas.
+
+### Añadido
+- **Banco de pruebas de superficie del bot** (`test/botSurface.test.js`): ejecuta
+  los 52 comandos (y cada subcomando) con Discord y MongoDB simulados, y verifica
+  que ninguno lanza un error de programación y que todos responden a la
+  interacción. También prueba los manejadores de botones, menús y modales con
+  identificadores inexistentes y con nombres del prototipo de `Object`, y la
+  política de eventos en los tres tipos de servidor. Los cinco fallos de arriba
+  los encontró esta prueba.
+- Comprobación de que la raíz redirige y de que el panel no depende de recursos
+  externos ni usa atributos `style` en línea, que su propia CSP bloquearía.
+
+
 ## 2.8.1 — Auditoría, editor de embeds y paridad entre Main
 
 ### Corregido (crítico)
