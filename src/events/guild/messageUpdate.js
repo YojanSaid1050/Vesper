@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { buildMessage, memberVars } = require('../../core/EmbedCatalog');
 const { createLog } = require('../../utils/logCache');
 
 module.exports = {
@@ -22,16 +23,21 @@ module.exports = {
 
     if (!createLog(`edit-${newMessage.id}`)) return;
 
-    const embed = new EmbedBuilder()
-      .setTitle('✏️ Message Edited')
-      .setColor('#FAA61A')
-      .addFields(
+    const before = oldMessage.content?.substring(0, 500) || '*Sin texto*';
+    const after = newMessage.content?.substring(0, 500) || '*Sin texto*';
+    await sendBrandedMessage(logChannel, buildMessage('log_message_edited', {
+      config: guildConfig,
+      vars: memberVars(newMessage.member || { user: newMessage.author, guild: newMessage.guild }, {
+        userTag: authorTag, channel: `${oldMessage.channel}`,
+        channelName: oldMessage.channel?.name || '', before, after
+      }),
+      defaults: { title: '✏️ Message Edited', color: '#FAA61A' },
+      fields: [
         { name: '👤 Usuario', value: authorTag },
         { name: '📍 Canal', value: `${oldMessage.channel}` },
-        { name: '📌 Antes', value: oldMessage.content?.substring(0, 500) || '*Sin texto*' },
-        { name: '📌 Después', value: newMessage.content?.substring(0, 500) || '*Sin texto*' }
-      )
-      .setTimestamp();
-    await sendBrandedMessage(logChannel, { embeds: [embed] });
+        { name: '📌 Antes', value: before },
+        { name: '📌 Después', value: after }
+      ]
+    }));
   }
 };

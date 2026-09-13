@@ -1,5 +1,93 @@
 # Changelog
 
+## 2.9.0 — Todos los mensajes editables, boosts y ofertas de juegos
+
+### Corregido
+- **El falso «Role Added» al eliminar un bot.** Vesper usa `Partials.GuildMember`,
+  así que el miembro anterior puede llegar sin su caché de roles. La comparación
+  tomaba esa caché vacía como punto de partida y concluía que TODOS los roles
+  acababan de asignarse. Ahora, si no se puede saber qué había antes, no se
+  registra nada. El mismo fallo afectaba al registro de cambios de apodo.
+- **El registro de roles solo informaba del primero.** Si alguien recibía tres
+  roles a la vez, los otros dos no aparecían.
+- **Tres registros se saltaban la identidad del bot.** «Rol creado» y los tres
+  de voz usaban `channel.send` directamente en vez del webhook, así que salían
+  con el nombre y el avatar de la cuenta en lugar de los configurados.
+
+### Añadido · Todos los mensajes se editan desde la web
+- Nueva sección **«Todos los mensajes»** con los **38 avisos** que publica
+  Vesper, agrupados por tema y con vista previa en vivo: bienvenida, despedida,
+  los 22 registros del servidor, los avisos de moderación, los de redes y los
+  de ofertas.
+- De cada uno se puede cambiar título, cuerpo, color, imagen, pie de página y
+  si se muestra la imagen de perfil, con variables propias de cada mensaje.
+- **Nada cambia si no lo tocas.** Un campo vacío usa el valor original; escribir
+  un cuerpo sustituye los campos del aviso. Cada mensaje indica si está
+  «Original» o «Personalizado», y se puede restablecer.
+
+### Añadido · Las dos versiones de embed, en los dos servidores
+- Cada mensaje se puede publicar como **embed clásico** (barra de color al lado,
+  miniatura, campos y pie con la hora) o como **contenedor Components V2** (el
+  bloque con borde de color y títulos grandes que estrenó Embers Void). La
+  elección es por mensaje y está disponible en **los dos Main**: Ankerie
+  Dimension puede usar el contenedor V2 y Embers Void puede usar el clásico.
+- El mismo contenido se pinta de las dos formas, así que cambiar de versión no
+  borra nada de lo escrito. El contenedor V2 no tiene miniatura y publica el pie
+  como texto pequeño (`-#`), que es su equivalente en Discord.
+- Mientras no se toque el selector, cada mensaje sale con la versión de siempre:
+  las pruebas de paridad comprueban que la bienvenida de Embers Void sigue
+  saliendo carácter a carácter igual.
+- Los avisos que no son embed (automoderación y el aviso por privado) no ofrecen
+  el selector, y la API lo rechaza si se intenta forzar.
+
+### Añadido · Guía de formato y paleta de símbolos
+- **Guía de formato** en las dos pantallas de edición: una tabla con todos los
+  símbolos de Discord y lo que hace cada uno, con un ejemplo lado a lado de lo
+  que se escribe y lo que se ve. Explica cómo se pone **la letra más grande**
+  (`#`, `##`, `###`) y cómo se pone diminuta (`-#`), que es lo que no tiene
+  botón en Discord.
+- **Barra de formato** encima de cada caja de texto: tamaño, negrita, cursiva,
+  subrayado, tachado, spoiler, citas, listas, código y enlaces. Respeta la
+  selección y se puede quitar volviendo a pulsar.
+- **Paleta de adornos y letras**: 126 símbolos ornamentales agrupados por estilo
+  (marcos, estrellas, gótico, corazones, separadores, flechas, sellos) y 11
+  alfabetos decorativos de Unicode — los mismos de los diseños del servidor
+  (𝐴 𝑛𝑒𝑤 𝑤𝑎𝑛𝑑𝑒𝑟𝑒𝑟, 𝑾𝒆𝒍𝒄𝒐𝒎𝒆, ℬ𝒾ℯ𝓃𝓋ℯ𝓃𝒾𝒹ℴ, 𝔅𝔦𝔢𝔫𝔳𝔢𝔫𝔦𝔡𝔬…). Se escribe el texto una vez
+  y se inserta convertido donde esté el cursor.
+- La vista previa entiende ahora texto pequeño, citas, listas, subrayado,
+  spoilers, bloques de código y enlaces con texto propio.
+
+### Añadido · Boosts de Nitro
+- **Agradecimiento por boost**, mensaje al retirarlo y aviso de **nuevo nivel de
+  mejora** del servidor, con su propio canal configurable (si no se elige, usa el
+  de bienvenida) y su propio módulo.
+
+### Añadido · Ofertas y juegos gratis
+- Nuevo módulo que publica en el canal que elijas, con tres fuentes **gratuitas
+  y sin clave**: juegos gratis de **Epic Games**, sorteos y llaves de **Steam,
+  GOG, Ubisoft e itch.io** (vía GamerPower) y **rebajas de Steam** por encima del
+  descuento que configures.
+- Recuerda lo ya publicado para no repetirse, limita cuántos avisos manda por
+  ronda y permite elegir tiendas y rol al que mencionar.
+
+### Añadido · Más eventos de Discord
+- Registro de **mensajes purgados** (borrados en bloque) y de **hilos creados**.
+
+### Cambiado · YouTube deja de depender de la cuota
+- El descubrimiento de contenido pasa a hacerse por los **feeds RSS públicos**
+  de YouTube, que no consumen cuota ni necesitan clave. La API solo se usa para
+  los detalles de lo que es nuevo.
+- Antes, vigilar un canal costaba unas **1.150 unidades al día**, y la cuota
+  gratuita (10.000) daba para ocho o nueve canales. Ahora el gasto depende de
+  que haya contenido nuevo, no de cada cuánto se mira.
+- Se puede volver al comportamiento anterior con `YOUTUBE_USE_RSS=false`.
+
+### Cambiado · El panel ya no usa los diálogos del navegador
+- `confirm()` y `prompt()` mostraban una caja del navegador con el dominio del
+  alojamiento. Se sustituyen por un diálogo propio, accesible y con el estilo del
+  panel. El lint impide que vuelvan a colarse.
+
+
 ## 2.8.2 — Panel reconstruido y verificación completa del bot
 
 ### Panel web: rehecho de cero

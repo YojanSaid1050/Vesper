@@ -3,13 +3,14 @@ const mongoose = require('mongoose');
 
 const guildSchema = new mongoose.Schema({
   guildId: { type: String, required: true, unique: true, index: true },
-  schemaVersion: { type: Number, default: 5, min: 1 },
+  schemaVersion: { type: Number, default: 6, min: 1 },
   general: {
     welcomeChannel: { type: String, default: null },
     goodbyeChannel: { type: String, default: null },
     logChannel: { type: String, default: null },
     botLogChannel: { type: String, default: null },
-    botRole: { type: String, default: null }
+    botRole: { type: String, default: null },
+    boostChannel: { type: String, default: null }
   },
   dashboard: {
     channel: { type: String, default: null },
@@ -55,24 +56,11 @@ const guildSchema = new mongoose.Schema({
     goodbyeMessage: { type: String, default: null, maxlength: 1500 },
     memberRole: { type: String, default: null }
   },
-  embeds: {
-    welcome: {
-      title: { type: String, default: null, maxlength: 240 },
-      message: { type: String, default: null, maxlength: 3000 },
-      color: { type: String, default: null, maxlength: 7 },
-      image: { type: String, default: null, maxlength: 500 },
-      footer: { type: String, default: null, maxlength: 200 },
-      thumbnail: { type: Boolean, default: true }
-    },
-    goodbye: {
-      title: { type: String, default: null, maxlength: 240 },
-      message: { type: String, default: null, maxlength: 3000 },
-      color: { type: String, default: null, maxlength: 7 },
-      image: { type: String, default: null, maxlength: 500 },
-      footer: { type: String, default: null, maxlength: 200 },
-      thumbnail: { type: Boolean, default: true }
-    }
-  },
+  // Plantillas de los mensajes que publica el bot, indexadas por el tipo del
+  // catálogo (welcome, log_ban_added, notify_twitch_live…). Se guarda como
+  // mapa libre porque el catálogo crece; la validación de cada campo la hace
+  // src/web/configSanitizer.js antes de escribir.
+  embeds: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
   features: {
     tiktok: { type: Boolean, default: true },
     twitch: { type: Boolean, default: true },
@@ -80,6 +68,8 @@ const guildSchema = new mongoose.Schema({
     welcome: { type: Boolean, default: true },
     goodbye: { type: Boolean, default: true },
     logs: { type: Boolean, default: true },
+    boosts: { type: Boolean, default: true },
+    deals: { type: Boolean, default: false },
     music: { type: Boolean, default: false },
     moderation: { type: Boolean, default: false },
     tickets: { type: Boolean, default: false },
@@ -101,6 +91,16 @@ const guildSchema = new mongoose.Schema({
     maxMentions: { type: Number, default: 5 },
     repeatLimit: { type: Number, default: 4 },
     action: { type: String, enum: ['delete', 'warn', 'timeout'], default: 'warn' }
+  },
+  deals: {
+    channel: { type: String, default: null },
+    pingRole: { type: String, default: null },
+    epicFree: { type: Boolean, default: true },
+    giveaways: { type: Boolean, default: true },
+    steamSpecials: { type: Boolean, default: false },
+    minDiscount: { type: Number, min: 10, max: 95, default: 50 },
+    giveawayPlatforms: { type: [String], default: ['steam', 'epic-games-store', 'gog'] },
+    maxPerCycle: { type: Number, min: 1, max: 10, default: 5 }
   },
   music: {
     requestChannel: { type: String, default: null },

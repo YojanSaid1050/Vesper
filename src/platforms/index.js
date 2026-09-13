@@ -3,6 +3,7 @@ const MonitorService = require('../core/MonitorService');
 const youtubeMonitors = require('./youtube/monitors');
 const twitchMonitors = require('./twitch/monitors');
 const tiktokMonitors = require('./tiktok/monitors');
+const dealsMonitors = require('./deals/monitors');
 const { shutdownTikTokProvider } = require('./tiktok/checks');
 
 function minutesFromEnv(name, fallbackMinutes) {
@@ -25,6 +26,9 @@ const INTERVALS = {
     // TikTok
     TIKTOK_LIVE: minutesFromEnv('TIKTOK_LIVE_INTERVAL_MINUTES', 10),
     TIKTOK_VIDEO: minutesFromEnv('TIKTOK_VIDEO_INTERVAL_MINUTES', 60),
+
+    // Ofertas y juegos gratis: cambian pocas veces al día, no hace falta más.
+    DEALS: minutesFromEnv('DEALS_INTERVAL_MINUTES', 30),
 };
 
 const monitors = [];
@@ -96,6 +100,16 @@ function startAllMonitors(client) {
     } else {
         console.log('ℹ️ TikTok desactivado mediante TIKTOK_ENABLED=false');
     }
+
+    // ==================================================
+    // OFERTAS Y JUEGOS GRATIS (Epic, Steam y sorteos)
+    // ==================================================
+    monitors.push(new MonitorService({
+        name: 'Ofertas y juegos gratis',
+        interval: INTERVALS.DEALS,
+        maxConsecutiveErrors: 3,
+        executeFunction: dealsMonitors.monitorDeals
+    }));
 
     // Iniciar todos los monitores
     for (const monitor of monitors) {

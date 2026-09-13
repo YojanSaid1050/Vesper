@@ -2,6 +2,7 @@ const { PermissionFlagsBits } = require('discord.js');
 const ModerationCase = require('../database/models/ModerationCase');
 const { getGuildConfig } = require('../database/mongoManager');
 const { isModuleEnabledConfig } = require('../config/guildPolicy');
+const { buildMessage, memberVars } = require('./EmbedCatalog');
 const mongoose = require('mongoose');
 
 const repeats = new Map();
@@ -128,14 +129,27 @@ async function applyAutomaticAction(message, config, reason) {
     evidence: message.content.slice(0, 1000),
     expiresAt
   });
+  const vars = memberVars(message.member || { user: message.author, guild: message.guild }, {
+    reason,
+    case: caseIdentifier(record)
+  });
+
   if (action === 'warning') {
-    await message.author.send({
-      content: `Recibiste una advertencia en **${message.guild.name}**.\nMotivo: ${reason}\nCaso: **#${caseIdentifier(record)}**`,
-      allowedMentions: { parse: [] }
-    }).catch(() => null);
+    const dm = buildMessage('automod_dm', {
+      config,
+      vars,
+      defaults: { message: 'Recibiste una advertencia en **{server}**.\nMotivo: {reason}\nCaso: **#{case}**' }
+    });
+    await message.author.send({ content: dm.content, allowedMentions: { parse: [] } }).catch(() => null);
   }
+
+  const publicNotice = buildMessage('automod_notice', {
+    config,
+    vars,
+    defaults: { message: '{user}, tu mensaje fue retirado: {reason}. Caso **#{case}**.' }
+  });
   const notice = await message.channel.send({
-    content: `<@${message.author.id}>, tu mensaje fue retirado: ${reason}. Caso **#${caseIdentifier(record)}**.`,
+    content: publicNotice.content,
     allowedMentions: { users: [message.author.id], roles: [], parse: [] }
   }).catch(() => null);
   if (notice) setTimeout(() => notice.delete().catch(() => null), 10_000);

@@ -10,13 +10,15 @@ const nodeGlobals = {
   fetch: 'readonly', AbortController: 'readonly', AbortSignal: 'readonly', global: 'readonly'
 };
 
+// confirm, prompt y alert NO están aquí a propósito: el panel usa su propio
+// diálogo y esos tres muestran una caja del navegador con el dominio del
+// alojamiento. Dejarlos fuera hace que el lint los rechace.
 const browserGlobals = {
   document: 'readonly', window: 'readonly', location: 'readonly', history: 'readonly',
   navigator: 'readonly', fetch: 'readonly', FormData: 'readonly', Intl: 'readonly',
-  confirm: 'readonly', prompt: 'readonly', alert: 'readonly',
   setTimeout: 'readonly', clearTimeout: 'readonly', setInterval: 'readonly',
-  clearInterval: 'readonly', URLSearchParams: 'readonly', FormData: 'readonly',
-  localStorage: 'readonly', console: 'readonly'
+  clearInterval: 'readonly', URLSearchParams: 'readonly',
+  localStorage: 'readonly', console: 'readonly', Event: 'readonly'
 };
 
 const rules = {

@@ -244,7 +244,7 @@ async function processGuildLives(guildId, config, client, liveStatus) {
         });
         
         try {
-          const embed = youtubeLive(guildId, {
+          const embed = await youtubeLive(guildId, {
             channelName: user.channelName,
             handle: user.handle,
             title: user.title,
@@ -437,7 +437,7 @@ async function processGuildVideos(guildId, config, client, videos) {
         });
         
         try {
-          const embed = youtubeVideo(guildId, { 
+          const embed = await youtubeVideo(guildId, { 
             channelName: user.channelName, 
             handle: user.handle
           }, latestVideo, pingText);
@@ -614,7 +614,7 @@ async function processGuildShorts(guildId, config, client, shorts) {
         });
         
         try {
-          const embed = youtubeShort(guildId, { 
+          const embed = await youtubeShort(guildId, { 
             channelName: user.channelName, 
             handle: user.handle
           }, latestShort, pingText);

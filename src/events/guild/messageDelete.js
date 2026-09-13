@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { buildMessage, memberVars } = require('../../core/EmbedCatalog');
 const { createLog } = require('../../utils/logCache');
 const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
 
@@ -30,16 +31,20 @@ module.exports = {
       deleter = auditExecutor(deletionLog);
     } catch {}
 
-    const embed = new EmbedBuilder()
-      .setTitle('🗑️ Message Deleted')
-      .setColor('#ED4245')
-      .addFields(
+    const content = message.content?.substring(0, 1000) || '*Sin texto*';
+    await sendBrandedMessage(logChannel, buildMessage('log_message_deleted', {
+      config: guildConfig,
+      vars: memberVars(message.member || { user: message.author, guild: message.guild }, {
+        userTag: authorTag, executor: deleter,
+        channel: `${message.channel}`, channelName: message.channel?.name || '', content
+      }),
+      defaults: { title: '🗑️ Message Deleted', color: '#ED4245' },
+      fields: [
         { name: '👤 Usuario', value: authorTag },
         { name: '🛠️ Eliminado por', value: deleter },
         { name: '📍 Canal', value: `${message.channel}` },
-        { name: '💬 Contenido', value: message.content?.substring(0, 1000) || '*Sin texto*' }
-      )
-      .setTimestamp();
-    await sendBrandedMessage(logChannel, { embeds: [embed] });
+        { name: '💬 Contenido', value: content }
+      ]
+    }));
   }
 };

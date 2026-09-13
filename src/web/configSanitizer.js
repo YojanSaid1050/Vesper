@@ -1,7 +1,8 @@
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const { MODULE_DEFAULTS, isAnyMainGuild, isMainGuild } = require('../config/guildPolicy');
 const { normalizeAllowedDomain } = require('../core/ModerationService');
-const { EMBED_KINDS, EMBED_FIELD_LIMITS } = require('../core/EmbedTemplateService');
+const { EMBED_FIELD_LIMITS } = require('../core/EmbedTemplateService');
+const { isKnownKind, kindInfo } = require('../core/EmbedCatalog');
 
 class ValidationError extends Error {
   constructor(message) {
@@ -12,13 +13,18 @@ class ValidationError extends Error {
 }
 
 const CHANNEL_FIELDS = Object.freeze({
-  general: ['welcomeChannel', 'goodbyeChannel', 'logChannel', 'botLogChannel'],
+  general: ['welcomeChannel', 'goodbyeChannel', 'logChannel', 'botLogChannel', 'boostChannel'],
   tiktok: ['liveChannel', 'videoChannel'],
   twitch: ['liveChannel'],
   youtube: ['liveChannel', 'videoChannel', 'shortChannel'],
-  music: ['requestChannel']
+  music: ['requestChannel'],
+  deals: ['channel']
 });
 const ROLE_ARRAY_FIELDS = ['socialManagerRoles', 'moderatorRoles', 'musicDjRoles'];
+
+// Plataformas que admite la API de sorteos. Se valida contra esta lista para
+// no reenviar a la fuente cualquier cadena que llegue del navegador.
+const GIVEAWAY_PLATFORMS = ['steam', 'epic-games-store', 'gog', 'ubisoft', 'origin', 'itchio', 'battlenet', 'drm-free', 'xbox-one', 'ps4', 'switch', 'android', 'ios', 'vr'];
 
 function booleanValue(value, path) {
   if (typeof value !== 'boolean') throw new ValidationError(`${path} debe ser verdadero o falso.`);
@@ -159,7 +165,10 @@ function sanitizeGuildPatch(input, guild) {
     const source = input.embeds;
     if (!source || typeof source !== 'object' || Array.isArray(source)) throw new ValidationError('embeds no es válido.');
     const target = {};
-    for (const kind of EMBED_KINDS) {
+    for (const kind of Object.keys(source)) {
+      // Solo se aceptan tipos que existan en el catálogo: así una petición
+      // manipulada no puede sembrar claves arbitrarias en la base de datos.
+      if (!isKnownKind(kind)) throw new ValidationError(`Tipo de mensaje desconocido: ${kind}`);
       if (source[kind] === undefined) continue;
       const block = source[kind];
       if (!block || typeof block !== 'object' || Array.isArray(block)) throw new ValidationError(`embeds.${kind} no es válido.`);
@@ -168,11 +177,25 @@ function sanitizeGuildPatch(input, guild) {
         if (block[field] === undefined) continue;
         result[field] = optionalText(block[field], EMBED_FIELD_LIMITS[field], `embeds.${kind}.${field}`);
       }
-      if (block.image !== undefined) result.image = imageUrlValue(block.image, `embeds.${kind}.image`);
+      const supports = kindInfo(kind)?.supports || {};
+      if (block.image !== undefined) {
+        if (supports.image === false) throw new ValidationError(`embeds.${kind} no admite imagen.`);
+        result.image = imageUrlValue(block.image, `embeds.${kind}.image`);
+      }
       if (block.color !== undefined) {
         result.color = block.color === null || block.color === '' ? null : colorValue(block.color, `embeds.${kind}.color`);
       }
       if (block.thumbnail !== undefined) result.thumbnail = booleanValue(block.thumbnail, `embeds.${kind}.thumbnail`);
+      if (block.layout !== undefined) {
+        if (block.layout === null || block.layout === '' || block.layout === 'auto') {
+          result.layout = null;
+        } else if (block.layout === 'classic' || block.layout === 'components_v2') {
+          if (kindInfo(kind)?.plainText) throw new ValidationError(`embeds.${kind} es texto normal y no admite formato de embed.`);
+          result.layout = block.layout;
+        } else {
+          throw new ValidationError(`embeds.${kind}.layout no es válido.`);
+        }
+      }
       if (Object.keys(result).length) target[kind] = result;
     }
     if (Object.keys(target).length) updates.embeds = target;
@@ -257,6 +280,27 @@ function sanitizeGuildPatch(input, guild) {
       target.exemptRoles = uniqueArray(source.exemptRoles, 100, 'moderation.exemptRoles').map(value => roleValue(guild, value, 'moderation.exemptRoles'));
     }
     if (Object.keys(target).length) updates.moderation = target;
+  }
+
+  if (input.deals !== undefined) {
+    const source = input.deals;
+    if (!source || typeof source !== 'object' || Array.isArray(source)) throw new ValidationError('deals no es válido.');
+    const target = updates.deals || {};
+    if (source.pingRole !== undefined) {
+      target.pingRole = source.pingRole === null || source.pingRole === '' ? null : roleValue(guild, source.pingRole, 'deals.pingRole');
+    }
+    for (const field of ['epicFree', 'giveaways', 'steamSpecials']) {
+      if (source[field] !== undefined) target[field] = booleanValue(source[field], `deals.${field}`);
+    }
+    if (source.minDiscount !== undefined) target.minDiscount = integerValue(source.minDiscount, 10, 95, 'deals.minDiscount');
+    if (source.maxPerCycle !== undefined) target.maxPerCycle = integerValue(source.maxPerCycle, 1, 10, 'deals.maxPerCycle');
+    if (source.giveawayPlatforms !== undefined) {
+      const allowed = new Set(GIVEAWAY_PLATFORMS);
+      const list = uniqueArray(source.giveawayPlatforms, 20, 'deals.giveawayPlatforms');
+      if (list.some(platform => !allowed.has(platform))) throw new ValidationError('deals.giveawayPlatforms contiene una plataforma no admitida.');
+      target.giveawayPlatforms = list;
+    }
+    if (Object.keys(target).length) updates.deals = target;
   }
 
   if (input.music !== undefined) {

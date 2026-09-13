@@ -9,6 +9,9 @@ function setupChecks(config = {}) {
     { key: 'logs', label: 'Canal de registros', ready: configured(config.general?.logChannel) },
     { key: 'welcome', label: 'Canal de bienvenida', ready: !isModuleEnabledConfig(config, 'welcome') || configured(config.general?.welcomeChannel) },
     { key: 'goodbye', label: 'Canal de despedida', ready: !isModuleEnabledConfig(config, 'goodbye') || configured(config.general?.goodbyeChannel) },
+    // El agradecimiento por boosts cae en el canal de bienvenida si no se le
+    // asigna uno propio, así que basta con tener cualquiera de los dos.
+    { key: 'boosts', label: 'Canal de boosts', ready: !isModuleEnabledConfig(config, 'boosts') || configured(config.general?.boostChannel) || configured(config.general?.welcomeChannel) },
     { key: 'tiktok', label: 'TikTok', ready: !isModuleEnabledConfig(config, 'tiktok') || (configured(config.tiktok?.users) && (configured(config.tiktok?.liveChannel) || configured(config.tiktok?.videoChannel))) },
     { key: 'twitch', label: 'Twitch', ready: !isModuleEnabledConfig(config, 'twitch') || (configured(config.twitch?.users) && configured(config.twitch?.liveChannel)) },
     { key: 'youtube', label: 'YouTube', ready: !isModuleEnabledConfig(config, 'youtube') || (configured(config.youtube?.users) && (configured(config.youtube?.liveChannel) || configured(config.youtube?.videoChannel) || configured(config.youtube?.shortChannel))) },

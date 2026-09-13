@@ -1,5 +1,6 @@
 const { isMainGuild, isThemedMainGuild } = require('../config/guildPolicy');
 const { resolveEmbedTemplate } = require('./EmbedTemplateService');
+const { containerFromTemplate } = require('./EmbedLayouts');
 
 const TEXT = Object.freeze({
   neutral: {
@@ -71,8 +72,13 @@ function themedPayload(member, kind, config = {}) {
     footer: `${displayName} • ${member?.guild?.name || THEMED_DEFAULTS.guildLabel}`,
     color: colorNumber(legacyColor, welcome ? THEMED_DEFAULTS.primaryColor : THEMED_DEFAULTS.secondaryColor),
     image: null,
-    thumbnail: true
+    thumbnail: true,
+    layout: 'classic'
   });
+
+  // Aquí el embed clásico es lo de fábrica, pero el administrador puede pedir
+  // el contenedor V2 desde el panel y queda igual que el de Embers Void.
+  if (template.layout === 'components_v2') return containerFromTemplate(template);
 
   const embed = {
     title: template.title,

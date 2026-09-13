@@ -1,7 +1,7 @@
 const { moduleDefaults, isMainGuild, isThemedMainGuild } = require('./guildPolicy');
 const { defaultEmbedsConfig } = require('../core/EmbedTemplateService');
 
-const CURRENT_SCHEMA_VERSION = 5;
+const CURRENT_SCHEMA_VERSION = 6;
 
 function defaultProfileConfig(guildId = null) {
   if (isThemedMainGuild(guildId)) {
@@ -52,7 +52,7 @@ function createDefaultGuildConfig(guildId = null) {
   return {
     ...(guildId ? { guildId: String(guildId) } : {}),
     schemaVersion: CURRENT_SCHEMA_VERSION,
-    general: { welcomeChannel: null, goodbyeChannel: null, logChannel: null, botLogChannel: null, botRole: null },
+    general: { welcomeChannel: null, goodbyeChannel: null, logChannel: null, botLogChannel: null, botRole: null, boostChannel: null },
     dashboard: { channel: null, message: null, enabled: false, currentPanel: 'main', currentMode: 'default' },
     tiktok: { liveChannel: null, videoChannel: null, users: [], showUsers: false, pingRole: null },
     twitch: { liveChannel: null, users: [], showUsers: false, pingRole: null },
@@ -71,6 +71,11 @@ function createDefaultGuildConfig(guildId = null) {
       maxMentions: 5,
       repeatLimit: 4,
       action: 'warn'
+    },
+    deals: {
+      channel: null, pingRole: null,
+      epicFree: true, giveaways: true, steamSpecials: false,
+      minDiscount: 50, giveawayPlatforms: ['steam', 'epic-games-store', 'gog'], maxPerCycle: 5
     },
     music: { requestChannel: null, preferredVoiceChannel: null, defaultVolume: 50, maxQueue: 100, maxPerUser: 3, maxTrackMinutes: 15, idleSeconds: 180 },
     community: defaultCommunityConfig(),

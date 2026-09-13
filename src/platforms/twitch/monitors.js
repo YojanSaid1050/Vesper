@@ -181,7 +181,7 @@ async function processGuildStreams(guildId, config, client, streamStatus) {
         });
         
         try {
-          const embed = twitchLive(guildId, {
+          const embed = await twitchLive(guildId, {
             streamer: streamer.streamerName,
             title: streamer.title || 'Sin título',
             game: streamer.game || 'Sin categoría',
