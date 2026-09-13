@@ -1,4 +1,4 @@
-# Vesper Bot 2.8.2
+# Vesper Bot 2.9.0
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión 2.8 conserva la presentación visual original con
@@ -95,6 +95,8 @@ Está organizado en diez secciones, cada una con su propia pantalla:
 | Comunidad | Tickets, sugerencias, autorroles y mensajes destacados |
 | Música | Canales permitidos y límites de la cola |
 | Módulos y permisos | Qué funciones están activas y qué roles pueden usarlas |
+| Todos los mensajes | Los 38 avisos que publica el bot, editables con vista previa |
+| Ofertas de juegos | Juegos gratis de Epic, sorteos y rebajas de Steam |
 | Configuración | Todo lo guardado del servidor, con los IDs traducidos a nombres |
 | Auditoría | Quién cambió qué desde la web |
 
@@ -331,6 +333,85 @@ de sintaxis en Node.js 24.
 Entre las pruebas hay una que compara el mensaje de bienvenida y el de despedida
 de Embers Void, sin configuración guardada, contra el diseño original carácter a
 carácter. Si alguien cambia la estructura del embed sin querer, falla.
+
+## Todos los mensajes son editables
+
+Cada aviso que publica Vesper —bienvenida, despedida, los registros del
+servidor, los avisos de moderación, los de redes y los de ofertas— se edita
+desde «Todos los mensajes» en el panel: título, cuerpo, color, imagen, pie de
+página y si se muestra la imagen de perfil, con las variables propias de cada
+mensaje y vista previa en vivo.
+
+**Un campo vacío conserva el valor original.** Si no tocas nada, el bot publica
+exactamente lo mismo que antes; si escribes un cuerpo, sustituye a los campos
+del aviso. Hay pruebas que verifican esa equivalencia.
+
+### Las dos versiones de embed
+
+Cada mensaje se puede publicar de dos formas, y las dos están disponibles en los
+dos Main:
+
+| Versión | Cómo se ve | Notas |
+| --- | --- | --- |
+| Embed clásico | Barra de color a la izquierda, miniatura, campos y pie con la hora | Lo de fábrica en Ankerie Dimension y en todos los registros |
+| Contenedor Components V2 | Bloque con borde de color y títulos grandes | Lo de fábrica en la bienvenida y la despedida de Embers Void |
+
+El contenido es el mismo en las dos, así que cambiar de versión no borra nada de
+lo escrito. El contenedor V2 no tiene miniatura y publica el pie como texto
+pequeño (`-#`). Los avisos que no son embed (automoderación y el aviso por
+privado) no ofrecen el selector.
+
+### Cómo se pone la letra más grande
+
+Discord no tiene botones de tamaño: el tamaño se pide con símbolos al principio
+de la línea. El panel trae una guía con todos ellos y una barra que los inserta
+por ti.
+
+| Escribes | Sale |
+| --- | --- |
+| `# Texto` | El título más grande |
+| `## Texto` | Un escalón por debajo |
+| `### Texto` | Mediano, algo mayor que el texto normal |
+| `-# Texto` | Diminuto y gris, para notas y pies |
+| `**Texto**` · `*Texto*` · `__Texto__` · `~~Texto~~` · `\|\|Texto\|\|` | Negrita, cursiva, subrayado, tachado y spoiler |
+| `> Texto` · `>>> Texto` | Cita de una línea y cita hasta el final |
+| `- Texto` · `1. Texto` | Listas |
+| Acentos graves alrededor del texto | Código en línea (uno) o bloque de código (tres) |
+| `[Visítanos](https://…)` | Enlace con texto propio (solo dentro de un embed) |
+
+El botón **«Símbolos y letras…»** de la barra abre una paleta con 126 adornos
+(marcos, estrellas, gótico, corazones, separadores, flechas y sellos) y 11
+alfabetos decorativos de Unicode. Las letras raras de los diseños del servidor
+(𝐴 𝑛𝑒𝑤 𝑤𝑎𝑛𝑑𝑒𝑟𝑒𝑟, 𝑾𝒆𝒍𝒄𝒐𝒎𝒆) salen de ahí: no son una fuente, son caracteres reales,
+así que se ven igual en móvil y en ordenador.
+
+## Ofertas y juegos gratis
+
+Módulo opcional (`features.deals`) que publica en el canal que elijas:
+
+| Fuente | Qué trae | Coste |
+| --- | --- | --- |
+| Epic Games | El juego gratis de la semana y el anuncio del siguiente | Gratis, sin clave |
+| GamerPower | Sorteos y llaves de Steam, GOG, Ubisoft, itch.io y otras | Gratis, sin clave |
+| Steam | Rebajas de la portada por encima del descuento que fijes | Gratis, sin clave |
+
+Vesper recuerda lo que ya publicó en cada servidor, limita cuántos avisos manda
+por ronda y comprueba cada 30 minutos (`DEALS_INTERVAL_MINUTES`).
+
+## Cuánto cuesta vigilar YouTube
+
+La API de datos de YouTube da 10.000 unidades gratis al día. Vesper usa los
+**feeds RSS públicos** para enterarse de que hay contenido nuevo, que no
+consumen cuota ni necesitan clave, y reserva la API para los detalles de lo que
+acaba de salir.
+
+En la práctica: antes, vigilar un canal gastaba unas 1.150 unidades diarias y la
+cuota daba para ocho o nueve canales. Ahora el gasto depende de cuánto publiquen
+tus canales, no de cada cuánto los mira el bot. `YOUTUBE_USE_RSS=false` vuelve al
+comportamiento anterior.
+
+TikTok ya era gratuito: Vesper lo consulta con un Chromium propio dentro del
+mismo contenedor, sin Apify ni ningún servicio de pago.
 
 ## Comprobaciones de salud
 

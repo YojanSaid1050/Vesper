@@ -109,7 +109,7 @@ async function monitorLives(client) {
         const wasLive = guildStatus[username] === true;
 
         if (result.isLive && !wasLive) {
-          const payload = tiktokLive(guildData.guildId, {
+          const payload = await tiktokLive(guildData.guildId, {
             username,
             nickname: result.nickname,
             viewers: result.viewers,
@@ -224,7 +224,7 @@ async function monitorVideos(client) {
         }
         if (previousId === result.latestVideoId) continue;
 
-        const payload = tiktokVideo(guildData.guildId, {
+        const payload = await tiktokVideo(guildData.guildId, {
           username,
           nickname: result.nickname,
           description: result.latestVideoTitle,

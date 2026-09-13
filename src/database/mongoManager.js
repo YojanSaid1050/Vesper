@@ -154,7 +154,7 @@ async function updateGuildConfig(guildId, updates) {
   await connectMongo();
   
   try {
-    const allowedSections = ['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'features', 'permissions', 'moderation', 'music', 'community', 'testPanel'];
+    const allowedSections = ['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'features', 'permissions', 'moderation', 'music', 'deals', 'community', 'testPanel'];
     const sanitizedUpdates = {};
     for (const section of allowedSections) {
       if (updates?.[section] === undefined) continue;
@@ -226,7 +226,7 @@ async function updateGuildSection(guildId, section, values) {
   await connectMongo();
   
   try {
-    const allowedSections = new Set(['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'features', 'permissions', 'moderation', 'music', 'testPanel']);
+    const allowedSections = new Set(['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'features', 'permissions', 'moderation', 'music', 'deals', 'testPanel']);
     if (!allowedSections.has(section)) throw new Error(`Sección de configuración no permitida: ${section}`);
 
     const update = {};

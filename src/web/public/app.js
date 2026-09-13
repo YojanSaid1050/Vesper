@@ -68,6 +68,57 @@ function toast(message, kind = 'ok') {
   toast.timer = setTimeout(() => { element.hidden = true; }, 4800);
 }
 
+// --------------------------------------------------------------------
+// Diálogos propios
+//
+// El navegador muestra sus confirm() y prompt() con el dominio del
+// alojamiento y sin ningún estilo. Estos usan <dialog>, que es accesible
+// de serie (foco atrapado, Escape cierra) y se ve como el resto del panel.
+// --------------------------------------------------------------------
+
+function closeDialog(dialog, value) {
+  dialog.close(value);
+}
+
+function openDialog({ title, message, confirmLabel = 'Aceptar', cancelLabel = 'Cancelar', danger = false, input = null }) {
+  const dialog = $('#app-dialog');
+  const field = $('#app-dialog-field');
+  const control = $('#app-dialog-input');
+
+  $('#app-dialog-title').textContent = title;
+  $('#app-dialog-message').textContent = message || '';
+  $('#app-dialog-message').hidden = !message;
+  $('#app-dialog-confirm').textContent = confirmLabel;
+  $('#app-dialog-cancel').textContent = cancelLabel;
+  dialog.classList.toggle('danger', danger);
+
+  if (input) {
+    field.hidden = false;
+    $('#app-dialog-label').textContent = input.label || '';
+    control.value = input.value || '';
+    control.placeholder = input.placeholder || '';
+  } else {
+    field.hidden = true;
+    control.value = '';
+  }
+
+  return new Promise(resolve => {
+    const onClose = () => {
+      dialog.removeEventListener('close', onClose);
+      const accepted = dialog.returnValue === 'confirm';
+      resolve(input ? (accepted ? control.value.trim() : null) : accepted);
+    };
+    dialog.addEventListener('close', onClose);
+    dialog.returnValue = 'cancel';
+    dialog.showModal();
+    (input ? control : $('#app-dialog-confirm')).focus();
+  });
+}
+
+// Sustitutos directos de confirm() y prompt().
+const confirmDialog = options => openDialog({ confirmLabel: 'Sí, continuar', ...options });
+const promptDialog = options => openDialog({ confirmLabel: 'Guardar', ...options, input: options.input || { label: options.label || '' } });
+
 async function api(path, options = {}) {
   const headers = { Accept: 'application/json', ...(options.headers || {}) };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
@@ -203,6 +254,8 @@ const MODULES = {
   welcome: ['Mensaje de bienvenida', 'Envía el embed de bienvenida cuando alguien entra.'],
   goodbye: ['Mensaje de despedida', 'Envía el embed de despedida cuando alguien sale.'],
   logs: ['Registro de eventos', 'Anota entradas, salidas, ediciones, baneos y cambios de canal.'],
+  boosts: ['Agradecimiento por boosts', 'Publica un mensaje cuando alguien mejora el servidor con Nitro.'],
+  deals: ['Ofertas de juegos', 'Avisa de juegos gratis de Epic, rebajas de Steam y sorteos de llaves.'],
   music: ['Reproductor de música', 'Habilita /musica y la reproducción en canales de voz.'],
   moderation: ['Moderación automática', 'Filtra enlaces, invitaciones, menciones y mensajes repetidos.'],
   tickets: ['Tickets de soporte', 'Panel de tickets con categoría y transcripciones.'],
@@ -246,28 +299,66 @@ function renderMarkdown(value) {
   return escapeHtml(value ?? '')
     .split('\n')
     .map(line => {
+      if (line.startsWith('-# ')) return `<span class="md-small">${line.slice(3)}</span>`;
       if (line.startsWith('### ')) return `<span class="md-h3">${line.slice(4)}</span>`;
       if (line.startsWith('## ')) return `<span class="md-h2">${line.slice(3)}</span>`;
       if (line.startsWith('# ')) return `<span class="md-h1">${line.slice(2)}</span>`;
+      if (line.startsWith('&gt;&gt;&gt; ')) return `<span class="md-quote">${line.slice(12)}</span>`;
+      if (line.startsWith('&gt; ')) return `<span class="md-quote">${line.slice(5)}</span>`;
+      if (/^[-*] /.test(line)) return `<span class="md-bullet">${line.slice(2)}</span>`;
+      if (/^\d+\. /.test(line)) return `<span class="md-bullet ordered">${line}</span>`;
       return line;
     })
     .join('<br>')
+    .replace(/```([\s\S]+?)```/g, '<code class="md-block">$1</code>')
+    .replace(/\*\*\*([^*]+)\*\*\*/g, '<strong><em>$1</em></strong>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^_]+)__/g, '<u>$1</u>')
     .replace(/~~([^~]+)~~/g, '<s>$1</s>')
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/\|\|([^|]+)\|\|/g, '<span class="md-spoiler">$1</span>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<span class="md-link">$1</span>')
     .replace(/(@[\w-]+)/g, '<span class="md-mention">$1</span>');
 }
 
+// Valores de ejemplo para la vista previa. Cubren todas las variables del
+// catálogo para que ningún marcador se quede sin sustituir en pantalla.
+const SAMPLE = {
+  user: '@nuevo-miembro',
+  username: 'nuevo-miembro',
+  userTag: 'nuevo-miembro#0001',
+  displayName: 'Nuevo miembro',
+  userId: '123456789012345678',
+  executor: 'Yojan',
+  channel: '#general',
+  channelName: 'general',
+  role: '@Miembro',
+  roleName: 'Miembro',
+  roles: '@Miembro, @Avisos',
+  before: 'texto anterior',
+  after: 'texto nuevo',
+  content: 'contenido del mensaje',
+  reason: 'enlace no permitido',
+  case: 'A1B2C3',
+  until: '12 de enero a las 18:00',
+  from: '#voz-1',
+  to: '#voz-2',
+  creator: 'AnkerieDimension',
+  title: 'Título de la publicación',
+  url: 'https://ejemplo.com/publicacion',
+  game: 'Just Chatting',
+  viewers: '128',
+  views: '4.320'
+};
+
 function sampleValues(text) {
   const guild = state.data?.guild;
-  return String(text ?? '')
-    .replaceAll('{user}', '@nuevo-miembro')
-    .replaceAll('{username}', 'nuevo-miembro')
-    .replaceAll('{displayName}', 'Nuevo miembro')
-    .replaceAll('{server}', guild?.name || 'tu servidor')
-    .replaceAll('{memberCount}', formatNumber(guild?.memberCount ?? 0))
-    .replaceAll('{userId}', '123456789012345678');
+  return String(text ?? '').replace(/\{(\w+)\}/g, (match, name) => {
+    if (name === 'server') return guild?.name || 'tu servidor';
+    if (name === 'memberCount') return formatNumber(guild?.memberCount ?? 0);
+    return Object.hasOwn(SAMPLE, name) ? SAMPLE[name] : match;
+  });
 }
 
 // Cabecera del mensaje: el autor que verá un miembro. Usa la identidad efectiva
@@ -298,12 +389,16 @@ function embedPreviewMarkup(values, options) {
          data-fallback="La imagen no se pudo cargar. Comprueba que la URL sea pública y HTTPS.">`
     : '';
 
-  const footerRow = !componentsV2 && footer
-    ? `<div class="embed-footer">${escapeHtml(footer)} · hoy a las 14:32</div>`
+  // En el contenedor V2 el pie no es una pieza propia: se publica como texto
+  // pequeño dentro del bloque, que es su equivalente exacto en Discord.
+  const footerRow = footer
+    ? (componentsV2
+      ? `<div class="embed-subtext">${escapeHtml(footer)}</div>`
+      : `<div class="embed-footer">${escapeHtml(footer)} · hoy a las 14:32</div>`)
     : '';
 
   return `
-    <div class="embed-preview">
+    <div class="embed-preview${componentsV2 ? ' v2' : ''}">
       <div class="embed-top">
         <div class="embed-text">
           <div class="embed-title">${renderMarkdown(title)}</div>
@@ -343,6 +438,10 @@ const SECTIONS = [
     hint: 'Edita los embeds que se publican cuando alguien entra o sale.', needs: 'configure' },
   { id: 'avisos', group: 'Mensajes', icon: '◎', label: 'Avisos de redes', title: 'TikTok, Twitch y YouTube',
     hint: 'Cuentas vigiladas, canales de destino y rol al que avisar.', needs: 'social' },
+  { id: 'mensajes', group: 'Mensajes', icon: '✎', label: 'Todos los mensajes', title: 'Todos los mensajes del bot',
+    hint: 'Cada aviso que Vesper publica, editable: título, texto, color, imagen y pie.', needs: 'configure' },
+  { id: 'ofertas', group: 'Mensajes', icon: '◈', label: 'Ofertas de juegos', title: 'Ofertas y juegos gratis',
+    hint: 'Avisa en un canal cuando Epic regale un juego, Steam rebaje algo o aparezca un sorteo.', needs: 'configure' },
   { id: 'moderacion', group: 'Comunidad', icon: '⚖', label: 'Moderación', title: 'Moderación',
     hint: 'Filtros automáticos, casos abiertos y sanciones.' },
   { id: 'comunidad', group: 'Comunidad', icon: '☰', label: 'Comunidad', title: 'Tickets, sugerencias y roles',
@@ -620,8 +719,366 @@ function refreshIdentityPreview() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Formato del texto: barra, símbolos y letras decorativas           */
+/* ---------------------------------------------------------------- */
+
+// Cada botón de la barra o mete un prefijo al principio de la línea (los
+// títulos, las citas y las listas) o envuelve lo seleccionado (negrita,
+// cursiva, spoiler…). Nada de esto es magia del panel: es el Markdown que
+// entiende Discord, escrito por ti sin tener que acordarte de los símbolos.
+const FORMAT_TOOLS = [
+  {
+    group: 'Tamaño de la letra',
+    tools: [
+      { label: 'H1', prefix: '# ', title: 'Título muy grande — el tamaño más alto que permite Discord' },
+      { label: 'H2', prefix: '## ', title: 'Título grande' },
+      { label: 'H3', prefix: '### ', title: 'Título mediano, algo mayor que el texto normal' },
+      { label: 'a', prefix: '-# ', title: 'Texto diminuto, ideal para notas al pie' }
+    ]
+  },
+  {
+    group: 'Estilo',
+    tools: [
+      { label: 'B', wrap: '**', title: 'Negrita' },
+      { label: 'I', wrap: '*', title: 'Cursiva' },
+      { label: 'U', wrap: '__', title: 'Subrayado' },
+      { label: 'S', wrap: '~~', title: 'Tachado' },
+      { label: '◼', wrap: '||', title: 'Spoiler: hay que pulsar para verlo' }
+    ]
+  },
+  {
+    group: 'Bloques',
+    tools: [
+      { label: '❝', prefix: '> ', title: 'Cita de una línea' },
+      { label: '❞', prefix: '>>> ', title: 'Cita que sigue hasta el final del mensaje' },
+      { label: '•', prefix: '- ', title: 'Lista con puntos' },
+      { label: '1.', prefix: '1. ', title: 'Lista numerada' },
+      { label: '‹›', wrap: '`', title: 'Código en línea' },
+      { label: '⌗', wrap: '```\n', title: 'Bloque de código' }
+    ]
+  },
+  {
+    group: 'Insertar',
+    tools: [
+      { label: '🔗', insert: '[texto visible](https://ejemplo.com)', title: 'Enlace con texto propio' },
+      { label: '—', insert: '\n', title: 'Salto de línea' }
+    ]
+  }
+];
+
+// Símbolos ornamentales, agrupados por el aire que dan. Son los que usan los
+// diseños del servidor: se pulsan y se pegan donde esté el cursor.
+const SYMBOL_SETS = [
+  { name: 'Marcos y cierres', items: ['༺', '༻', '꒰', '꒱', '⟢', '⟣', '「', '」', '『', '』', '〔', '〕', '⦇', '⦈', '⌈', '⌉', '⌊', '⌋', '❪', '❫', '❲', '❳'] },
+  { name: 'Estrellas y destellos', items: ['✦', '✧', '⋆', '✩', '✪', '★', '☆', '⁺', '˖', '࿔', '༉', '⊹', '✶', '✷', '✸', '❈', '❉', '✺'] },
+  { name: 'Oscuro y gótico', items: ['⛧', '⸸', '✝', '☠', '⚰', '🕯', '𓆩', '𓆪', '𖤐', '☾', '☽', '☯', '⚔', '⛥', '☾°', '.⋆'] },
+  { name: 'Corazones y suaves', items: ['♡', '❥', '❤', '♥', '˚', '୨', '୧', '⑅', '𓂃', '𓈒', '໒', '꒱', '♡̷̸', '❀', '✿', '❁', '⚘', '☁'] },
+  { name: 'Líneas y separadores', items: ['─', '━', '┄', '┈', '╌', '═', '⎯', '▬', '▭', '▰', '▱', '⌗', '⌁', '⌇', '∿', '⋯', '⸻', '❖'] },
+  { name: 'Flechas y punteros', items: ['➤', '➣', '➢', '⇾', '⟶', '↝', '⤷', '↳', '↴', '⌁', '⟡', '◈', '◆', '◇', '▸', '▹', '▪', '▫'] },
+  { name: 'Sellos y avisos', items: ['⚠', '✔', '✖', '✧', '⌛', '⏳', '⏱', '🔔', '📌', '📎', '🔒', '🔓', '⚑', '✉', '❗', '❕'] }
+];
+
+// Alfabetos decorativos de Unicode. No son una fuente distinta: son letras de
+// verdad, así que se ven igual en móvil y en ordenador y se pueden copiar.
+const FANCY_EXCEPTIONS = {
+  italic: { h: 'ℎ' },
+  script: {
+    B: 'ℬ', E: 'ℰ', F: 'ℱ', H: 'ℋ', I: 'ℐ', L: 'ℒ',
+    M: 'ℳ', R: 'ℛ', e: 'ℯ', g: 'ℊ', o: 'ℴ'
+  },
+  fraktur: { C: 'ℭ', H: 'ℌ', I: 'ℑ', R: 'ℜ', Z: 'ℨ' },
+  outline: { C: 'ℂ', H: 'ℍ', N: 'ℕ', P: 'ℙ', Q: 'ℚ', R: 'ℝ', Z: 'ℤ' }
+};
+
+const FANCY_FONTS = [
+  { id: 'bold', label: 'Negrita sólida', upper: 0x1D400, lower: 0x1D41A, digits: 0x1D7CE },
+  { id: 'italic', label: 'Cursiva fina', upper: 0x1D434, lower: 0x1D44E },
+  { id: 'boldItalic', label: 'Cursiva gruesa', upper: 0x1D468, lower: 0x1D482 },
+  { id: 'script', label: 'Caligrafía', upper: 0x1D49C, lower: 0x1D4B6 },
+  { id: 'boldScript', label: 'Caligrafía gruesa', upper: 0x1D4D0, lower: 0x1D4EA },
+  { id: 'fraktur', label: 'Gótica', upper: 0x1D504, lower: 0x1D51E },
+  { id: 'boldFraktur', label: 'Gótica gruesa', upper: 0x1D56C, lower: 0x1D586 },
+  { id: 'outline', label: 'Hueca', upper: 0x1D538, lower: 0x1D552, digits: 0x1D7D8 },
+  { id: 'mono', label: 'Máquina de escribir', upper: 0x1D670, lower: 0x1D68A, digits: 0x1D7F6 },
+  { id: 'wide', label: 'Ancha', upper: 0xFF21, lower: 0xFF41, digits: 0xFF10 },
+  { id: 'smallCaps', label: 'Versalitas', table: 'ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ' }
+];
+
+function fancyText(font, text) {
+  const chars = [...String(text ?? '')];
+  return chars.map(char => {
+    const exception = FANCY_EXCEPTIONS[font.id]?.[char];
+    if (exception) return exception;
+    const code = char.codePointAt(0);
+    if (font.table) {
+      const lower = char.toLowerCase();
+      const index = lower.charCodeAt(0) - 97;
+      return index >= 0 && index < 26 ? [...font.table][index] : char;
+    }
+    if (code >= 65 && code <= 90 && font.upper) return String.fromCodePoint(font.upper + code - 65);
+    if (code >= 97 && code <= 122 && font.lower) return String.fromCodePoint(font.lower + code - 97);
+    if (code >= 48 && code <= 57 && font.digits) return String.fromCodePoint(font.digits + code - 48);
+    return char;
+  }).join('');
+}
+
+// Barra de formato que se pinta encima de cada caja de texto.
+function formatToolbar(targetId) {
+  const groups = FORMAT_TOOLS.map(group => `
+    <div class="format-group" role="group" aria-label="${escapeHtml(group.group)}">
+      <span class="format-group-name">${escapeHtml(group.group)}</span>
+      <div class="format-buttons">
+        ${group.tools.map(tool => `
+          <button type="button" class="format-button" title="${escapeHtml(tool.title)}"
+                  data-format-target="${escapeHtml(targetId)}"
+                  ${tool.prefix ? `data-prefix="${escapeHtml(tool.prefix)}"` : ''}
+                  ${tool.wrap ? `data-wrap="${escapeHtml(tool.wrap)}"` : ''}
+                  ${tool.insert ? `data-insert="${escapeHtml(tool.insert)}"` : ''}>${escapeHtml(tool.label)}</button>`).join('')}
+      </div>
+    </div>`).join('');
+
+  return `<div class="format-toolbar" data-toolbar-for="${escapeHtml(targetId)}">
+    ${groups}
+    <div class="format-group">
+      <span class="format-group-name">Adornos</span>
+      <div class="format-buttons">
+        <button type="button" class="format-button wide" data-symbols-for="${escapeHtml(targetId)}">Símbolos y letras…</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Aplica el formato sobre la caja de texto, respetando lo que haya
+// seleccionado. Si no hay selección, deja el cursor listo para escribir dentro.
+function applyFormat(field, { prefix, wrap, insert }) {
+  if (!field) return;
+  const value = field.value;
+  const start = field.selectionStart ?? value.length;
+  const end = field.selectionEnd ?? start;
+  let next = value;
+  let cursor = end;
+
+  if (prefix) {
+    const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+    const line = value.slice(lineStart);
+    const already = line.startsWith(prefix);
+    next = already
+      ? value.slice(0, lineStart) + line.slice(prefix.length)
+      : value.slice(0, lineStart) + prefix + value.slice(lineStart);
+    cursor = already ? Math.max(lineStart, start - prefix.length) : start + prefix.length;
+  } else if (wrap) {
+    const closing = wrap === '```\n' ? '\n```' : wrap;
+    const selected = value.slice(start, end);
+    next = `${value.slice(0, start)}${wrap}${selected || 'texto'}${closing}${value.slice(end)}`;
+    cursor = start + wrap.length + (selected || 'texto').length;
+  } else if (insert) {
+    next = value.slice(0, start) + insert + value.slice(end);
+    cursor = start + insert.length;
+  }
+
+  field.value = next;
+  field.focus();
+  field.setSelectionRange(cursor, cursor);
+  field.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+// Panel de símbolos y alfabetos. Se abre desde la barra y escribe en la misma
+// caja desde la que se abrió.
+function openSymbolPicker(targetId) {
+  const field = document.getElementById(targetId);
+  if (!field) return;
+
+  const dialog = $('#symbol-dialog');
+  const grid = $('#symbol-grid');
+  const sample = $('#symbol-sample');
+  const fancy = $('#symbol-fancy');
+  if (!dialog || !grid) return;
+
+  grid.innerHTML = SYMBOL_SETS.map(set => `
+    <div class="symbol-set">
+      <h4>${escapeHtml(set.name)}</h4>
+      <div class="symbol-row">
+        ${set.items.map(symbol => `<button type="button" class="symbol" data-symbol="${escapeHtml(symbol)}">${escapeHtml(symbol)}</button>`).join('')}
+      </div>
+    </div>`).join('');
+
+  const paintFancy = () => {
+    const text = sample.value.trim() || 'Bienvenido';
+    fancy.innerHTML = FANCY_FONTS.map(font => `
+      <li>
+        <span class="fancy-label">${escapeHtml(font.label)}</span>
+        <code class="fancy-sample">${escapeHtml(fancyText(font, text))}</code>
+        <button type="button" class="button ghost sm" data-fancy="${escapeHtml(font.id)}">Insertar</button>
+      </li>`).join('');
+  };
+  paintFancy();
+
+  const onInput = () => paintFancy();
+  const onClick = event => {
+    const symbol = event.target.closest('[data-symbol]');
+    if (symbol) {
+      applyFormat(field, { insert: symbol.dataset.symbol });
+      return;
+    }
+    const fancyButton = event.target.closest('[data-fancy]');
+    if (fancyButton) {
+      const font = FANCY_FONTS.find(item => item.id === fancyButton.dataset.fancy);
+      if (font) applyFormat(field, { insert: fancyText(font, sample.value.trim() || 'Bienvenido') });
+    }
+  };
+
+  sample.addEventListener('input', onInput);
+  dialog.addEventListener('click', onClick);
+  dialog.addEventListener('close', () => {
+    sample.removeEventListener('input', onInput);
+    dialog.removeEventListener('click', onClick);
+  }, { once: true });
+
+  dialog.showModal();
+}
+
+// Enlaza la barra de formato de una pantalla entera.
+function wireFormatting(root) {
+  root.querySelectorAll('[data-format-target]').forEach(button => {
+    button.addEventListener('click', () => {
+      applyFormat(document.getElementById(button.dataset.formatTarget), {
+        prefix: button.dataset.prefix,
+        wrap: button.dataset.wrap,
+        insert: button.dataset.insert
+      });
+    });
+  });
+  root.querySelectorAll('[data-symbols-for]').forEach(button => {
+    button.addEventListener('click', () => openSymbolPicker(button.dataset.symbolsFor));
+  });
+}
+
+// Marca visualmente qué formato está elegido.
+function wireLayoutChoice(root) {
+  root.querySelectorAll('.layout-choice').forEach(choice => {
+    choice.addEventListener('change', () => {
+      choice.querySelectorAll('.layout-option').forEach(option => {
+        option.classList.toggle('selected', Boolean(option.querySelector('input')?.checked));
+      });
+    });
+  });
+}
+
+// La guía: qué símbolo hace qué, con el resultado al lado.
+const FORMAT_GUIDE = [
+  { group: 'Hacer la letra más grande', rows: [
+    ['# Texto', 'El tamaño más grande. Tiene que ir al principio de la línea, con un espacio después de la almohadilla.'],
+    ['## Texto', 'Un escalón por debajo.'],
+    ['### Texto', 'El más discreto de los tres, pero se sigue notando frente al texto normal.'],
+    ['-# Texto', 'Al revés: hace la letra diminuta y gris. Es lo que se usa para notas y pies.']
+  ] },
+  { group: 'Estilo de la letra', rows: [
+    ['**Texto**', 'Negrita.'],
+    ['*Texto*', 'Cursiva.'],
+    ['***Texto***', 'Negrita y cursiva a la vez.'],
+    ['__Texto__', 'Subrayado.'],
+    ['~~Texto~~', 'Tachado.'],
+    ['||Texto||', 'Spoiler: sale tapado hasta que alguien lo pulsa.']
+  ] },
+  { group: 'Bloques y listas', rows: [
+    ['> Texto', 'Cita: una barra vertical a la izquierda.'],
+    ['>>> Texto', 'Cita larga: todo lo que venga después queda dentro.'],
+    ['- Texto', 'Punto de lista. Con dos espacios delante se anida.'],
+    ['1. Texto', 'Lista numerada.'],
+    ['`Texto`', 'Código en línea, con fondo oscuro.'],
+    ['``` … ```', 'Bloque de código de varias líneas: tres acentos graves en su propia línea, arriba y abajo del texto.']
+  ] },
+  { group: 'Enlaces y menciones', rows: [
+    ['[Visítanos](https://…)', 'Enlace con el texto que tú quieras. Solo funciona dentro de un embed, no en un mensaje normal.'],
+    ['{user}', 'Menciona a la persona del evento; Discord la pinta en azul.'],
+    ['<@&ID>', 'Menciona un rol concreto por su identificador.'],
+    ['<#ID>', 'Enlaza a un canal.'],
+    ['<t:1700000000:R>', 'Fecha que se actualiza sola («hace 3 minutos»).']
+  ] },
+  { group: 'Trucos de maquetación', rows: [
+    ['Línea en blanco', 'Separa párrafos. Dentro de un embed se respetan todas las que dejes.'],
+    ['⠀ (espacio Braille)', 'Un espacio que Discord no recorta, útil para centrar a ojo.'],
+    ['─────────', 'Una línea de guiones largos hace de separador dentro del texto.'],
+    ['Emojis del servidor', 'Escribe <:nombre:ID> y sale el emoji personalizado, también en los embeds.']
+  ] }
+];
+
+function formatGuideCard() {
+  const blocks = FORMAT_GUIDE.map(section => `
+    <div class="guide-block">
+      <h4>${escapeHtml(section.group)}</h4>
+      <table class="guide-table">
+        <tbody>
+          ${section.rows.map(([symbol, meaning]) => `
+            <tr>
+              <td><code>${escapeHtml(symbol)}</code></td>
+              <td>${escapeHtml(meaning)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`).join('');
+
+  const sampleText = '# ⛧°. ⋆༺ Título grande ༻⋆. °⛧\n### Un subtítulo\n\n**Negrita**, *cursiva*, __subrayado__ y ~~tachado~~.\n> Una cita.\n-# Y una nota pequeña al final.';
+
+  return card({
+    eyebrow: 'Cómo escribir',
+    title: 'Guía de formato',
+    description: 'Discord no tiene botones de tamaño: el tamaño se pide con símbolos al principio de la línea. Aquí están todos, con lo que hace cada uno.',
+    body: `
+      <details class="guide" open>
+        <summary>Ver la tabla completa de símbolos</summary>
+        <div class="guide-body">
+          ${blocks}
+          <div class="guide-block">
+            <h4>Cómo se ve todo junto</h4>
+            <div class="guide-demo">
+              <pre class="guide-source">${escapeHtml(sampleText)}</pre>
+              <div class="guide-result">${renderMarkdown(sampleText)}</div>
+            </div>
+            <p class="hint">Lo de la izquierda es lo que escribes; lo de la derecha, lo que ve la gente en Discord.</p>
+          </div>
+          <div class="guide-block">
+            <h4>Adornos y letras decorativas</h4>
+            <p class="hint">Las letras raras de los diseños del servidor (𝐴 𝑛𝑒𝑤 𝑤𝑎𝑛𝑑𝑒𝑟𝑒𝑟, 𝑾𝒆𝒍𝒄𝒐𝒎𝒆…) no son una fuente: son caracteres de Unicode. Pulsa «Símbolos y letras…» encima de cualquier caja de texto para elegirlos e insertarlos donde tengas el cursor.</p>
+          </div>
+        </div>
+      </details>`
+  });
+}
+
+/* ---------------------------------------------------------------- */
 /* Bienvenidas                                                       */
 /* ---------------------------------------------------------------- */
+
+// Selector de formato. Las dos versiones están disponibles en todos los
+// servidores y en todos los mensajes: la que viene marcada al abrir es la que
+// ese mensaje trae de fábrica aquí, así que no cambia nada hasta que se toca.
+function layoutChooser(idPrefix, dataAttr, kind, saved, factoryLayout) {
+  const current = saved === 'classic' || saved === 'components_v2' ? saved : 'auto';
+  const name = `${idPrefix}-${kind}-layout`;
+  const option = (value, title, description) => `
+    <label class="layout-option${current === value ? ' selected' : ''}">
+      <input type="radio" name="${name}" value="${value}" ${dataAttr}="${kind}" ${current === value ? 'checked' : ''}>
+      <span class="layout-figure layout-${value === 'auto' ? (factoryLayout === 'components_v2' ? 'components_v2' : 'classic') : value}" aria-hidden="true"></span>
+      <span class="layout-text">
+        <strong>${escapeHtml(title)}</strong>
+        <small>${escapeHtml(description)}</small>
+      </span>
+    </label>`;
+
+  const factoryName = factoryLayout === 'components_v2' ? 'contenedor V2' : 'embed clásico';
+
+  return `
+    <div class="field wide">
+      <span class="field-label">Formato del mensaje</span>
+      <div class="layout-choice" role="radiogroup" aria-label="Formato del mensaje">
+        ${option('auto', 'El de siempre', `Lo que trae de fábrica aquí: ${factoryName}.`)}
+        ${option('classic', 'Embed clásico', 'Barra de color al lado, miniatura, campos y pie con la hora.')}
+        ${option('components_v2', 'Contenedor V2', 'Bloque con borde de color y títulos grandes. El estilo de Embers Void.')}
+      </div>
+      <span class="hint">Puedes cambiar de formato sin perder el texto: el mismo contenido se pinta de las dos maneras. El contenedor V2 no tiene miniatura y muestra el pie como texto pequeño.</span>
+    </div>`;
+}
 
 function embedEditorCard(kind) {
   const data = state.data;
@@ -652,13 +1109,16 @@ function embedEditorCard(kind) {
     body: `
       <div class="editor-layout">
         <form id="form-embed-${kind}" class="form">
+          ${layoutChooser('embed', 'data-embed', kind, saved.layout, defaults.layout)}
           <div class="field wide">
             <label for="embed-${kind}-title">Título</label>
+            ${formatToolbar(`embed-${kind}-title`)}
             <input id="embed-${kind}-title" type="text" maxlength="240" data-embed="${kind}"
                    value="${escapeHtml(saved.title || '')}" placeholder="${escapeHtml(fallback.title || '')}">
           </div>
           <div class="field wide">
             <label for="embed-${kind}-message">Mensaje</label>
+            ${formatToolbar(`embed-${kind}-message`)}
             <textarea id="embed-${kind}-message" maxlength="3000" data-embed="${kind}"
                       placeholder="${escapeHtml(fallback.message || '')}">${escapeHtml(saved.message || '')}</textarea>
           </div>
@@ -670,7 +1130,7 @@ function embedEditorCard(kind) {
           </div>
           <div class="form-row">
             <div class="field">
-              <span class="field-label">${defaults.layout === 'components_v2' ? 'Color del borde' : 'Color del embed'}</span>
+              <span class="field-label">Color</span>
               <div class="color-field">
                 <input id="embed-${kind}-color" type="color" data-embed="${kind}"
                        value="${escapeHtml(saved.color || fallback.color || '#5865F2')}" ${hasColor ? '' : 'disabled'}>
@@ -696,11 +1156,17 @@ function embedEditorCard(kind) {
   });
 }
 
+function chosenLayout(name) {
+  const picked = document.querySelector(`input[name="${name}"]:checked`);
+  return picked && picked.value !== 'auto' ? picked.value : null;
+}
+
 function embedValues(kind) {
   const read = suffix => $(`#embed-${kind}-${suffix}`)?.value ?? '';
   const useColor = $(`#embed-${kind}-usecolor`)?.checked;
   const thumbnail = $(`#embed-${kind}-thumbnail`);
   return {
+    layout: chosenLayout(`embed-${kind}-layout`),
     title: read('title').trim() || null,
     message: read('message').trim() || null,
     footer: read('footer').trim() || null,
@@ -717,7 +1183,7 @@ function refreshEmbedPreview(kind) {
   const defaults = data.embedDefaults || {};
   const fallback = defaults[kind] || {};
   const values = embedValues(kind);
-  const componentsV2 = defaults.layout === 'components_v2';
+  const componentsV2 = (values.layout || defaults.layout) === 'components_v2';
 
   const resolved = {
     title: values.title ?? fallback.title,
@@ -770,13 +1236,20 @@ function renderBienvenidas() {
               <label for="channel-goodbye">Canal de despedida</label>
               <select id="channel-goodbye">${selectOptions(data.channels, config.general?.goodbyeChannel)}</select>
             </div>
+            <div class="field">
+              <label for="channel-boost">Canal de agradecimiento por boosts</label>
+              <select id="channel-boost">${selectOptions(data.channels, config.general?.boostChannel, 'Usar el de bienvenida')}</select>
+              <span class="hint">Donde Vesper da las gracias cuando alguien mejora el servidor.</span>
+            </div>
           </div>
           ${formActions('Guardar canales')}
         </form>`
     })}
 
+    ${formatGuideCard()}
+
     ${card({
-      eyebrow: 'Cómo escribir',
+      eyebrow: 'Variables',
       title: 'Variables disponibles',
       description: `${defaults.note || ''} Pulsa una variable para copiarla.`,
       body: `<ul class="var-list">${variables}</ul>`
@@ -784,6 +1257,249 @@ function renderBienvenidas() {
 
     ${embedEditorCard('welcome')}
     ${embedEditorCard('goodbye')}`;
+}
+
+/* ---------------------------------------------------------------- */
+/* Todos los mensajes del bot                                        */
+/* ---------------------------------------------------------------- */
+
+// Valores con los que sale un mensaje si no se toca nada. Para bienvenida y
+// despedida los calcula el backend a partir del diseño real del servidor; para
+// el resto vienen del catálogo.
+function messageFactoryDefaults(item) {
+  const embedDefaults = state.data.embedDefaults || {};
+  if (item.id === 'welcome' || item.id === 'goodbye') return embedDefaults[item.id] || {};
+  return item.factory || {};
+}
+
+function messageEditorMarkup(item) {
+  const saved = state.data.config.embeds?.[item.id] || {};
+  const factory = messageFactoryDefaults(item);
+  const hasColor = Boolean(saved.color);
+  const customised = ['title', 'message', 'footer', 'image', 'color', 'layout'].some(field => saved[field]);
+
+  const layoutField = item.plainText
+    ? ''
+    : layoutChooser('msg', 'data-msg', item.id, saved.layout, item.defaultLayout);
+
+  const titleField = item.plainText ? '' : `
+    <div class="field wide">
+      <label for="msg-${item.id}-title">Título</label>
+      ${formatToolbar(`msg-${item.id}-title`)}
+      <input id="msg-${item.id}-title" type="text" maxlength="240" data-msg="${item.id}"
+             value="${escapeHtml(saved.title || '')}" placeholder="${escapeHtml(factory.title || 'Sin título')}">
+    </div>`;
+
+  const footerField = item.supports.footer ? `
+    <div class="field">
+      <label for="msg-${item.id}-footer">Pie de página</label>
+      <input id="msg-${item.id}-footer" type="text" maxlength="200" data-msg="${item.id}" value="${escapeHtml(saved.footer || '')}">
+    </div>` : '';
+
+  const imageField = item.supports.image ? `
+    <div class="field">
+      <label for="msg-${item.id}-image">Imagen (URL HTTPS)</label>
+      <input id="msg-${item.id}-image" type="url" maxlength="500" data-msg="${item.id}"
+             value="${escapeHtml(saved.image || '')}" placeholder="${escapeHtml(factory.image || 'https://…')}">
+    </div>` : '';
+
+  const colorField = item.plainText ? '' : `
+    <div class="field">
+      <span class="field-label">Color</span>
+      <div class="color-field">
+        <input id="msg-${item.id}-color" type="color" data-msg="${item.id}"
+               value="${escapeHtml(saved.color || factory.color || '#5865F2')}" ${hasColor ? '' : 'disabled'}>
+        <label class="inline-check">
+          <input id="msg-${item.id}-usecolor" type="checkbox" data-msg="${item.id}" ${hasColor ? 'checked' : ''}>
+          <span>Usar color propio</span>
+        </label>
+      </div>
+    </div>`;
+
+  const thumbField = item.supports.thumbnail ? `
+    <label class="inline-check">
+      <input id="msg-${item.id}-thumbnail" type="checkbox" data-msg="${item.id}" ${saved.thumbnail === false ? '' : 'checked'}>
+      <span>Mostrar la imagen de perfil</span>
+    </label>` : '';
+
+  const variables = (item.variables || []).map(([token, description]) =>
+    `<li><button type="button" data-variable="${escapeHtml(token)}"><code>${escapeHtml(token)}</code></button> · ${escapeHtml(description)}</li>`).join('');
+
+  const bodyHint = item.plainText
+    ? 'Este mensaje es texto normal, no un embed.'
+    : 'Si lo dejas vacío se conservan los campos originales del aviso. Si escribes algo, sustituye el cuerpo entero.';
+
+  return `
+    <details class="message-item"${customised ? ' open' : ''} data-message="${item.id}">
+      <summary>
+        <span class="message-summary">
+          <strong>${escapeHtml(item.label)}</strong>
+          <small>${escapeHtml(item.description)}</small>
+        </span>
+        <span class="tag ${customised ? 'accent' : ''}">${customised ? 'Personalizado' : 'Original'}</span>
+      </summary>
+      <div class="editor-layout">
+        <form id="form-msg-${item.id}" class="form">
+          ${layoutField}
+          ${titleField}
+          <div class="field wide">
+            <label for="msg-${item.id}-message">${item.plainText ? 'Mensaje' : 'Cuerpo del mensaje'}</label>
+            ${formatToolbar(`msg-${item.id}-message`)}
+            <textarea id="msg-${item.id}-message" maxlength="3000" data-msg="${item.id}"
+                      placeholder="${escapeHtml(factory.message || '')}">${escapeHtml(saved.message || '')}</textarea>
+            <span class="hint">${escapeHtml(bodyHint)}</span>
+          </div>
+          <div class="form-row">
+            ${colorField}
+            ${footerField}
+            ${imageField}
+            ${thumbField ? `<div class="field">${thumbField}</div>` : ''}
+          </div>
+          <ul class="var-list">${variables}</ul>
+          <div class="form-actions">
+            <button class="button" type="submit">Guardar</button>
+            <button class="button ghost" type="button" data-msg-reset="${item.id}" ${customised ? '' : 'disabled'}>Restablecer</button>
+            <span class="dirty-flag" hidden>Cambios sin guardar</span>
+          </div>
+        </form>
+        <div class="editor-preview">
+          <p class="eyebrow">Vista previa</p>
+          <div class="preview-shell"><div class="discord-message" id="msg-preview-${item.id}"></div></div>
+        </div>
+      </div>
+    </details>`;
+}
+
+function messageValues(id) {
+  const read = suffix => document.querySelector(`#msg-${id}-${suffix}`)?.value ?? '';
+  const useColor = document.querySelector(`#msg-${id}-usecolor`)?.checked;
+  const thumbnail = document.querySelector(`#msg-${id}-thumbnail`);
+  const colorInput = document.querySelector(`#msg-${id}-color`);
+  const values = {
+    title: read('title').trim() || null,
+    message: read('message').trim() || null,
+    footer: read('footer').trim() || null,
+    image: read('image').trim() || null
+  };
+  if (document.querySelector(`input[name="msg-${id}-layout"]`)) values.layout = chosenLayout(`msg-${id}-layout`);
+  if (colorInput) values.color = useColor ? read('color') : null;
+  if (thumbnail) values.thumbnail = thumbnail.checked;
+  return values;
+}
+
+function refreshMessagePreview(item) {
+  const container = document.querySelector(`#msg-preview-${item.id}`);
+  if (!container) return;
+  const factory = messageFactoryDefaults(item);
+  const values = messageValues(item.id);
+  const author = identityValues();
+
+  if (item.plainText) {
+    const text = sampleValues(values.message ?? factory.message ?? '');
+    container.innerHTML = `${messageHeaderMarkup(author)}<div class="embed-desc">${renderMarkdown(text)}</div></div>`;
+    return;
+  }
+
+  const resolved = {
+    title: values.title ?? factory.title,
+    message: values.message ?? factory.message ?? '(campos originales del aviso)',
+    footer: values.footer,
+    image: values.image ?? factory.image ?? null,
+    thumbnail: values.thumbnail !== false && item.supports.thumbnail
+  };
+  const color = values.color || factory.color || '#5865F2';
+
+  container.innerHTML = `${messageHeaderMarkup(author)}${embedPreviewMarkup(resolved, {
+    componentsV2: (values.layout || item.defaultLayout) === 'components_v2',
+    memberAvatar: state.session.user.discord?.avatar || null
+  })}</div>`;
+
+  const embed = container.querySelector('.embed-preview');
+  if (embed) embed.style.setProperty('--embed-accent', color);
+  wireImageFallbacks(container);
+}
+
+function renderMensajes() {
+  const catalog = state.data.messageCatalog || [];
+  if (!catalog.length) {
+    return card({ eyebrow: 'Mensajes', title: 'No hay catálogo disponible', description: 'Actualiza la página para volver a cargarlo.', body: '' });
+  }
+
+  const total = catalog.reduce((sum, group) => sum + group.items.length, 0);
+  const customised = catalog.reduce((sum, group) =>
+    sum + group.items.filter(item => ['title', 'message', 'footer', 'image', 'color', 'layout']
+      .some(field => state.data.config.embeds?.[item.id]?.[field])).length, 0);
+
+  const groups = catalog.map(group => card({
+    eyebrow: group.group,
+    title: `${group.items.length} ${group.items.length === 1 ? 'mensaje' : 'mensajes'}`,
+    description: 'Despliega cualquiera para editarlo. La vista previa se actualiza mientras escribes.',
+    body: `<div class="message-list">${group.items.map(messageEditorMarkup).join('')}</div>`
+  })).join('');
+
+  return `
+    <div class="callout info">
+      <strong>${customised} de ${total} mensajes personalizados.</strong>
+      <span>Los que no toques salen exactamente como siempre. Vaciar un campo lo devuelve a su valor original, y cada mensaje puede publicarse como embed clásico o como contenedor V2.</span>
+    </div>
+    ${formatGuideCard()}
+    ${groups}`;
+}
+
+function bindMensajes(root) {
+  const items = (state.data.messageCatalog || []).flatMap(group => group.items);
+  wireFormatting(root);
+  wireLayoutChoice(root);
+
+  for (const item of items) {
+    const form = root.querySelector(`#form-msg-${item.id}`);
+    if (!form) continue;
+
+    const update = () => refreshMessagePreview(item);
+    form.addEventListener('input', event => {
+      if (event.target.id === `msg-${item.id}-usecolor`) {
+        const picker = document.querySelector(`#msg-${item.id}-color`);
+        if (picker) picker.disabled = !event.target.checked;
+      }
+      update();
+    });
+    form.addEventListener('change', update);
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      saveConfig({ embeds: { [item.id]: messageValues(item.id) } }, `«${item.label}» guardado.`, event.submitter);
+    });
+
+    root.querySelector(`[data-msg-reset="${item.id}"]`)?.addEventListener('click', async event => {
+      if (!await confirmDialog({
+        title: `Restablecer «${item.label}»`,
+        message: 'Volverá al formato original y se perderá tu texto.',
+        confirmLabel: 'Restablecer',
+        danger: true
+      })) return;
+      saveConfig(
+        { embeds: { [item.id]: { title: null, message: null, footer: null, image: null, color: null, layout: null, thumbnail: true } } },
+        `«${item.label}» restablecido.`,
+        event.currentTarget
+      );
+    });
+
+    // La vista previa solo se pinta al desplegar, para no montar 30 a la vez.
+    const details = root.querySelector(`[data-message="${item.id}"]`);
+    details?.addEventListener('toggle', () => { if (details.open) update(); });
+    if (details?.open) update();
+  }
+
+  root.querySelectorAll('[data-variable]').forEach(button => {
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.variable);
+        toast(`${button.dataset.variable} copiado.`, 'ok');
+      } catch {
+        toast(`Copia manualmente: ${button.dataset.variable}`, 'bad');
+      }
+    });
+  });
 }
 
 /* ---------------------------------------------------------------- */
@@ -861,6 +1577,115 @@ function renderAvisos() {
     : '';
 
   return `${notice}${cards}`;
+}
+
+/* ---------------------------------------------------------------- */
+/* Ofertas y juegos gratis                                           */
+/* ---------------------------------------------------------------- */
+
+const GIVEAWAY_PLATFORMS = [
+  ['steam', 'Steam'], ['epic-games-store', 'Epic Games'], ['gog', 'GOG'],
+  ['ubisoft', 'Ubisoft'], ['origin', 'EA'], ['itchio', 'itch.io'],
+  ['battlenet', 'Battle.net'], ['drm-free', 'Sin DRM'],
+  ['xbox-one', 'Xbox'], ['ps4', 'PlayStation'], ['switch', 'Switch'],
+  ['android', 'Android'], ['ios', 'iOS'], ['vr', 'VR']
+];
+
+function renderOfertas() {
+  const data = state.data;
+  const deals = data.config.deals || {};
+  const enabled = data.config.features?.deals;
+  const chosen = new Set(deals.giveawayPlatforms || ['steam', 'epic-games-store', 'gog']);
+
+  return `
+    ${!enabled ? '<div class="callout warn"><strong>El módulo de ofertas está apagado.</strong><span>Actívalo en «Módulos y permisos» para que Vesper empiece a publicar.</span></div>' : ''}
+
+    ${card({
+      eyebrow: 'Cómo funciona',
+      title: 'Tres fuentes, ninguna de pago',
+      description: 'Vesper consulta cada media hora y publica solo lo que no haya publicado antes en este servidor.',
+      body: `
+        <div class="grid-3">
+          <div class="stat"><small>Epic Games</small><strong>Juegos gratis</strong><span class="stat-note">El regalo semanal y el de la semana siguiente. Endpoint público de su tienda.</span></div>
+          <div class="stat"><small>Sorteos</small><strong>Llaves y DLC</strong><span class="stat-note">Steam, GOG, Ubisoft, itch.io y más, vía GamerPower. Sin clave.</span></div>
+          <div class="stat"><small>Steam</small><strong>Rebajas</strong><span class="stat-note">Ofertas de la portada por encima del descuento que elijas.</span></div>
+        </div>`
+    })}
+
+    ${card({
+      eyebrow: 'Dónde y a quién',
+      title: 'Canal de publicación',
+      description: 'Sin canal elegido, el módulo no publica nada aunque esté activo.',
+      body: `
+        <form id="form-deals" class="form">
+          <div class="form-row">
+            <div class="field">
+              <label for="deals-channel">Canal de ofertas</label>
+              <select id="deals-channel">${selectOptions(data.channels, deals.channel)}</select>
+            </div>
+            <div class="field">
+              <label for="deals-ping">Rol al que avisar</label>
+              <select id="deals-ping">${selectOptions(data.roles, deals.pingRole, 'Sin mención')}</select>
+            </div>
+            <div class="field">
+              <label for="deals-max">Máximo de avisos por ronda</label>
+              <input id="deals-max" type="number" min="1" max="10" value="${Number(deals.maxPerCycle ?? 5)}">
+              <span class="hint">Evita una avalancha si aparecen muchas ofertas de golpe.</span>
+            </div>
+          </div>
+
+          <div class="switch-list">
+            <label class="switch">
+              <input id="deals-epic" type="checkbox" ${deals.epicFree !== false ? 'checked' : ''}>
+              <span class="switch-copy"><strong>Juegos gratis de Epic Games</strong><small>El regalo semanal y el anuncio del siguiente.</small></span>
+            </label>
+            <label class="switch">
+              <input id="deals-giveaways" type="checkbox" ${deals.giveaways !== false ? 'checked' : ''}>
+              <span class="switch-copy"><strong>Sorteos y llaves gratis</strong><small>Juegos, DLC y llaves de varias tiendas.</small></span>
+            </label>
+            <label class="switch">
+              <input id="deals-steam" type="checkbox" ${deals.steamSpecials === true ? 'checked' : ''}>
+              <span class="switch-copy"><strong>Rebajas de Steam</strong><small>Puede ser ruidoso: ajusta el descuento mínimo.</small></span>
+            </label>
+          </div>
+
+          <div class="form-row">
+            <div class="field">
+              <label for="deals-discount">Descuento mínimo de Steam (%)</label>
+              <input id="deals-discount" type="number" min="10" max="95" value="${Number(deals.minDiscount ?? 50)}">
+            </div>
+            <div class="field wide">
+              <label for="deals-platforms">Tiendas de los sorteos</label>
+              <select id="deals-platforms" multiple>
+                ${GIVEAWAY_PLATFORMS.map(([value, label]) => `<option value="${value}"${chosen.has(value) ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+              </select>
+              <span class="hint">Mantén Ctrl o Cmd para elegir varias.</span>
+            </div>
+          </div>
+          ${formActions('Guardar ofertas')}
+        </form>`
+    })}
+
+    <div class="callout info">
+      <strong>Los textos de estos avisos también se editan.</strong>
+      <span>Están en «Todos los mensajes», grupo «Ofertas y juegos gratis».</span>
+    </div>`;
+}
+
+function bindOfertas(root) {
+  root.querySelector('#form-deals')?.addEventListener('submit', event => {
+    event.preventDefault();
+    saveConfig({ deals: {
+      channel: $('#deals-channel').value || null,
+      pingRole: $('#deals-ping').value || null,
+      epicFree: $('#deals-epic').checked,
+      giveaways: $('#deals-giveaways').checked,
+      steamSpecials: $('#deals-steam').checked,
+      minDiscount: Number($('#deals-discount').value),
+      maxPerCycle: Number($('#deals-max').value),
+      giveawayPlatforms: selectedValues($('#deals-platforms'))
+    } }, 'Ofertas actualizadas.', event.submitter);
+  });
 }
 
 /* ---------------------------------------------------------------- */
@@ -1309,6 +2134,7 @@ function renderResumen() {
     ['Canales', [
       ['Bienvenida', nameOf(channels, config.general?.welcomeChannel)],
       ['Despedida', nameOf(channels, config.general?.goodbyeChannel)],
+      ['Agradecimiento por boosts', nameOf(channels, config.general?.boostChannel, 'El de bienvenida')],
       ['Registro general', nameOf(channels, config.general?.logChannel)],
       ['Registro de bots', nameOf(channels, config.general?.botLogChannel)],
       ['Rol automático de bots', nameOf(roles, config.general?.botRole, 'Sin rol')]
@@ -1335,6 +2161,14 @@ function renderResumen() {
       ['Shorts', nameOf(channels, config.youtube?.shortChannel)],
       ['Canales', (config.youtube?.users || []).join(', ') || 'Ninguno'],
       ['Rol de aviso', nameOf(roles, config.youtube?.pingRole, 'Sin mención')]
+    ]],
+    ['Ofertas de juegos', [
+      ['Canal', nameOf(channels, config.deals?.channel)],
+      ['Rol de aviso', nameOf(roles, config.deals?.pingRole, 'Sin mención')],
+      ['Epic gratis', config.deals?.epicFree === false ? 'No' : 'Sí'],
+      ['Sorteos', config.deals?.giveaways === false ? 'No' : 'Sí'],
+      ['Rebajas de Steam', config.deals?.steamSpecials === true ? `Sí (desde ${config.deals?.minDiscount ?? 50}%)` : 'No'],
+      ['Tiendas de sorteos', (config.deals?.giveawayPlatforms || []).join(', ') || 'Todas']
     ]],
     ['Permisos', [
       ['Gestión de redes', namesOf(roles, config.permissions?.socialManagerRoles)],
@@ -1517,11 +2351,15 @@ function bindIdentidad(root) {
 }
 
 function bindBienvenidas(root) {
+  wireFormatting(root);
+  wireLayoutChoice(root);
+
   root.querySelector('#form-welcome-channels')?.addEventListener('submit', event => {
     event.preventDefault();
     saveConfig({ general: {
       welcomeChannel: $('#channel-welcome').value || null,
-      goodbyeChannel: $('#channel-goodbye').value || null
+      goodbyeChannel: $('#channel-goodbye').value || null,
+      boostChannel: $('#channel-boost').value || null
     } }, 'Canales actualizados.', event.submitter);
   });
 
@@ -1556,10 +2394,16 @@ function bindBienvenidas(root) {
       saveConfig({ embeds: { [kind]: embedValues(kind) } }, `Embed de ${EMBED_KINDS[kind].toLowerCase()} guardado.`, event.submitter);
     });
 
-    root.querySelector(`[data-embed-reset="${kind}"]`)?.addEventListener('click', event => {
-      if (!confirm(`¿Restablecer el embed de ${EMBED_KINDS[kind].toLowerCase()} al diseño original del servidor?`)) return;
+    root.querySelector(`[data-embed-reset="${kind}"]`)?.addEventListener('click', async event => {
+      const label = EMBED_KINDS[kind].toLowerCase();
+      if (!await confirmDialog({
+        title: `Restablecer ${label}`,
+        message: `El embed de ${label} volverá al diseño original del servidor y se perderá lo que hayas escrito.`,
+        confirmLabel: 'Restablecer',
+        danger: true
+      })) return;
       saveConfig(
-        { embeds: { [kind]: { title: null, message: null, footer: null, image: null, color: null, thumbnail: true } } },
+        { embeds: { [kind]: { title: null, message: null, footer: null, image: null, color: null, layout: null, thumbnail: true } } },
         `Embed de ${EMBED_KINDS[kind].toLowerCase()} restablecido.`,
         event.currentTarget
       );
@@ -1599,7 +2443,12 @@ function bindAvisos(root) {
   root.querySelectorAll('[data-remove-account]').forEach(button => {
     button.addEventListener('click', async () => {
       const account = button.dataset.removeAccount;
-      if (!confirm(`¿Dejar de vigilar ${account}?`)) return;
+      if (!await confirmDialog({
+        title: 'Dejar de vigilar la cuenta',
+        message: `Vesper dejará de avisar cuando ${account} publique o empiece directo.`,
+        confirmLabel: 'Dejar de vigilar',
+        danger: true
+      })) return;
       button.disabled = true;
       try {
         await api(`/guilds/${state.guildId}/social/${button.dataset.platform}/${encodeURIComponent(account)}`, { method: 'DELETE' });
@@ -1699,15 +2548,27 @@ function bindModeracion(root) {
 
 function bindCaseRowActions() {
   $$('[data-case-note]').forEach(button => button.addEventListener('click', async () => {
-    const note = prompt(`Nota interna para el caso #${button.dataset.caseNote}`);
-    if (!note?.trim()) return;
-    await updateCase(button.dataset.caseNote, { note: note.trim() });
+    const note = await promptDialog({
+      title: `Nota del caso #${button.dataset.caseNote}`,
+      message: 'Solo la ve el equipo de moderación.',
+      label: 'Nota interna'
+    });
+    if (!note) return;
+    await updateCase(button.dataset.caseNote, { note });
   }));
 
   $$('[data-case-status]').forEach(button => button.addEventListener('click', async () => {
-    const labels = { active: 'reabrir', resolved: 'resolver', revoked: 'revocar' };
-    if (!confirm(`¿Deseas ${labels[button.dataset.status]} el caso #${button.dataset.caseStatus}?`)) return;
-    await updateCase(button.dataset.caseStatus, { status: button.dataset.status, note: prompt('Nota opcional') || '' });
+    const labels = { active: 'Reabrir', resolved: 'Resolver', revoked: 'Revocar' };
+    const action = labels[button.dataset.status];
+    const note = await promptDialog({
+      title: `${action} el caso #${button.dataset.caseStatus}`,
+      message: 'Puedes dejar constancia del motivo. La nota es opcional.',
+      label: 'Nota (opcional)',
+      confirmLabel: action,
+      danger: button.dataset.status === 'revoked'
+    });
+    if (note === null) return;
+    await updateCase(button.dataset.caseStatus, { status: button.dataset.status, note });
   }));
 }
 
@@ -1783,9 +2644,16 @@ function bindComunidad(root) {
 
   root.querySelectorAll('[data-suggestion]').forEach(button => {
     button.addEventListener('click', async () => {
-      const labels = { open: 'devolver a pendiente', approved: 'aprobar', rejected: 'rechazar' };
-      if (!confirm(`¿Deseas ${labels[button.dataset.status]} esta sugerencia?`)) return;
-      const note = prompt('Nota opcional para quien la propuso') || '';
+      const labels = { open: 'Devolver a pendiente', approved: 'Aprobar', rejected: 'Rechazar' };
+      const action = labels[button.dataset.status];
+      const note = await promptDialog({
+        title: `${action} la sugerencia`,
+        message: 'La nota se le muestra a quien la propuso.',
+        label: 'Nota (opcional)',
+        confirmLabel: action,
+        danger: button.dataset.status === 'rejected'
+      });
+      if (note === null) return;
       button.disabled = true;
       try {
         await api(`/guilds/${state.guildId}/suggestions/${button.dataset.suggestion}`, {
@@ -1866,6 +2734,8 @@ const RENDERERS = {
   identidad: { render: renderIdentidad, bind: bindIdentidad },
   bienvenidas: { render: renderBienvenidas, bind: bindBienvenidas },
   avisos: { render: renderAvisos, bind: bindAvisos },
+  mensajes: { render: renderMensajes, bind: bindMensajes },
+  ofertas: { render: renderOfertas, bind: bindOfertas },
   moderacion: { render: renderModeracion, bind: bindModeracion },
   comunidad: { render: renderComunidad, bind: bindComunidad },
   musica: { render: renderMusica, bind: bindMusica },
@@ -1958,7 +2828,11 @@ function renderAccount() {
   });
 
   $('#unlink-google')?.addEventListener('click', async () => {
-    if (!confirm('¿Separar las cuentas de Google y Discord? Podrás volver a vincularlas después.')) return;
+    if (!await confirmDialog({
+      title: 'Separar las cuentas',
+      message: 'Google y Discord dejarán de estar vinculadas. Podrás volver a unirlas cuando quieras.',
+      confirmLabel: 'Separar'
+    })) return;
     try {
       const result = await api('/unlink', { method: 'POST', body: JSON.stringify({ provider: 'google' }) });
       state.session = { ...state.session, ...result };
@@ -1972,8 +2846,18 @@ function showSection(id) {
   const section = SECTIONS.find(item => item.id === id);
   if (!section || !sectionAllowed(section)) return showSection('inicio');
 
-  if (state.dirty.size && !confirm('Tienes cambios sin guardar en esta pantalla. ¿Salir de todos modos?')) return;
-  state.dirty.clear();
+  if (state.dirty.size) {
+    // La navegación es asíncrona a partir de aquí, así que se delega en una
+    // función aparte para no dejar showSection a medias.
+    confirmDialog({
+      title: 'Cambios sin guardar',
+      message: 'Has modificado esta pantalla y no la has guardado. Si sales, se pierden los cambios.',
+      confirmLabel: 'Salir sin guardar',
+      cancelLabel: 'Seguir aquí',
+      danger: true
+    }).then(accepted => { if (accepted) { state.dirty.clear(); showSection(id); } });
+    return;
+  }
   state.section = id;
   closeNav();
   renderNav();
@@ -2170,6 +3054,8 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && document.body.dataset.nav === 'open') closeNav();
 });
 
+// Este sí es del navegador y no se puede estilar, pero solo salta al cerrar la
+// pestaña de verdad: dentro del panel la navegación usa el diálogo propio.
 window.addEventListener('beforeunload', event => {
   if (!state.dirty.size) return;
   event.preventDefault();

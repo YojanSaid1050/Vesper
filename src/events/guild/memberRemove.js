@@ -2,6 +2,7 @@ const { Events, EmbedBuilder } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const { resolveEmbedTemplate } = require('../../core/EmbedTemplateService');
+const { classicFromTemplate } = require('../../core/EmbedLayouts');
 
 // Mismo criterio que en memberAdd: la estructura del diseño es intocable y
 // solo los textos, el color de acento y la imagen salen a la configuración.
@@ -18,8 +19,13 @@ function buildGoodbyePayload(member, config = null) {
     title: GOODBYE_DEFAULT_TITLE,
     message: goodbyeDefaultMessage(member),
     color: GOODBYE_DEFAULT_COLOR,
-    image: GOODBYE_DEFAULT_IMAGE
+    image: GOODBYE_DEFAULT_IMAGE,
+    layout: 'components_v2'
   });
+
+  // Igual que en la bienvenida: el contenedor V2 es lo de siempre, y el embed
+  // clásico solo aparece si se elige en el panel.
+  if (template.layout === 'classic') return classicFromTemplate(template, member);
 
   return {
     flags: 32768,

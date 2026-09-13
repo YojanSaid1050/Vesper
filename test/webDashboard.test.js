@@ -207,6 +207,17 @@ test('la interfaz web es autocontenida y compatible con su propia CSP', () => {
   // Todo lo que se interpola en el HTML pasa por escapeHtml.
   assert.match(script, /function escapeHtml/);
   assert.doesNotMatch(script, /innerHTML\s*=\s*[^`'"].*location/i);
+
+  // El panel no usa los diálogos del navegador: muestran el dominio del
+  // alojamiento y no se pueden estilar.
+  const code = script.split('\n').filter(line => !line.trim().startsWith('//')).join('\n');
+  for (const nativeDialog of ['confirm(', 'prompt(', 'alert(']) {
+    const uses = code.split(nativeDialog).length - 1;
+    const wrapped = code.split(`Dialog(`).length - 1;
+    assert.ok(uses === 0 || wrapped > 0, `el panel no debe llamar a ${nativeDialog}`);
+  }
+  assert.match(script, /openDialog/, 'debe existir el diálogo propio');
+  assert.match(html, /<dialog id="app-dialog"/, 'el diálogo propio debe estar en el HTML');
 });
 
 test('la raíz lleva al panel en el navegador y conserva el JSON para las sondas', async () => {
@@ -324,4 +335,34 @@ test('la identidad se puede editar en ambos Main pero no en un satélite', () =>
 
   if (previousMain === undefined) delete process.env.MAIN_GUILD_ID; else process.env.MAIN_GUILD_ID = previousMain;
   if (previousThemed === undefined) delete process.env.THEMED_MAIN_GUILD_IDS; else process.env.THEMED_MAIN_GUILD_IDS = previousThemed;
+});
+
+/* ------------------------------------------------------------------ */
+/* Formato del mensaje (embed clásico / contenedor V2)                 */
+/* ------------------------------------------------------------------ */
+
+test('el saneador acepta los dos formatos y el «el de siempre»', () => {
+  const guild = mockGuild();
+  for (const layout of ['classic', 'components_v2']) {
+    const result = sanitizeGuildPatch({ embeds: { welcome: { layout } } }, guild);
+    assert.equal(result.embeds.welcome.layout, layout);
+  }
+  for (const empty of [null, '', 'auto']) {
+    const result = sanitizeGuildPatch({ embeds: { welcome: { layout: empty } } }, guild);
+    assert.equal(result.embeds.welcome.layout, null);
+  }
+});
+
+test('un formato inventado se rechaza', () => {
+  assert.throws(
+    () => sanitizeGuildPatch({ embeds: { welcome: { layout: 'bonito' } } }, mockGuild()),
+    /layout no es válido/
+  );
+});
+
+test('los mensajes de texto normal no admiten formato de embed', () => {
+  assert.throws(
+    () => sanitizeGuildPatch({ embeds: { automod_dm: { layout: 'components_v2' } } }, mockGuild()),
+    /texto normal/
+  );
 });

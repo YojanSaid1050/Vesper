@@ -83,6 +83,44 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 
+  <!-- Diálogo propio. Sustituye a confirm() y prompt() del navegador, que no
+       se pueden estilar y muestran el dominio del alojamiento. -->
+  <dialog id="app-dialog" class="modal" aria-labelledby="app-dialog-title">
+    <form method="dialog" class="modal-card">
+      <h2 id="app-dialog-title"></h2>
+      <p id="app-dialog-message"></p>
+      <div id="app-dialog-field" hidden>
+        <label for="app-dialog-input" id="app-dialog-label"></label>
+        <textarea id="app-dialog-input" rows="3" maxlength="1000"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button value="cancel" class="button quiet" type="submit" id="app-dialog-cancel">Cancelar</button>
+        <button value="confirm" class="button" type="submit" id="app-dialog-confirm">Aceptar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Paleta de adornos y alfabetos decorativos. Escribe en la caja de texto
+       desde la que se abrió, sin salir de la pantalla. -->
+  <dialog id="symbol-dialog" class="modal wide" aria-labelledby="symbol-dialog-title">
+    <div class="modal-card">
+      <h2 id="symbol-dialog-title">Símbolos y letras decorativas</h2>
+      <p class="modal-lead">Pulsa un símbolo para insertarlo donde tengas el cursor. Para las letras, escribe tu texto abajo y elige el alfabeto.</p>
+
+      <div id="symbol-grid" class="symbol-grid"></div>
+
+      <div class="fancy-block">
+        <label for="symbol-sample">Texto que quieres convertir</label>
+        <input id="symbol-sample" type="text" maxlength="80" value="Bienvenido" autocomplete="off">
+        <ul id="symbol-fancy" class="fancy-list"></ul>
+      </div>
+
+      <form method="dialog" class="modal-actions">
+        <button value="close" class="button" type="submit">Listo</button>
+      </form>
+    </div>
+  </dialog>
+
   <noscript>
     <p class="noscript-warning">El panel de Vesper necesita JavaScript activado.</p>
   </noscript>

@@ -2,6 +2,7 @@ const { Events, EmbedBuilder } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const { resolveEmbedTemplate } = require('../../core/EmbedTemplateService');
+const { classicFromTemplate } = require('../../core/EmbedLayouts');
 
 // Diseño original de Embers Void. La ESTRUCTURA (contenedor V2, separador,
 // tipografía y GIF) no cambia nunca: solo se pueden sustituir los textos, el
@@ -20,8 +21,14 @@ function buildWelcomePayload(member, config = null) {
     title: WELCOME_DEFAULT_TITLE,
     message: welcomeDefaultMessage(member),
     color: WELCOME_DEFAULT_COLOR,
-    image: WELCOME_DEFAULT_IMAGE
+    image: WELCOME_DEFAULT_IMAGE,
+    layout: 'components_v2'
   });
+
+  // Si el administrador eligió el embed clásico en el panel, se publica con
+  // esa forma. Mientras no lo elija, sale el contenedor V2 de siempre, igual
+  // carácter a carácter.
+  if (template.layout === 'classic') return classicFromTemplate(template, member);
 
   return {
     flags: 32768,

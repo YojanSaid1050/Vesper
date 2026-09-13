@@ -90,7 +90,7 @@ class MusicService {
     const headers = {
       Authorization: config.password,
       'User-Id': this.client.user.id,
-      'Client-Name': 'Vesper/2.8.2'
+      'Client-Name': 'Vesper/2.9.0'
     };
     if (this.resumeSessionId) headers['Session-Id'] = this.resumeSessionId;
     this.socket = new WebSocket(wsUrl(config.url), {

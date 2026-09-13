@@ -9,6 +9,18 @@
 
 const EMBED_KINDS = Object.freeze(['welcome', 'goodbye']);
 
+// Las dos formas en que Discord puede pintar un mensaje del bot:
+//   - 'classic'        el embed de toda la vida (barra de color + campos).
+//   - 'components_v2'  el contenedor de Components V2 que usa Embers Void.
+// 'auto' significa "la que trae de fábrica este mensaje en este servidor".
+const LAYOUTS = Object.freeze(['auto', 'classic', 'components_v2']);
+
+function normalizeLayout(value, fallback = 'classic') {
+  const raw = String(value ?? '').trim();
+  if (raw === 'classic' || raw === 'components_v2') return raw;
+  return fallback === 'components_v2' ? 'components_v2' : 'classic';
+}
+
 const EMBED_FIELD_LIMITS = Object.freeze({
   title: 240,
   message: 3000,
@@ -20,8 +32,10 @@ function defaultEmbedTemplate() {
   return { title: null, message: null, color: null, image: null, footer: null, thumbnail: true };
 }
 
+// Nace vacío a propósito: un tipo de mensaje sin entrada usa su diseño
+// original. Guardar plantillas vacías para los 30 tipos solo ocuparía espacio.
 function defaultEmbedsConfig() {
-  return { welcome: defaultEmbedTemplate(), goodbye: defaultEmbedTemplate() };
+  return {};
 }
 
 // Sustituye las variables que el administrador puede escribir en el panel.
@@ -69,12 +83,15 @@ function resolveEmbedTemplate(config, kind, member, fallbacks = {}) {
     image: imageUrl(stored.image) ?? fallbacks.image ?? null,
     thumbnail: stored.thumbnail === undefined || stored.thumbnail === null
       ? (fallbacks.thumbnail !== false)
-      : stored.thumbnail !== false
+      : stored.thumbnail !== false,
+    layout: normalizeLayout(stored.layout, fallbacks.layout)
   };
 }
 
 module.exports = {
   EMBED_KINDS,
+  LAYOUTS,
+  normalizeLayout,
   EMBED_FIELD_LIMITS,
   defaultEmbedTemplate,
   defaultEmbedsConfig,

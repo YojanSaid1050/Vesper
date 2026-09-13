@@ -45,7 +45,7 @@ const { normalizeUsername } = require('../platforms/tiktok/utils');
 const { verifyStreamer } = require('../platforms/twitch/utils');
 const { verifyChannel } = require('../platforms/youtube/utils');
 const { publishSelfRolePanel, publishTicketPanel, reviewSuggestion } = require('../core/CommunityService');
-const { defaultEmbedTemplate } = require('../core/EmbedTemplateService');
+const { catalogForPanel } = require('../core/EmbedCatalog');
 
 const publicDir = path.join(__dirname, 'public');
 const authLimiter = createRateLimiter({ windowMs: 5 * 60 * 1000, max: 20 });
@@ -115,14 +115,12 @@ function serializedConfig(config) {
     youtube: { ...(config.youtube || {}), users: config.youtube?.users || [] },
     branding: config.branding || {},
     profile: config.profile || {},
-    embeds: {
-      welcome: { ...defaultEmbedTemplate(), ...(config.embeds?.welcome || {}) },
-      goodbye: { ...defaultEmbedTemplate(), ...(config.embeds?.goodbye || {}) }
-    },
+    embeds: config.embeds && typeof config.embeds === 'object' ? config.embeds : {},
     features: config.features || {},
     permissions: config.permissions || {},
     moderation: config.moderation || {},
     music: config.music || {},
+    deals: config.deals || {},
     community: config.community || {}
   };
 }
@@ -143,6 +141,13 @@ function templateMember(guildName) {
 
 // Valores originales de cada servidor, para mostrarlos como marcador de
 // posición en el editor y permitir «restablecer» sin inventar textos.
+// Con qué forma nacen la bienvenida y la despedida en este servidor. El resto
+// de mensajes son embeds clásicos de fábrica en todas partes.
+function welcomeLayoutsFor(guildId) {
+  const layout = guildTier(guildId) === 'primary_main' ? 'components_v2' : 'classic';
+  return { welcome: layout, goodbye: layout };
+}
+
 function embedDefaultsFor(guildId, guildName) {
   const tier = guildTier(guildId);
   const sample = templateMember(guildName);
@@ -152,9 +157,9 @@ function embedDefaultsFor(guildId, guildName) {
     const memberRemove = require('../events/guild/memberRemove');
     return {
       layout: 'components_v2',
-      note: 'Este servidor usa el diseño original en formato Components V2. La estructura (contenedor, separador y tipografía) no cambia: solo puedes sustituir el texto, el color del borde y la imagen.',
-      supportsFooter: false,
-      supportsThumbnail: false,
+      note: 'Este servidor nace con el diseño original en contenedor Components V2. Puedes cambiar el texto, el color del borde y la imagen, y también pasarlo al embed clásico si lo prefieres.',
+      supportsFooter: true,
+      supportsThumbnail: true,
       welcome: {
         title: memberAdd.WELCOME_DEFAULT_TITLE,
         message: memberAdd.welcomeDefaultMessage(sample),
@@ -173,9 +178,9 @@ function embedDefaultsFor(guildId, guildName) {
   const { THEMED_DEFAULTS } = require('../core/PersonalityService');
   const themed = tier === 'themed_main';
   return {
-    layout: 'embed',
+    layout: 'classic',
     note: themed
-      ? 'Embed clásico de Discord. Puedes cambiar título, mensaje, color, imagen, pie de página y si se muestra el avatar del miembro.'
+      ? 'Embed clásico de Discord. Puedes cambiar título, mensaje, color, imagen, pie de página y si se muestra el avatar del miembro, o pasarlo al contenedor Components V2.'
       : 'Embed neutro para servidores satélite.',
     supportsFooter: true,
     supportsThumbnail: true,
@@ -326,7 +331,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     discordEnabled: dashboardEnabled() && sessionConfigured() && discordConfigured(),
     googleEnabled: dashboardEnabled() && sessionConfigured() && googleConfigured(),
     webAdminMode: webAdminMode(),
-    version: '2.8.2'
+    version: '2.9.0'
   }));
 
   app.get('/auth/discord', authLimiter, requireDashboard, async (req, res, next) => {
@@ -449,6 +454,9 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         setup: setupChecks(config),
         modules: { moderation: isModuleEnabledConfig(config, 'moderation') },
         embedDefaults: access.configure ? embedDefaultsFor(req.params.guildId, access.guild.name) : null,
+        messageCatalog: access.configure
+          ? catalogForPanel(welcomeLayoutsFor(req.params.guildId))
+          : null,
         identity: effectiveIdentity(config, client, access.guild),
         config: access.configure ? serializedConfig(config) : null,
         channels,
@@ -726,4 +734,4 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
   });
 }
 
-module.exports = { mountWebDashboard, publicCase, publicSuggestion, serializedConfig, identity, actorCanTarget, embedDefaultsFor, templateMember, effectiveIdentity };
+module.exports = { mountWebDashboard, publicCase, publicSuggestion, serializedConfig, identity, actorCanTarget, embedDefaultsFor, welcomeLayoutsFor, templateMember, effectiveIdentity };

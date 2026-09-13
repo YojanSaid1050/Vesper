@@ -5,6 +5,8 @@ const MODULE_DEFAULTS = Object.freeze({
   welcome: true,
   goodbye: true,
   logs: true,
+  boosts: true,
+  deals: false,
   music: false,
   moderation: false,
   tickets: false,

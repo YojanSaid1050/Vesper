@@ -2,6 +2,7 @@
 const { google } = require('googleapis');
 const { getChannelInfo, formatDuration } = require('./utils');
 const { recordRequest } = require('../../core/ProviderMetrics');
+const { fetchFeed } = require('./rss');
 
 const youtube = google.youtube({
   version: 'v3',
@@ -26,21 +27,36 @@ async function getChannelContent(channelId) {
   const cached = channelContentCache.get(channelId);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) return cached.data;
 
-  // Todo canal de YouTube tiene una playlist de subidas cuyo identificador se
-  // obtiene reemplazando el prefijo UC por UU. playlistItems.list cuesta una
-  // fracción de la búsqueda y permite reutilizar una sola consulta para lives,
-  // videos y shorts.
-  const uploadsPlaylistId = `UU${channelId.slice(2)}`;
-  const playlist = await youtube.playlistItems.list({
-    part: ['snippet', 'contentDetails'],
-    playlistId: uploadsPlaylistId,
-    maxResults: 20
-  });
-  recordRequest('youtube', 1);
+  // Descubrimiento por RSS (gratis) y detalles por API (1 unidad). Antes se
+  // gastaban 2 unidades por consulta y, con los intervalos de vigilancia, la
+  // cuota diaria daba para ocho o nueve canales. Ahora el coste depende de que
+  // haya contenido nuevo, no de cada cuánto se mira.
+  // Paso 1: descubrir qué hay. El feed RSS es gratuito y no consume cuota, así
+  // que se intenta primero. Solo si falla se recurre a la API, que sí cuesta.
+  let ids = [];
+  const useRss = String(process.env.YOUTUBE_USE_RSS || 'true').toLowerCase() !== 'false';
 
-  const ids = (playlist.data.items || [])
-    .map(item => item.contentDetails?.videoId || item.snippet?.resourceId?.videoId)
-    .filter(Boolean);
+  if (useRss) {
+    const entries = await fetchFeed(channelId, 'uploads').catch(error => {
+      console.warn(`[YouTube] RSS no disponible para ${channelId}, se usará la API: ${error.message}`);
+      return null;
+    });
+    if (entries) ids = entries.slice(0, 20).map(entry => entry.videoId);
+  }
+
+  if (ids.length === 0) {
+    const uploadsPlaylistId = `UU${channelId.slice(2)}`;
+    const playlist = await youtube.playlistItems.list({
+      part: ['snippet', 'contentDetails'],
+      playlistId: uploadsPlaylistId,
+      maxResults: 20
+    });
+    recordRequest('youtube', 1);
+
+    ids = (playlist.data.items || [])
+      .map(item => item.contentDetails?.videoId || item.snippet?.resourceId?.videoId)
+      .filter(Boolean);
+  }
 
   if (ids.length === 0) {
     channelContentCache.set(channelId, { data: [], timestamp: Date.now() });

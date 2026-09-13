@@ -2,6 +2,7 @@ const { Events, EmbedBuilder, AuditLogEvent, ChannelType } = require('discord.js
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { createLog } = require('../../utils/logCache');
 const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { buildMessage, memberVars } = require('../../core/EmbedCatalog');
 const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
 
 module.exports = {
@@ -29,15 +30,18 @@ module.exports = {
       executor = auditExecutor(await findRecentAuditEntry(channel.guild, AuditLogEvent.ChannelDelete, channel.id));
     } catch {}
 
-    const embed = new EmbedBuilder()
-      .setTitle('🗑️ Channel Deleted')
-      .setColor('#ED4245')
-      .addFields(
+    await sendBrandedMessage(logChannel, buildMessage('log_channel_deleted', {
+      config: guildConfig,
+      vars: {
+        channel: channel.name, channelName: channel.name, type: tipo, executor,
+        server: channel.guild.name, memberCount: channel.guild.memberCount
+      },
+      defaults: { title: '🗑️ Channel Deleted', color: '#ED4245' },
+      fields: [
         { name: '📌 Canal', value: channel.name },
         { name: '📂 Tipo', value: tipo, inline: true },
         { name: '🛠️ Eliminado por', value: executor, inline: true }
-      )
-      .setTimestamp();
-    await sendBrandedMessage(logChannel, { embeds: [embed] });
+      ]
+    }));
   }
 };

@@ -2,6 +2,7 @@ const { Events, EmbedBuilder, AuditLogEvent, ChannelType } = require('discord.js
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { createLog } = require('../../utils/logCache');
 const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { buildMessage, memberVars } = require('../../core/EmbedCatalog');
 const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
 
 module.exports = {
@@ -29,15 +30,18 @@ module.exports = {
       creator = auditExecutor(await findRecentAuditEntry(channel.guild, AuditLogEvent.ChannelCreate, channel.id));
     } catch {}
 
-    const embed = new EmbedBuilder()
-      .setTitle('📁 Channel Created')
-      .setColor('#57F287')
-      .addFields(
+    await sendBrandedMessage(logChannel, buildMessage('log_channel_created', {
+      config: guildConfig,
+      vars: {
+        channel: `${channel}`, channelName: channel.name, type: tipo, executor: creator,
+        server: channel.guild.name, memberCount: channel.guild.memberCount
+      },
+      defaults: { title: '📁 Channel Created', color: '#57F287' },
+      fields: [
         { name: '📌 Canal', value: `${channel}` },
         { name: '📂 Tipo', value: tipo, inline: true },
         { name: '🛠️ Creado por', value: creator, inline: true }
-      )
-      .setTimestamp();
-    await sendBrandedMessage(logChannel, { embeds: [embed] });
+      ]
+    }));
   }
 };

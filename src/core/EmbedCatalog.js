@@ -1,0 +1,463 @@
+// src/core/EmbedCatalog.js
+//
+// Catálogo de todos los mensajes que Vesper publica en un servidor.
+//
+// Cada mensaje tiene una entrada aquí con su nombre, su descripción y las
+// variables que admite. El panel web lee este catálogo para construir el
+// editor, y los eventos lo usan para publicar.
+//
+// Regla que no se rompe: si el administrador no ha escrito nada, el mensaje
+// sale EXACTAMENTE igual que antes de que esto existiera. La configuración
+// sustituye piezas; nunca inventa un formato nuevo por su cuenta.
+
+const { colorNumber, imageUrl, normalizeLayout } = require('./EmbedTemplateService');
+const { containerPayload } = require('./EmbedLayouts');
+
+// Variables comunes a casi todos los registros.
+const MEMBER_VARS = [
+  ['{user}', 'menciona al miembro'],
+  ['{username}', 'su nombre de usuario'],
+  ['{userTag}', 'su etiqueta completa'],
+  ['{displayName}', 'su apodo en el servidor'],
+  ['{userId}', 'su ID'],
+  ['{server}', 'nombre del servidor'],
+  ['{memberCount}', 'total de miembros']
+];
+
+const SERVER_VARS = [
+  ['{server}', 'nombre del servidor'],
+  ['{memberCount}', 'total de miembros']
+];
+
+const ACTOR_VARS = [['{executor}', 'quién realizó la acción']];
+const CHANNEL_VARS = [['{channel}', 'canal afectado'], ['{channelName}', 'nombre del canal']];
+const ROLE_VARS = [['{role}', 'rol afectado'], ['{roleName}', 'nombre del rol']];
+
+const CREATOR_VARS = [
+  ['{creator}', 'nombre de la cuenta'],
+  ['{title}', 'título de la publicación'],
+  ['{url}', 'enlace'],
+  ['{server}', 'nombre del servidor']
+];
+
+// `supports` dice qué campos tiene sentido ofrecer en el editor de cada
+// mensaje. Un registro sin miniatura no debe mostrar esa casilla.
+const FULL = { footer: true, thumbnail: true, image: true };
+const NO_THUMB = { footer: true, thumbnail: false, image: true };
+
+const CATALOG = Object.freeze({
+  // ---------------------------------------------------------------- Entradas
+  welcome: {
+    group: 'Entradas y salidas', label: 'Bienvenida',
+    description: 'Se publica en el canal de bienvenida cuando alguien entra.',
+    variables: MEMBER_VARS, supports: FULL
+  },
+  goodbye: {
+    group: 'Entradas y salidas', label: 'Despedida',
+    description: 'Se publica en el canal de despedida cuando alguien sale.',
+    variables: MEMBER_VARS, supports: FULL
+  },
+
+  // ------------------------------------------------------------------ Boost
+  boost_started: {
+    group: 'Mejoras del servidor', label: 'Gracias por el boost',
+    description: 'Se publica cuando alguien mejora el servidor con un boost de Nitro. Es el agradecimiento público.',
+    variables: [...MEMBER_VARS, ['{boostCount}', 'boosts totales del servidor'], ['{boostLevel}', 'nivel actual']],
+    supports: FULL
+  },
+  boost_stopped: {
+    group: 'Mejoras del servidor', label: 'Boost retirado',
+    description: 'Cuando alguien deja de mejorar el servidor.',
+    variables: [...MEMBER_VARS, ['{boostCount}', 'boosts totales del servidor'], ['{boostLevel}', 'nivel actual']],
+    supports: FULL
+  },
+  boost_level: {
+    group: 'Mejoras del servidor', label: 'Nuevo nivel de mejora',
+    description: 'Cuando el servidor alcanza (o pierde) un nivel de mejora.',
+    variables: [...SERVER_VARS, ['{boostLevel}', 'nivel nuevo'], ['{previousLevel}', 'nivel anterior'], ['{boostCount}', 'boosts totales']],
+    supports: NO_THUMB
+  },
+
+  // ------------------------------------------------------------------ Logs
+  log_member_join: {
+    group: 'Registro de miembros', label: 'Miembro entró',
+    description: 'Anotación en el canal de registro cuando entra una persona.',
+    variables: MEMBER_VARS, supports: FULL
+  },
+  log_member_leave: {
+    group: 'Registro de miembros', label: 'Miembro salió',
+    description: 'Anotación en el canal de registro cuando sale una persona.',
+    variables: MEMBER_VARS, supports: FULL
+  },
+  log_bot_join: {
+    group: 'Registro de miembros', label: 'Bot añadido',
+    description: 'Se publica en el canal de registro de bots cuando se añade uno.',
+    variables: [...MEMBER_VARS, ['{role}', 'rol asignado automáticamente']], supports: FULL
+  },
+  log_bot_leave: {
+    group: 'Registro de miembros', label: 'Bot retirado',
+    description: 'Se publica cuando un bot deja el servidor.',
+    variables: MEMBER_VARS, supports: FULL
+  },
+  log_nickname: {
+    group: 'Registro de miembros', label: 'Apodo cambiado',
+    description: 'Cuando alguien cambia su apodo en el servidor.',
+    variables: [...MEMBER_VARS, ['{before}', 'apodo anterior'], ['{after}', 'apodo nuevo']], supports: FULL
+  },
+  log_roles_added: {
+    group: 'Registro de miembros', label: 'Roles añadidos',
+    description: 'Cuando un miembro recibe uno o varios roles.',
+    variables: [...MEMBER_VARS, ['{roles}', 'roles añadidos']], supports: NO_THUMB
+  },
+  log_roles_removed: {
+    group: 'Registro de miembros', label: 'Roles retirados',
+    description: 'Cuando a un miembro le quitan uno o varios roles.',
+    variables: [...MEMBER_VARS, ['{roles}', 'roles retirados']], supports: NO_THUMB
+  },
+
+  // ------------------------------------------------------------ Moderación
+  log_timeout_on: {
+    group: 'Registro de moderación', label: 'Miembro aislado',
+    description: 'Cuando se aplica un aislamiento temporal.',
+    variables: [...MEMBER_VARS, ...ACTOR_VARS, ['{until}', 'hasta cuándo'], ['{reason}', 'motivo']], supports: FULL
+  },
+  log_timeout_off: {
+    group: 'Registro de moderación', label: 'Aislamiento retirado',
+    description: 'Cuando se levanta un aislamiento.',
+    variables: [...MEMBER_VARS, ...ACTOR_VARS], supports: FULL
+  },
+  log_ban_added: {
+    group: 'Registro de moderación', label: 'Miembro baneado',
+    description: 'Cuando alguien recibe un baneo.',
+    variables: [...MEMBER_VARS, ...ACTOR_VARS], supports: FULL
+  },
+  log_ban_removed: {
+    group: 'Registro de moderación', label: 'Baneo retirado',
+    description: 'Cuando se retira un baneo.',
+    variables: [...MEMBER_VARS, ...ACTOR_VARS], supports: FULL
+  },
+  automod_notice: {
+    group: 'Registro de moderación', label: 'Aviso de moderación automática',
+    description: 'El mensaje público que Vesper deja en el canal cuando retira un mensaje. Se borra solo a los 10 segundos.',
+    variables: [...MEMBER_VARS, ['{reason}', 'motivo de la retirada'], ['{case}', 'identificador del caso']],
+    supports: { footer: false, thumbnail: false, image: false },
+    plainText: true
+  },
+  automod_dm: {
+    group: 'Registro de moderación', label: 'Aviso privado de advertencia',
+    description: 'El mensaje directo que recibe quien es advertido.',
+    variables: [...MEMBER_VARS, ['{reason}', 'motivo'], ['{case}', 'identificador del caso']],
+    supports: { footer: false, thumbnail: false, image: false },
+    plainText: true
+  },
+
+  // -------------------------------------------------------------- Servidor
+  log_message_deleted: {
+    group: 'Registro del servidor', label: 'Mensaje borrado',
+    description: 'Cuando se elimina un mensaje de un canal vigilado.',
+    variables: [...MEMBER_VARS, ...CHANNEL_VARS, ...ACTOR_VARS, ['{content}', 'contenido del mensaje']], supports: NO_THUMB
+  },
+  log_message_edited: {
+    group: 'Registro del servidor', label: 'Mensaje editado',
+    description: 'Cuando alguien edita un mensaje.',
+    variables: [...MEMBER_VARS, ...CHANNEL_VARS, ['{before}', 'texto anterior'], ['{after}', 'texto nuevo']], supports: NO_THUMB
+  },
+  log_channel_created: {
+    group: 'Registro del servidor', label: 'Canal creado',
+    description: 'Cuando se crea un canal.',
+    variables: [...SERVER_VARS, ...CHANNEL_VARS, ...ACTOR_VARS], supports: NO_THUMB
+  },
+  log_channel_deleted: {
+    group: 'Registro del servidor', label: 'Canal eliminado',
+    description: 'Cuando se elimina un canal.',
+    variables: [...SERVER_VARS, ...CHANNEL_VARS, ...ACTOR_VARS], supports: NO_THUMB
+  },
+  log_role_created: {
+    group: 'Registro del servidor', label: 'Rol creado',
+    description: 'Cuando se crea un rol.',
+    variables: [...SERVER_VARS, ...ROLE_VARS, ...ACTOR_VARS], supports: NO_THUMB
+  },
+  log_role_deleted: {
+    group: 'Registro del servidor', label: 'Rol eliminado',
+    description: 'Cuando se elimina un rol.',
+    variables: [...SERVER_VARS, ...ROLE_VARS, ...ACTOR_VARS], supports: NO_THUMB
+  },
+  log_voice_join: {
+    group: 'Registro del servidor', label: 'Entró a voz',
+    description: 'Cuando alguien se conecta a un canal de voz.',
+    variables: [...MEMBER_VARS, ...CHANNEL_VARS], supports: NO_THUMB
+  },
+  log_voice_leave: {
+    group: 'Registro del servidor', label: 'Salió de voz',
+    description: 'Cuando alguien se desconecta de un canal de voz.',
+    variables: [...MEMBER_VARS, ...CHANNEL_VARS], supports: NO_THUMB
+  },
+  log_messages_purged: {
+    group: 'Registro del servidor', label: 'Mensajes purgados',
+    description: 'Cuando se borran varios mensajes a la vez, por ejemplo con /clear.',
+    variables: [...SERVER_VARS, ...CHANNEL_VARS, ['{count}', 'cantidad de mensajes']], supports: NO_THUMB
+  },
+  log_thread_created: {
+    group: 'Registro del servidor', label: 'Hilo creado',
+    description: 'Cuando alguien abre un hilo.',
+    variables: [...SERVER_VARS, ...CHANNEL_VARS, ['{thread}', 'hilo creado'], ['{owner}', 'quién lo abrió']], supports: NO_THUMB
+  },
+  log_voice_move: {
+    group: 'Registro del servidor', label: 'Cambió de canal de voz',
+    description: 'Cuando alguien se mueve entre canales de voz.',
+    variables: [...MEMBER_VARS, ['{from}', 'canal de origen'], ['{to}', 'canal de destino']], supports: NO_THUMB
+  },
+
+  // ------------------------------------------------------------- Avisos
+  notify_tiktok_live: {
+    group: 'Avisos de redes', label: 'TikTok · directo',
+    description: 'Aviso cuando una cuenta de TikTok empieza directo.',
+    variables: [...CREATOR_VARS, ['{viewers}', 'espectadores']], supports: FULL
+  },
+  deal_epic_free: {
+    group: 'Ofertas y juegos gratis', label: 'Epic · juego gratis',
+    description: 'Cuando Epic Games regala un juego (o anuncia el de la próxima semana).',
+    variables: [['{title}', 'nombre del juego'], ['{url}', 'enlace a la tienda'], ['{store}', 'tienda'], ['{endsAt}', 'cuándo termina'], ['{originalPrice}', 'precio habitual']],
+    supports: FULL
+  },
+  deal_steam_special: {
+    group: 'Ofertas y juegos gratis', label: 'Steam · oferta',
+    description: 'Cuando un juego de Steam supera el descuento mínimo que configures.',
+    variables: [['{title}', 'nombre del juego'], ['{url}', 'enlace'], ['{discount}', 'porcentaje de descuento'], ['{price}', 'precio rebajado'], ['{originalPrice}', 'precio normal'], ['{endsAt}', 'cuándo termina']],
+    supports: FULL
+  },
+  deal_giveaway: {
+    group: 'Ofertas y juegos gratis', label: 'Sorteo o llave gratis',
+    description: 'Juegos, DLC y llaves gratis de Steam, GOG, Ubisoft, itch.io y otras tiendas.',
+    variables: [['{title}', 'nombre'], ['{url}', 'enlace'], ['{worth}', 'valor habitual'], ['{platforms}', 'plataformas'], ['{endsAt}', 'cuándo termina']],
+    supports: FULL
+  },
+
+  notify_tiktok_video: {
+    group: 'Avisos de redes', label: 'TikTok · video nuevo',
+    description: 'Aviso cuando una cuenta de TikTok publica un video.',
+    variables: [...CREATOR_VARS, ['{views}', 'reproducciones']], supports: FULL
+  },
+  notify_twitch_live: {
+    group: 'Avisos de redes', label: 'Twitch · directo',
+    description: 'Aviso cuando un streamer de Twitch empieza directo.',
+    variables: [...CREATOR_VARS, ['{game}', 'categoría'], ['{viewers}', 'espectadores']], supports: FULL
+  },
+  notify_youtube_live: {
+    group: 'Avisos de redes', label: 'YouTube · directo',
+    description: 'Aviso cuando un canal de YouTube empieza directo.',
+    variables: [...CREATOR_VARS, ['{viewers}', 'espectadores']], supports: FULL
+  },
+  notify_youtube_video: {
+    group: 'Avisos de redes', label: 'YouTube · video nuevo',
+    description: 'Aviso cuando un canal publica un video.',
+    variables: [...CREATOR_VARS, ['{views}', 'visualizaciones']], supports: FULL
+  },
+  notify_youtube_short: {
+    group: 'Avisos de redes', label: 'YouTube · Short nuevo',
+    description: 'Aviso cuando un canal publica un Short.',
+    variables: [...CREATOR_VARS, ['{views}', 'visualizaciones']], supports: FULL
+  }
+});
+
+
+// Valores con los que sale cada mensaje si no hay nada configurado. Se usan
+// como marcador de posición en el editor del panel. Los de bienvenida y
+// despedida no están aquí: dependen del servidor y los calcula el backend a
+// partir del código que los publica.
+const FACTORY = Object.freeze({
+  boost_started: {
+    title: '💜 ¡Gracias por el boost!',
+    message: '{user} acaba de mejorar **{server}**. Ya vamos por {boostCount} boosts (nivel {boostLevel}).',
+    color: '#F47FFF'
+  },
+  boost_stopped: { title: '💔 Boost retirado', color: '#747F8D' },
+  boost_level: { title: '🚀 Nuevo nivel de mejora', color: '#F47FFF' },
+  log_member_join: { title: '📥 Member Joined', color: '#57F287' },
+  log_member_leave: { title: '📤 Member Left', color: '#ED4245' },
+  log_bot_join: { title: '🤖 Bot Added', color: '#5865F2' },
+  log_bot_leave: { title: '🤖 Bot Left', color: '#ED4245' },
+  log_nickname: { title: '📝 Nickname Updated', color: '#00B0F4' },
+  log_roles_added: { title: '🎭 Role Added', color: '#57F287' },
+  log_roles_removed: { title: '❌ Role Removed', color: '#ED4245' },
+  log_timeout_on: { title: '🔇 User Timed Out', color: '#ED4245' },
+  log_timeout_off: { title: '🔊 Timeout Removed', color: '#57F287' },
+  log_ban_added: { title: '🔨 User Banned', color: '#ED4245' },
+  log_ban_removed: { title: '🔓 User Unbanned', color: '#57F287' },
+  automod_notice: { message: '{user}, tu mensaje fue retirado: {reason}. Caso **#{case}**.' },
+  automod_dm: { message: 'Recibiste una advertencia en **{server}**.\nMotivo: {reason}\nCaso: **#{case}**' },
+  log_message_deleted: { title: '🗑️ Message Deleted', color: '#ED4245' },
+  log_message_edited: { title: '✏️ Message Edited', color: '#FAA61A' },
+  log_channel_created: { title: '📁 Channel Created', color: '#57F287' },
+  log_channel_deleted: { title: '🗑️ Channel Deleted', color: '#ED4245' },
+  log_role_created: { title: '🎭 Role Created', color: '#57F287' },
+  log_role_deleted: { title: '❌ Role Deleted', color: '#FF4D4D' },
+  log_voice_join: { title: '🔊 Voice Joined', color: '#57F287' },
+  log_voice_leave: { title: '📴 Voice Left', color: '#ED4245' },
+  log_voice_move: { title: '🔄 Voice Moved', color: '#5865F2' },
+  log_messages_purged: { title: '🧹 Mensajes purgados', color: '#FAA61A' },
+  log_thread_created: { title: '🧵 Hilo creado', color: '#57F287' },
+  notify_twitch_live: { title: '{creator} está en directo en Twitch', color: '#9146FF' },
+  notify_youtube_live: { title: '{creator} está en directo en YouTube', color: '#FF0000' },
+  notify_youtube_video: { title: 'Nuevo video de {creator}', color: '#FF0000' },
+  notify_youtube_short: { title: 'Nuevo short de {creator}', color: '#FF0000' },
+  notify_tiktok_live: { title: '{creator} está en directo en TikTok', color: '#1E90FF' },
+  notify_tiktok_video: { title: 'Nuevo video de {creator}', color: '#1E90FF' },
+  deal_epic_free: { title: '🎁 Gratis en Epic: {title}', color: '#2A2A2A' },
+  deal_steam_special: { title: '🏷️ {discount}% de descuento: {title}', color: '#1B2838' },
+  deal_giveaway: { title: '🎉 {title}', color: '#57F287' }
+});
+
+function factoryDefaults(kind) {
+  return FACTORY[kind] || {};
+}
+
+const KINDS = Object.freeze(Object.keys(CATALOG));
+
+function isKnownKind(kind) {
+  return Object.hasOwn(CATALOG, kind);
+}
+
+function kindInfo(kind) {
+  return CATALOG[kind] || null;
+}
+
+// Agrupado tal y como lo pinta el panel. `defaultLayouts` dice con qué forma
+// sale de fábrica cada mensaje en ESTE servidor: la bienvenida de Embers Void
+// nace como contenedor V2 y el resto como embed clásico.
+function catalogForPanel(defaultLayouts = {}) {
+  const groups = new Map();
+  for (const [id, entry] of Object.entries(CATALOG)) {
+    if (!groups.has(entry.group)) groups.set(entry.group, []);
+    groups.get(entry.group).push({
+      id,
+      label: entry.label,
+      description: entry.description,
+      variables: entry.variables,
+      supports: entry.supports,
+      plainText: Boolean(entry.plainText),
+      defaultLayout: defaultLayouts[id] === 'components_v2' ? 'components_v2' : 'classic',
+      factory: factoryDefaults(id)
+    });
+  }
+  return [...groups.entries()].map(([group, items]) => ({ group, items }));
+}
+
+function storedTemplate(config, kind) {
+  const stored = config?.embeds?.[kind];
+  return stored && typeof stored === 'object' ? stored : {};
+}
+
+// ¿Tiene este mensaje alguna personalización guardada?
+function isCustomised(config, kind) {
+  const stored = storedTemplate(config, kind);
+  return ['title', 'message', 'footer', 'image', 'color', 'layout'].some(field => stored[field]);
+}
+
+/**
+ * Construye el mensaje que se va a publicar.
+ *
+ * `defaults` son los valores que el bot usaba antes de que esto fuese
+ * configurable, y `fields` son los campos del embed original. Si el
+ * administrador no ha escrito un mensaje propio, se conservan los campos tal
+ * cual; si lo ha escrito, ese texto sustituye el cuerpo, que es justo lo que
+ * se espera al personalizar.
+ */
+function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = {}) {
+  const stored = storedTemplate(config, kind);
+  const entry = CATALOG[kind];
+
+  // Un campo vacío o en blanco significa "usa el valor original", no "déjalo
+  // en blanco": así el editor puede vaciarse para volver al diseño de fábrica.
+  const resolve = value => {
+    if (value === null || value === undefined) return null;
+    const text = String(value);
+    return text.trim() ? substitute(text, vars) : null;
+  };
+
+  const title = resolve(stored.title) ?? defaults.title ?? null;
+  const message = resolve(stored.message);
+  const footer = resolve(stored.footer) ?? defaults.footer ?? null;
+  const image = imageUrl(stored.image) ?? defaults.image ?? null;
+  const color = colorNumber(stored.color, colorNumber(defaults.color, 0x5865F2));
+  const showThumbnail = stored.thumbnail === undefined || stored.thumbnail === null
+    ? defaults.thumbnail !== false
+    : stored.thumbnail !== false;
+
+  // Mensajes que no son embed (avisos de automoderación y MD de advertencia).
+  if (entry?.plainText) {
+    return { content: message ?? substitute(defaults.message || '', vars) };
+  }
+
+  // El administrador elige con qué forma sale el mensaje. Si no ha elegido
+  // ninguna, se usa la de fábrica de ese mensaje en ese servidor, así que
+  // nada cambia hasta que se toca el selector a propósito.
+  const layout = normalizeLayout(stored.layout, defaults.layout);
+
+  const body = message
+    ?? (defaults.description ? substitute(defaults.description, vars) : null);
+  const usableFields = message ? [] : fields.filter(field => field && field.name && field.value);
+
+  if (layout === 'components_v2') {
+    return containerPayload({
+      title,
+      message: body,
+      fields: usableFields,
+      footer,
+      image,
+      color
+    });
+  }
+
+  const embed = { color, timestamp: new Date().toISOString() };
+  if (title) embed.title = title;
+
+  // El administrador escribió su propio cuerpo: sustituye a los campos.
+  if (body) embed.description = body;
+  if (usableFields.length) embed.fields = usableFields;
+
+  if (showThumbnail && defaults.thumbnailUrl) embed.thumbnail = { url: defaults.thumbnailUrl };
+  if (image) embed.image = { url: image };
+  if (footer) embed.footer = { text: footer };
+
+  return { embeds: [embed] };
+}
+
+// Sustituye {variables} por sus valores. Se hace aquí y no en
+// EmbedTemplateService porque estas variables dependen del evento.
+function substitute(text, vars) {
+  return String(text ?? '').replace(/\{(\w+)\}/g, (match, name) => {
+    const value = vars[name];
+    return value === undefined || value === null ? match : String(value);
+  });
+}
+
+// Variables de miembro, que casi todos los registros comparten.
+function memberVars(member, extra = {}) {
+  const user = member?.user || member;
+  return {
+    user: member?.toString?.() ?? (user?.id ? `<@${user.id}>` : ''),
+    username: user?.username ?? '',
+    userTag: user?.tag ?? user?.username ?? '',
+    displayName: member?.displayName ?? user?.username ?? '',
+    userId: user?.id ?? '',
+    server: member?.guild?.name ?? '',
+    memberCount: member?.guild?.memberCount ?? '',
+    ...extra
+  };
+}
+
+module.exports = {
+  CATALOG,
+  FACTORY,
+  factoryDefaults,
+  KINDS,
+  isKnownKind,
+  kindInfo,
+  catalogForPanel,
+  isCustomised,
+  buildMessage,
+  containerPayload,
+  substitute,
+  memberVars
+};

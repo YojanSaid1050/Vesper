@@ -140,3 +140,62 @@ test('las variables y los validadores de la plantilla se comportan como se esper
   assert.equal(resuelto.color, 0xABCDEF);
   assert.equal(resuelto.thumbnail, true);
 });
+
+/* ------------------------------------------------------------------ */
+/* Las dos versiones de embed, disponibles en los dos servidores       */
+/* ------------------------------------------------------------------ */
+
+test('en Embers Void la bienvenida sale en contenedor V2 mientras no se elija otra cosa', () => {
+  const payload = memberAdd.buildWelcomePayload(fakeMember(), { embeds: {} });
+  assert.equal(payload.flags, 32768);
+  assert.equal(payload.components[0].type, 17);
+  assert.ok(!payload.embeds);
+});
+
+test('en Embers Void se puede pasar la bienvenida al embed clásico sin perder el texto', () => {
+  const member = fakeMember();
+  const config = { embeds: { welcome: { layout: 'classic' } } };
+  const payload = memberAdd.buildWelcomePayload(member, config);
+
+  assert.ok(!payload.flags, 'ya no lleva la marca de Components V2');
+  assert.equal(payload.embeds.length, 1);
+  assert.equal(payload.embeds[0].title, memberAdd.WELCOME_DEFAULT_TITLE);
+  assert.equal(payload.embeds[0].description, memberAdd.welcomeDefaultMessage(member));
+  assert.equal(payload.embeds[0].image.url, memberAdd.WELCOME_DEFAULT_IMAGE);
+  assert.equal(payload.embeds[0].color, memberAdd.WELCOME_DEFAULT_COLOR);
+  assert.equal(payload.embeds[0].thumbnail.url, 'https://cdn.example/avatar.png');
+});
+
+test('la despedida de Embers Void también admite el embed clásico', () => {
+  const payload = memberRemove.buildGoodbyePayload(fakeMember(), { embeds: { goodbye: { layout: 'classic' } } });
+  assert.ok(!payload.flags);
+  assert.equal(payload.embeds[0].title, memberRemove.GOODBYE_DEFAULT_TITLE);
+});
+
+test('en el Main temático la bienvenida sale como embed clásico por defecto', () => {
+  const payload = themedWelcomePayload(fakeMember(), { embeds: {} });
+  assert.ok(Array.isArray(payload.embeds));
+  assert.ok(!payload.flags);
+});
+
+test('el Main temático puede pedir el contenedor V2 y queda igual que el de Embers Void', () => {
+  const payload = themedWelcomePayload(fakeMember(), { embeds: { welcome: { layout: 'components_v2' } } });
+  assert.equal(payload.flags, 32768);
+
+  const container = payload.components[0];
+  assert.equal(container.type, 17);
+  const kinds = container.components.map(part => part.type);
+  assert.deepEqual(kinds.slice(0, 3), [10, 14, 10], 'título, separador y cuerpo');
+  // El pie no existe en V2: se publica como texto pequeño de Markdown.
+  assert.ok(container.components.at(-1).content.startsWith('-# '));
+});
+
+test('la despedida temática también admite el contenedor V2', () => {
+  const payload = themedGoodbyePayload(fakeMember(), { embeds: { goodbye: { layout: 'components_v2' } } });
+  assert.equal(payload.flags, 32768);
+});
+
+test('un formato desconocido no rompe nada: se usa el de fábrica', () => {
+  const payload = memberAdd.buildWelcomePayload(fakeMember(), { embeds: { welcome: { layout: 'inventado' } } });
+  assert.equal(payload.flags, 32768);
+});
