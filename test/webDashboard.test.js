@@ -174,18 +174,70 @@ test('las utilidades de sesión usan HMAC, cookies seguras y comparación consta
   if (oldSecret === undefined) delete process.env.WEB_SESSION_SECRET; else process.env.WEB_SESSION_SECRET = oldSecret;
 });
 
-test('la interfaz web existe y no depende de scripts externos', () => {
+test('la interfaz web es autocontenida y compatible con su propia CSP', () => {
   const html = fs.readFileSync(path.join(__dirname, '../src/web/public/index.html'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../src/web/public/app.js'), 'utf8');
+  const styles = fs.readFileSync(path.join(__dirname, '../src/web/public/styles.css'), 'utf8');
   const routes = fs.readFileSync(path.join(__dirname, '../src/web/routes.js'), 'utf8');
+
   assert.match(html, /Vesper · Panel de control/);
   assert.match(html, /\/panel\/assets\/app\.js/);
-  assert.match(script, /publish-ticket-panel/);
-  assert.match(script, /suggestion-status/);
+  assert.match(html, /\/panel\/assets\/styles\.css/);
+
+  // La CSP del panel es `default-src 'self'`: ni scripts, ni hojas de estilo,
+  // ni tipografías externas.
+  assert.doesNotMatch(html, /https?:\/\/[^"']+\.js/, 'no debe cargar scripts externos');
+  assert.doesNotMatch(html, /<script>|<script [^>]*>[^<]/, 'no debe haber scripts en línea');
+  assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic/, 'no debe cargar tipografías externas');
+  assert.doesNotMatch(styles, /@import\s+url\(['"]?https?:/, 'no debe importar CSS externo');
+
+  // `style-src 'self'` también cubre los atributos style en línea, así que el
+  // color dinámico tiene que aplicarse por CSSOM.
+  assert.doesNotMatch(html, /\sstyle="/, 'no debe haber atributos style en el HTML');
+  assert.doesNotMatch(script, /<[a-z][^>]*\sstyle="/i, 'el HTML generado no debe llevar atributos style');
+  assert.match(script, /setProperty\('--accent'/, 'el acento debe aplicarse por CSSOM');
+
+  // Piezas que el panel necesita para funcionar.
+  for (const needle of ['publish-tickets', 'publish-selfroles', 'data-suggestion', 'data-embed-reset', 'refreshEmbedPreview', 'refreshIdentityPreview']) {
+    assert.ok(script.includes(needle), `falta ${needle} en el cliente del panel`);
+  }
   assert.match(routes, /community\/publish/);
   assert.match(routes, /suggestions\/:messageId/);
-  assert.doesNotMatch(html, /https?:\/\/[^"']+\.js/);
+
+  // Todo lo que se interpola en el HTML pasa por escapeHtml.
+  assert.match(script, /function escapeHtml/);
   assert.doesNotMatch(script, /innerHTML\s*=\s*[^`'"].*location/i);
+});
+
+test('la raíz lleva al panel en el navegador y conserva el JSON para las sondas', async () => {
+  const express = require('express');
+  const { mountHealthRoutes, buildRuntimeHealth } = require('../src/web/health');
+
+  const app = express();
+  const runtimeHealth = buildRuntimeHealth({
+    getClient: () => ({ isReady: () => true, uptime: 1, music: { status: () => ({ configured: false, connected: false }) } }),
+    getMongoStatus: () => ({ connected: true, readyState: 1 }),
+    getMonitorStats: () => [],
+    isShuttingDown: () => false
+  });
+  mountHealthRoutes(app, { runtimeHealth, getClient: () => ({ isReady: () => true, uptime: 1 }), isShuttingDown: () => false });
+
+  const server = app.listen(0);
+  await new Promise(resolve => server.once('listening', resolve));
+  const port = server.address().port;
+
+  try {
+    const browser = await fetch(`http://127.0.0.1:${port}/`, { headers: { Accept: 'text/html' }, redirect: 'manual' });
+    assert.equal(browser.status, 302, 'un navegador debe ser redirigido');
+    assert.equal(browser.headers.get('location'), '/panel');
+
+    const probe = await fetch(`http://127.0.0.1:${port}/`, { headers: { Accept: 'application/json' } });
+    assert.equal(probe.status, 200, 'un monitor que pida JSON debe seguir recibiéndolo');
+    const body = await probe.json();
+    assert.equal(body.status, 'online');
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
 });
 
 test('la vista administrativa de sugerencias usa un contrato acotado', () => {

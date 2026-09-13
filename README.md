@@ -1,4 +1,4 @@
-# Vesper Bot 2.8.1
+# Vesper Bot 2.8.2
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión 2.8 conserva la presentación visual original con
@@ -81,7 +81,28 @@ Solo un administrador del servidor puede modificar esta configuración.
 
 Vesper sirve una interfaz adaptable en `/panel` desde el mismo proceso Node.js.
 No necesita WordPress, otro servidor frontend ni una base de datos adicional.
-La interfaz incluye:
+Abrir la raíz del dominio en un navegador redirige directamente al panel.
+
+Está organizado en diez secciones, cada una con su propia pantalla:
+
+| Sección | Qué se hace ahí |
+| --- | --- |
+| Inicio | Estado del bot, qué falta por configurar y monitores en pausa |
+| Identidad | Nombre, avatar, colores y rol automático, con vista previa en vivo |
+| Bienvenidas | Canales y editor de los embeds de entrada y salida, con vista previa |
+| Avisos de redes | Cuentas vigiladas de TikTok, Twitch y YouTube, canales y rol |
+| Moderación | Filtros automáticos, registro de sanciones e historial de casos |
+| Comunidad | Tickets, sugerencias, autorroles y mensajes destacados |
+| Música | Canales permitidos y límites de la cola |
+| Módulos y permisos | Qué funciones están activas y qué roles pueden usarlas |
+| Configuración | Todo lo guardado del servidor, con los IDs traducidos a nombres |
+| Auditoría | Quién cambió qué desde la web |
+
+El panel toma su color del servidor que estés editando: el acento, el modo claro
+u oscuro, el nombre y el avatar de la barra lateral salen de la configuración de
+ese servidor y cambian en cuanto la cambias, sin recargar.
+
+Además incluye:
 
 - Estado del bot y preparación de cada servidor.
 - Configuración de módulos, canales, roles, música y filtros automáticos.

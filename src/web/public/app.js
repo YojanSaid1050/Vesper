@@ -1,15 +1,40 @@
+/* ============================================================
+   Vesper · Panel de control
+   ------------------------------------------------------------
+   Interfaz del panel. Principios que sigue este archivo:
+
+   1. Todo se pinta desde los datos que devuelve la API. No hay
+      textos ni colores de servidor escritos a mano aquí: el
+      acento, el nombre, el avatar y los valores por defecto de
+      cada embed llegan del backend y cambian con la configuración.
+   2. Cada pantalla es una sección independiente con su propio
+      render y su propio bind, en vez de una pestaña gigante.
+   3. Nada de HTML con atributos style: la CSP del panel es
+      `style-src 'self'` y los bloquearía. El color se aplica
+      siempre por CSSOM.
+   ============================================================ */
+
+'use strict';
+
 const state = {
   publicConfig: null,
   bootError: null,
   session: null,
   guilds: [],
-  selectedGuildId: null,
-  overview: null,
-  activeTab: 'overview'
+  guildId: null,
+  data: null,
+  section: 'inicio',
+  health: null,
+  loading: false,
+  dirty: new Set()
 };
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
+
+/* ---------------------------------------------------------------- */
+/* Utilidades                                                        */
+/* ---------------------------------------------------------------- */
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -22,170 +47,176 @@ function escapeHtml(value) {
 
 function formatDate(value) {
   if (!value) return '—';
-  return new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  try {
+    return new Intl.DateTimeFormat('es-CO', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+  } catch {
+    return '—';
+  }
 }
 
-function toast(message, error = false) {
+function formatNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number.toLocaleString('es-CO') : '—';
+}
+
+function toast(message, kind = 'ok') {
   const element = $('#toast');
   element.textContent = message;
-  element.classList.toggle('error', error);
+  element.className = `toast ${kind}`;
   element.hidden = false;
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => { element.hidden = true; }, 4500);
+  toast.timer = setTimeout(() => { element.hidden = true; }, 4800);
 }
 
 async function api(path, options = {}) {
   const headers = { Accept: 'application/json', ...(options.headers || {}) };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
-  if (state.session?.csrfToken && !['GET', 'HEAD'].includes(options.method || 'GET')) {
+  const method = options.method || 'GET';
+  if (state.session?.csrfToken && !['GET', 'HEAD'].includes(method)) {
     headers['X-CSRF-Token'] = state.session.csrfToken;
   }
-  const response = await fetch(`/api/web${path}`, { ...options, headers });
-  const data = response.status === 204 ? null : await response.json().catch(() => ({}));
+
+  let response;
+  try {
+    response = await fetch(`/api/web${path}`, { ...options, headers });
+  } catch {
+    throw new Error('No se pudo contactar con Vesper. Puede estar reiniciando.');
+  }
+
+  const payload = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     if (response.status === 401) showLogin();
-    throw new Error(data?.error || `Error HTTP ${response.status}`);
+    throw new Error(payload?.error || `El servidor respondió ${response.status}.`);
   }
-  return data;
+  return payload;
 }
 
-function avatarMarkup(url, fallback = 'V') {
+/* ---------------------------------------------------------------- */
+/* Color: el panel toma el acento del servidor que estás editando    */
+/* ---------------------------------------------------------------- */
+
+function parseHex(value) {
+  const hex = String(value || '').trim().replace(/^#/, '');
+  if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+  return {
+    r: parseInt(hex.slice(0, 2), 16),
+    g: parseInt(hex.slice(2, 4), 16),
+    b: parseInt(hex.slice(4, 6), 16)
+  };
+}
+
+// Luminancia relativa (WCAG). Decide si el texto sobre el acento debe ser
+// blanco o negro, en lugar de asumir siempre blanco y acabar con botones
+// ilegibles cuando alguien elige un color claro.
+function luminance({ r, g, b }) {
+  const channel = value => {
+    const v = value / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+}
+
+function applyTheme() {
+  const root = document.documentElement;
+  const guild = state.data?.guild;
+  const profile = state.data?.config?.profile || {};
+  const fallback = guild?.tier === 'themed_main' ? '#8DDCF4' : '#9D63FF';
+  const accentHex = profile.primaryColor || fallback;
+  const rgb = parseHex(accentHex) || parseHex(fallback);
+
+  root.style.setProperty('--accent', accentHex);
+  root.style.setProperty('--accent-soft', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, .16)`);
+  root.style.setProperty('--accent-line', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, .34)`);
+  root.style.setProperty('--accent-ink', luminance(rgb) > 0.55 ? '#14101c' : '#ffffff');
+
+  // Un servidor con paleta clara merece un panel claro. Se deduce del propio
+  // color elegido, así que cambiar el color cambia también el lienzo.
+  const light = luminance(rgb) > 0.62;
+  document.body.dataset.mode = light ? 'light' : 'dark';
+
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.setAttribute('content', light ? '#f7f5fb' : '#0e0b14');
+}
+
+/* ---------------------------------------------------------------- */
+/* Piezas de interfaz reutilizables                                  */
+/* ---------------------------------------------------------------- */
+
+function avatarMarkup(url, fallbackText = 'V', className = 'avatar') {
+  const initial = escapeHtml(String(fallbackText || 'V').trim().slice(0, 1).toUpperCase());
   return url
-    ? `<img class="avatar" src="${escapeHtml(url)}" alt="">`
-    : `<span class="avatar guild-icon">${escapeHtml(fallback.slice(0, 1).toUpperCase())}</span>`;
-}
-
-function showLogin() {
-  $('#app-view').hidden = true;
-  $('#login-view').hidden = false;
-  const params = new URLSearchParams(location.search);
-  if (params.get('message')) {
-    $('#auth-error').textContent = params.get('message');
-    $('#auth-error').hidden = false;
-  }
-  const actions = [];
-  if (state.bootError) {
-    actions.push(`<div class="notice danger">No se pudo contactar con Vesper: ${escapeHtml(state.bootError)}. Puede estar reiniciando; vuelve a intentarlo en un momento.</div>`);
-    actions.push('<a class="button secondary" href="/panel">Reintentar</a>');
-  } else if (!state.publicConfig?.enabled) {
-    actions.push('<div class="notice danger">El panel web todavía no está habilitado en el servidor.</div>');
-  } else if (!state.publicConfig.ready) {
-    actions.push('<div class="notice danger">El panel necesita una clave de sesión segura antes de poder iniciar.</div>');
-  } else {
-    if (state.publicConfig.discordEnabled) actions.push('<a class="button" href="/auth/discord">Continuar con Discord</a>');
-    if (state.publicConfig.googleEnabled) actions.push('<a class="button secondary" href="/auth/google">Continuar con Google</a>');
-    if (!state.publicConfig.discordEnabled && !state.publicConfig.googleEnabled) {
-      actions.push('<div class="notice danger">Configura al menos un proveedor OAuth para abrir el panel.</div>');
-    }
-  }
-  $('#auth-actions').innerHTML = actions.join('');
-}
-
-function renderIdentity() {
-  const user = state.session.user;
-  const preferred = user.discord || user.google;
-  const name = user.discord?.globalName || user.discord?.username || user.google?.name || user.google?.email || 'Cuenta vinculada';
-  const detail = user.globalOwner ? 'Propietario global' : user.discord ? 'Cuenta de Discord' : 'Cuenta de Google';
-  const links = [];
-  if (!user.discord && state.publicConfig.discordEnabled) links.push('<a class="button small" href="/auth/discord">Vincular Discord</a>');
-  if (!user.google && state.publicConfig.googleEnabled) links.push('<a class="button secondary small" href="/auth/google">Vincular Google</a>');
-  if (user.discord && user.google) links.push('<button class="button ghost small" data-unlink="google" type="button">Desvincular Google</button>');
-  links.push('<button id="logout-button" class="button ghost small" type="button">Cerrar sesión</button>');
-  $('#identity-card').innerHTML = `
-    <div class="identity-row">
-      ${avatarMarkup(preferred?.avatar || preferred?.picture, name)}
-      <div class="identity-copy"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(detail)}</small></div>
-    </div>
-    <div class="identity-links">${links.join('')}</div>`;
-  $('#logout-button').addEventListener('click', async () => {
-    try {
-      await api('/logout', { method: 'POST' });
-      location.href = '/panel';
-    } catch (error) { toast(error.message, true); }
-  });
-  $('[data-unlink]')?.addEventListener('click', async event => {
-    if (!confirm('¿Deseas separar las cuentas de Google y Discord? Podrás volver a vincularlas después.')) return;
-    try {
-      const result = await api('/unlink', { method: 'POST', body: JSON.stringify({ provider: event.currentTarget.dataset.unlink }) });
-      state.session = { ...state.session, ...result };
-      renderIdentity();
-      toast('Las identidades se separaron correctamente.');
-    } catch (error) { toast(error.message, true); }
-  });
-}
-
-function renderGuildList() {
-  $('#guild-list').innerHTML = state.guilds.length ? state.guilds.map(guild => `
-    <button class="guild-button ${guild.id === state.selectedGuildId ? 'active' : ''}" type="button" data-guild-id="${guild.id}">
-      <span class="guild-icon">${guild.icon ? `<img src="${escapeHtml(guild.icon)}" alt="">` : escapeHtml(guild.name.slice(0, 1))}</span>
-      <span class="guild-name">${escapeHtml(guild.name)}${guild.tier === 'themed_main' ? '<small class="guild-tier">Main temático</small>' : guild.tier === 'primary_main' ? '<small class="guild-tier">Main principal</small>' : ''}</span>
-    </button>`).join('') : '<div class="notice">No hay servidores disponibles para esta cuenta.</div>';
-  $$('.guild-button').forEach(button => button.addEventListener('click', () => selectGuild(button.dataset.guildId)));
-}
-
-function applyGuildTheme() {
-  const data = state.overview;
-  const themed = data?.guild?.tier === 'themed_main';
-  const body = document.body;
-  body.dataset.theme = themed ? (data.config?.profile?.theme || 'cinnamoroll') : data?.guild?.tier === 'primary_main' ? 'void' : 'neutral';
-  for (const variable of ['--purple', '--purple-2']) body.style.removeProperty(variable);
-  if (themed) {
-    body.style.setProperty('--purple', data.config?.profile?.primaryColor || '#8DDCF4');
-    body.style.setProperty('--purple-2', data.config?.profile?.secondaryColor || '#F8C8DC');
-  }
-  $('#panel-brand-name').textContent = themed ? (data.config?.profile?.displayName || 'AnkeBot') : 'Vesper';
-  $('#panel-brand-mode').textContent = themed ? 'Ankerie Console' : data?.guild?.tier === 'primary_main' ? 'Void Console' : 'Server Console';
+    ? `<span class="${className}"><img src="${escapeHtml(url)}" alt="" loading="lazy" referrerpolicy="no-referrer"></span>`
+    : `<span class="${className}">${initial}</span>`;
 }
 
 function selectOptions(items, selected, emptyLabel = 'Sin configurar') {
-  const values = new Set(Array.isArray(selected) ? selected.map(String) : [String(selected || '')]);
-  return `<option value="">${escapeHtml(emptyLabel)}</option>${items.map(item =>
-    `<option value="${item.id}" ${values.has(String(item.id)) ? 'selected' : ''}>${escapeHtml(item.parent ? `${item.parent} / ${item.name}` : item.name)}</option>`
-  ).join('')}`;
+  const current = String(selected ?? '');
+  const options = (items || []).map(item => {
+    const label = item.parent ? `${item.parent} / ${item.name}` : item.name;
+    return `<option value="${escapeHtml(item.id)}"${String(item.id) === current ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+  }).join('');
+  return `<option value="">${escapeHtml(emptyLabel)}</option>${options}`;
 }
 
 function multiOptions(items, selected = []) {
-  const values = new Set((selected || []).map(String));
-  return items.map(item => `<option value="${item.id}" ${values.has(String(item.id)) ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('');
+  const chosen = new Set((selected || []).map(String));
+  return (items || [])
+    .map(item => `<option value="${escapeHtml(item.id)}"${chosen.has(String(item.id)) ? ' selected' : ''}>${escapeHtml(item.name)}</option>`)
+    .join('');
 }
 
 function selectedValues(select) {
-  return [...select.selectedOptions].map(option => option.value).filter(Boolean);
+  return select ? [...select.selectedOptions].map(option => option.value).filter(Boolean) : [];
 }
 
-const MODULE_LABELS = {
-  tiktok: 'Avisos de TikTok',
-  twitch: 'Avisos de Twitch',
-  youtube: 'Avisos de YouTube',
-  welcome: 'Mensaje de bienvenida',
-  goodbye: 'Mensaje de despedida',
-  logs: 'Registro de eventos',
-  music: 'Reproductor de música',
-  moderation: 'Moderación automática',
-  tickets: 'Tickets de soporte',
-  suggestions: 'Buzón de sugerencias',
-  selfroles: 'Autorroles',
-  starboard: 'Mensajes destacados'
+function card({ eyebrow, title, description, actions = '', body, id = '' }) {
+  return `
+    <section class="card"${id ? ` id="${id}"` : ''}>
+      <div class="card-head">
+        <div>
+          ${eyebrow ? `<p class="eyebrow">${escapeHtml(eyebrow)}</p>` : ''}
+          <h2>${escapeHtml(title)}</h2>
+          ${description ? `<p>${escapeHtml(description)}</p>` : ''}
+        </div>
+        ${actions ? `<div class="card-actions">${actions}</div>` : ''}
+      </div>
+      ${body}
+    </section>`;
+}
+
+function emptyBlock(title, detail) {
+  return `<div class="empty"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}</span></div>`;
+}
+
+function formActions(label, extra = '') {
+  return `<div class="form-actions"><button class="button" type="submit">${escapeHtml(label)}</button>${extra}<span class="dirty-flag" hidden>Cambios sin guardar</span></div>`;
+}
+
+/* ---------------------------------------------------------------- */
+/* Etiquetas de dominio                                              */
+/* ---------------------------------------------------------------- */
+
+const MODULES = {
+  tiktok: ['Avisos de TikTok', 'Publica cuando una cuenta empieza directo o sube un video.'],
+  twitch: ['Avisos de Twitch', 'Publica cuando un streamer empieza directo.'],
+  youtube: ['Avisos de YouTube', 'Publica directos, videos y Shorts de los canales seguidos.'],
+  welcome: ['Mensaje de bienvenida', 'Envía el embed de bienvenida cuando alguien entra.'],
+  goodbye: ['Mensaje de despedida', 'Envía el embed de despedida cuando alguien sale.'],
+  logs: ['Registro de eventos', 'Anota entradas, salidas, ediciones, baneos y cambios de canal.'],
+  music: ['Reproductor de música', 'Habilita /musica y la reproducción en canales de voz.'],
+  moderation: ['Moderación automática', 'Filtra enlaces, invitaciones, menciones y mensajes repetidos.'],
+  tickets: ['Tickets de soporte', 'Panel de tickets con categoría y transcripciones.'],
+  suggestions: ['Buzón de sugerencias', 'Habilita /sugerir y su revisión desde el panel.'],
+  selfroles: ['Autorroles', 'Panel donde los miembros eligen sus propios roles.'],
+  starboard: ['Mensajes destacados', 'Destaca mensajes que superan un número de reacciones.']
 };
 
-const MODULE_HINTS = {
-  tiktok: 'Publica cuando una cuenta de TikTok empieza directo o sube un video.',
-  twitch: 'Publica cuando un streamer de Twitch empieza directo.',
-  youtube: 'Publica directos, videos y Shorts de los canales seguidos.',
-  welcome: 'Envía el embed de bienvenida cuando alguien entra.',
-  goodbye: 'Envía el embed de despedida cuando alguien sale.',
-  logs: 'Registra entradas, salidas, ediciones, baneos y cambios de canal.',
-  music: 'Habilita /musica y el reproductor de voz.',
-  moderation: 'Filtra enlaces, invitaciones, menciones y mensajes repetidos.',
-  tickets: 'Panel de tickets con categoría y transcripciones.',
-  suggestions: 'Permite /sugerir y su revisión desde el panel.',
-  selfroles: 'Panel donde los miembros eligen sus propios roles.',
-  starboard: 'Destaca mensajes que superan un número de reacciones.'
-};
+const moduleLabel = key => MODULES[key]?.[0] || key;
+const moduleHint = key => MODULES[key]?.[1] || '';
 
-const EMBED_KIND_LABELS = { welcome: 'Bienvenida', goodbye: 'Despedida' };
+const EMBED_KINDS = { welcome: 'Bienvenida', goodbye: 'Despedida' };
 
-const EMBED_VARIABLES = [
+const VARIABLES = [
   ['{user}', 'menciona al miembro'],
   ['{username}', 'su nombre de usuario'],
   ['{displayName}', 'su apodo en el servidor'],
@@ -194,60 +225,479 @@ const EMBED_VARIABLES = [
   ['{userId}', 'su ID']
 ];
 
-function moduleLabel(key) {
-  return MODULE_LABELS[key] || key;
-}
+const TIER_LABELS = {
+  primary_main: 'Main principal',
+  themed_main: 'Main temático',
+  satellite: 'Satélite',
+  external: 'No aprobado'
+};
 
-// Render mínimo de Markdown solo para la vista previa. Se escapa PRIMERO y
-// después se aplican las marcas, así el contenido del usuario nunca puede
-// inyectar HTML en el panel.
-function previewMarkdown(value) {
-  const escaped = escapeHtml(value ?? '');
-  return escaped
+const STATUS_LABELS = { active: 'Activo', resolved: 'Resuelto', revoked: 'Revocado' };
+const ACTION_LABELS = { warning: 'Advertencia', timeout: 'Aislamiento', filter: 'Filtro automático' };
+const SUGGESTION_LABELS = { open: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada' };
+
+/* ---------------------------------------------------------------- */
+/* Vista previa estilo Discord                                       */
+/* ---------------------------------------------------------------- */
+
+// Render mínimo de Markdown para la vista previa. Se escapa PRIMERO y luego se
+// aplican las marcas, así nada de lo que escriba el usuario puede inyectar HTML.
+function renderMarkdown(value) {
+  return escapeHtml(value ?? '')
     .split('\n')
     .map(line => {
-      if (line.startsWith('### ')) return `<span class="preview-h3">${line.slice(4)}</span>`;
-      if (line.startsWith('## ')) return `<span class="preview-h2">${line.slice(3)}</span>`;
-      if (line.startsWith('# ')) return `<span class="preview-h1">${line.slice(2)}</span>`;
+      if (line.startsWith('### ')) return `<span class="md-h3">${line.slice(4)}</span>`;
+      if (line.startsWith('## ')) return `<span class="md-h2">${line.slice(3)}</span>`;
+      if (line.startsWith('# ')) return `<span class="md-h1">${line.slice(2)}</span>`;
       return line;
     })
     .join('<br>')
-    .replaceAll('&lt;br&gt;', '<br>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/~~([^~]+)~~/g, '<s>$1</s>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/(@[\w-]+)/g, '<span class="md-mention">$1</span>');
 }
 
-// Sustituye las variables por valores de ejemplo, para que la vista previa se
-// parezca a lo que verá un miembro real.
-function previewVariables(value, data) {
-  const guildName = data?.guild?.name || 'tu servidor';
-  return String(value ?? '')
+function sampleValues(text) {
+  const guild = state.data?.guild;
+  return String(text ?? '')
     .replaceAll('{user}', '@nuevo-miembro')
     .replaceAll('{username}', 'nuevo-miembro')
     .replaceAll('{displayName}', 'Nuevo miembro')
-    .replaceAll('{server}', guildName)
-    .replaceAll('{memberCount}', String(data?.guild?.memberCount ?? 0))
+    .replaceAll('{server}', guild?.name || 'tu servidor')
+    .replaceAll('{memberCount}', formatNumber(guild?.memberCount ?? 0))
     .replaceAll('{userId}', '123456789012345678');
 }
 
-function statusLabel(status) {
-  return { active: 'Activo', resolved: 'Resuelto', revoked: 'Revocado' }[status] || status;
+// Cabecera del mensaje: el autor que verá un miembro. Usa la identidad efectiva
+// que calcula el backend (perfil → branding → cuenta del bot).
+function messageHeaderMarkup({ name, avatar }) {
+  return `
+    ${avatarMarkup(avatar, name, 'discord-avatar')}
+    <div class="discord-body">
+      <div class="discord-author">
+        <strong>${escapeHtml(name)}</strong>
+        <span class="discord-tag">Bot</span>
+        <span class="discord-time">hoy a las 14:32</span>
+      </div>`;
 }
 
-function suggestionStatusLabel(status) {
-  return { open: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada' }[status] || status;
+function embedPreviewMarkup(values, options) {
+  const { componentsV2 = false, memberAvatar = null } = options;
+  const title = sampleValues(values.title);
+  const message = sampleValues(values.message);
+  const footer = sampleValues(values.footer);
+
+  const thumb = !componentsV2 && values.thumbnail
+    ? `<div class="embed-thumb">${memberAvatar ? `<img src="${escapeHtml(memberAvatar)}" alt="">` : '👤'}</div>`
+    : '';
+
+  const image = values.image
+    ? `<img class="embed-image" src="${escapeHtml(values.image)}" alt="" loading="lazy" referrerpolicy="no-referrer"
+         data-fallback="La imagen no se pudo cargar. Comprueba que la URL sea pública y HTTPS.">`
+    : '';
+
+  const footerRow = !componentsV2 && footer
+    ? `<div class="embed-footer">${escapeHtml(footer)} · hoy a las 14:32</div>`
+    : '';
+
+  return `
+    <div class="embed-preview">
+      <div class="embed-top">
+        <div class="embed-text">
+          <div class="embed-title">${renderMarkdown(title)}</div>
+          ${componentsV2 ? '<div class="embed-divider"></div>' : ''}
+          <div class="embed-desc">${renderMarkdown(message)}</div>
+        </div>
+        ${thumb}
+      </div>
+      ${image}
+      ${footerRow}
+    </div>`;
 }
 
-function actionLabel(action) {
-  return { warning: 'Advertencia', timeout: 'Aislamiento', filter: 'Filtro automático' }[action] || action;
+// Si una imagen remota falla, se sustituye por una nota explicativa en vez de
+// dejar el icono roto del navegador, que no dice nada al usuario.
+function wireImageFallbacks(root) {
+  root.querySelectorAll('img[data-fallback]').forEach(image => {
+    image.addEventListener('error', () => {
+      const note = document.createElement('div');
+      note.className = 'embed-image-fallback';
+      note.textContent = image.dataset.fallback;
+      image.replaceWith(note);
+    }, { once: true });
+  });
 }
 
-function embedFieldValues(kind) {
-  const read = id => {
-    const element = $(`#embed-${kind}-${id}`);
-    return element ? element.value : '';
+/* ---------------------------------------------------------------- */
+/* Secciones                                                         */
+/* ---------------------------------------------------------------- */
+
+const SECTIONS = [
+  { id: 'inicio', group: 'Servidor', icon: '◈', label: 'Inicio', title: 'Resumen del servidor',
+    hint: 'Estado de Vesper y qué falta por configurar.' },
+  { id: 'identidad', group: 'Servidor', icon: '✦', label: 'Identidad', title: 'Identidad del bot',
+    hint: 'Cómo se llama y qué cara pone Vesper en este servidor.', needs: 'configure' },
+  { id: 'bienvenidas', group: 'Mensajes', icon: '✉', label: 'Bienvenidas', title: 'Bienvenida y despedida',
+    hint: 'Edita los embeds que se publican cuando alguien entra o sale.', needs: 'configure' },
+  { id: 'avisos', group: 'Mensajes', icon: '◎', label: 'Avisos de redes', title: 'TikTok, Twitch y YouTube',
+    hint: 'Cuentas vigiladas, canales de destino y rol al que avisar.', needs: 'social' },
+  { id: 'moderacion', group: 'Comunidad', icon: '⚖', label: 'Moderación', title: 'Moderación',
+    hint: 'Filtros automáticos, casos abiertos y sanciones.' },
+  { id: 'comunidad', group: 'Comunidad', icon: '☰', label: 'Comunidad', title: 'Tickets, sugerencias y roles',
+    hint: 'Paneles de soporte, buzón de sugerencias, autorroles y destacados.', needs: 'configure' },
+  { id: 'musica', group: 'Comunidad', icon: '♪', label: 'Música', title: 'Reproductor de música',
+    hint: 'Canales permitidos y límites de la cola.', needs: 'configure' },
+  { id: 'modulos', group: 'Ajustes', icon: '⚙', label: 'Módulos y permisos', title: 'Módulos y permisos',
+    hint: 'Qué funciones están activas y qué roles pueden usarlas.', needs: 'configure' },
+  { id: 'resumen', group: 'Ajustes', icon: '≡', label: 'Configuración', title: 'Configuración completa',
+    hint: 'Todo lo que Vesper tiene guardado de este servidor.', needs: 'configure' },
+  { id: 'auditoria', group: 'Ajustes', icon: '⏱', label: 'Auditoría', title: 'Auditoría del panel',
+    hint: 'Quién cambió qué desde la web.', needs: 'configure' }
+];
+
+function sectionAllowed(section) {
+  if (!section.needs) return true;
+  return Boolean(state.data?.permissions?.[section.needs]);
+}
+
+function currentSection() {
+  return SECTIONS.find(section => section.id === state.section) || SECTIONS[0];
+}
+
+/* ---------------------------------------------------------------- */
+/* Inicio                                                            */
+/* ---------------------------------------------------------------- */
+
+function renderInicio() {
+  const data = state.data;
+  const health = state.health || data.health || {};
+  const ready = health.ready ?? health.healthy;
+  const setup = data.setup || { checks: [], percentage: 0, ready: 0, total: 0 };
+  const activeCases = (data.cases || []).filter(item => item.status === 'active').length;
+  const accounts = ['tiktok', 'twitch', 'youtube']
+    .reduce((total, platform) => total + (data.config?.[platform]?.users?.length || 0), 0);
+  const activeModules = Object.values(data.config?.features || {}).filter(Boolean).length;
+
+  const pending = setup.checks.filter(check => !check.ready);
+  const checks = setup.checks.map(check => `
+    <div class="check-row">
+      <span>${escapeHtml(check.label)}</span>
+      <span class="tag ${check.ready ? 'ok' : 'warn'}">${check.ready ? 'Listo' : 'Pendiente'}</span>
+    </div>`).join('');
+
+  const monitors = (health.monitors || []).map(monitor => `
+    <div class="check-row">
+      <span>${escapeHtml(monitor.name)}</span>
+      <span class="tag ${monitor.disabledUntil ? 'warn' : 'ok'}">${monitor.disabledUntil ? `En pausa hasta ${formatDate(monitor.disabledUntil)}` : 'Activo'}</span>
+    </div>`).join('');
+
+  const noDiscord = !state.session.user.discord
+    ? `<div class="callout warn"><strong>Falta vincular Discord.</strong><span>Con solo Google puedes configurar, pero no moderar ni gestionar cuentas de redes. Vincula Discord desde la tarjeta de tu cuenta.</span></div>`
+    : '';
+
+  const nextStep = pending.length
+    ? `<div class="callout info"><strong>Siguiente paso: ${escapeHtml(pending[0].label)}.</strong><span>${pending.length === 1 ? 'Queda 1 ajuste' : `Quedan ${pending.length} ajustes`} por completar.</span></div>`
+    : `<div class="callout ok"><strong>Configuración completa.</strong><span>No queda nada pendiente en este servidor.</span></div>`;
+
+  return `
+    ${noDiscord}
+    <div class="grid-3">
+      <div class="stat">
+        <small>Estado de Vesper</small>
+        <strong class="${ready ? 'ok' : 'warn'}">${ready ? 'Operativo' : 'Requiere atención'}</strong>
+        <span class="stat-note">${escapeHtml(healthSummary(health))}</span>
+      </div>
+      <div class="stat">
+        <small>Preparación</small>
+        <strong>${setup.percentage}%</strong>
+        <span class="stat-note">${setup.ready} de ${setup.total} ajustes listos</span>
+      </div>
+      <div class="stat">
+        <small>Cuentas vigiladas</small>
+        <strong>${accounts}</strong>
+        <span class="stat-note">TikTok, Twitch y YouTube</span>
+      </div>
+      <div class="stat">
+        <small>Casos activos</small>
+        <strong class="${activeCases ? 'warn' : ''}">${activeCases}</strong>
+        <span class="stat-note">${data.cases?.length || 0} visibles en total</span>
+      </div>
+    </div>
+
+    ${nextStep}
+
+    <div class="grid-2">
+      ${card({
+        eyebrow: 'Preparación',
+        title: 'Qué falta por configurar',
+        description: 'Cada punto corresponde a un ajuste que Vesper necesita para trabajar.',
+        body: `<div class="meter"><span data-meter="${setup.percentage}"></span></div><div class="check-list">${checks || emptyBlock('Sin comprobaciones', 'El servidor todavía no tiene configuración.')}</div>`
+      })}
+      ${card({
+        eyebrow: 'Servicio',
+        title: 'Monitores y conexiones',
+        description: 'Si un monitor falla varias veces seguidas entra en pausa y se reanuda solo.',
+        body: `
+          <div class="check-list">
+            <div class="check-row"><span>Base de datos</span><span class="tag ${health.database?.connected ? 'ok' : 'bad'}">${health.database?.connected ? 'Conectada' : 'Desconectada'}</span></div>
+            <div class="check-row"><span>Música (Lavalink)</span><span class="tag ${health.music?.connected ? 'ok' : health.music?.configured ? 'warn' : ''}">${health.music?.connected ? 'Conectada' : health.music?.configured ? 'Sin conexión' : 'No configurada'}</span></div>
+            ${monitors}
+          </div>`
+      })}
+    </div>
+
+    ${card({
+      eyebrow: 'Módulos',
+      title: `${activeModules} de ${Object.keys(data.config?.features || {}).length} funciones activas`,
+      description: 'Un vistazo rápido. Se activan y desactivan en «Módulos y permisos».',
+      actions: data.permissions.configure ? '<button class="button quiet sm" type="button" data-goto="modulos">Gestionar módulos</button>' : '',
+      body: `<div class="chips">${Object.entries(data.config?.features || {}).map(([key, value]) =>
+        `<span class="tag ${value ? 'ok' : ''}">${escapeHtml(moduleLabel(key))}</span>`).join('') || emptyBlock('Sin módulos', 'No se pudo leer la configuración.')}</div>`
+    })}`;
+}
+
+function healthSummary(health) {
+  if (!health.botReady) return 'El bot no está conectado a Discord';
+  if (health.database && !health.database.connected) return 'La base de datos está reconectando';
+  const paused = (health.monitors || []).filter(monitor => monitor.disabledUntil);
+  if (paused.length) return `${paused.length} ${paused.length === 1 ? 'monitor' : 'monitores'} en pausa`;
+  if (health.musicRequired && !health.musicHealthy) return 'El servicio de música no responde';
+  return 'Todo funcionando con normalidad';
+}
+
+/* ---------------------------------------------------------------- */
+/* Identidad                                                         */
+/* ---------------------------------------------------------------- */
+
+function renderIdentidad() {
+  const data = state.data;
+  const config = data.config;
+  const identity = data.identity || {};
+  const profile = config.profile || {};
+  const branding = config.branding || {};
+  const isMain = data.guild.tier === 'primary_main' || data.guild.tier === 'themed_main';
+
+  const themeOptions = data.guild.tier === 'primary_main'
+    ? [['void', 'Void · morado profundo'], ['custom', 'Personalizado']]
+    : [['cinnamoroll', 'Cinnamoroll · nubes pastel'], ['custom', 'Personalizado']];
+
+  const identityForm = isMain ? `
+    <form id="form-profile" class="form">
+      <div class="form-row">
+        <div class="field">
+          <label for="profile-name">Nombre visible</label>
+          <input id="profile-name" type="text" maxlength="80" value="${escapeHtml(profile.displayName || '')}"
+                 placeholder="${escapeHtml(identity.account?.username || 'Vesper')}">
+          <span class="hint">Se usa como apodo del bot y como autor de sus mensajes.</span>
+        </div>
+        <div class="field">
+          <label for="profile-theme">Tema del panel</label>
+          <select id="profile-theme">
+            ${themeOptions.map(([value, label]) => `<option value="${value}"${profile.theme === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+          </select>
+          <span class="hint">Identifica el estilo del servidor.</span>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="profile-primary">Color principal</label>
+          <div class="color-field"><input id="profile-primary" type="color" value="${escapeHtml(profile.primaryColor || '#9D63FF')}"></div>
+          <span class="hint">Tiñe este panel y los embeds de bienvenida.</span>
+        </div>
+        <div class="field">
+          <label for="profile-secondary">Color secundario</label>
+          <div class="color-field"><input id="profile-secondary" type="color" value="${escapeHtml(profile.secondaryColor || '#747F8D')}"></div>
+          <span class="hint">Se usa en los embeds de despedida.</span>
+        </div>
+      </div>
+      <div class="field wide">
+        <label for="profile-avatar">Avatar de los mensajes (URL HTTPS)</label>
+        <input id="profile-avatar" type="url" maxlength="500" placeholder="https://…" value="${escapeHtml(profile.avatar || '')}">
+        <span class="hint">El avatar de la cuenta de Discord es global y no se cambia aquí; este solo afecta a este servidor.</span>
+      </div>
+      <div class="field wide">
+        <label for="profile-member-role">Rol automático para miembros nuevos</label>
+        <select id="profile-member-role">${selectOptions(data.assignableRoles || [], profile.memberRole, 'Sin rol automático')}</select>
+        <span class="hint">Solo aparecen roles que Vesper puede asignar por jerarquía.</span>
+      </div>
+      ${formActions('Guardar identidad')}
+    </form>` : `
+    <div class="callout">
+      <strong>Este servidor no tiene identidad propia.</strong>
+      <span>Los satélites publican con el nombre y el avatar de la cuenta del bot. Puedes ajustar el branding de los webhooks más abajo.</span>
+    </div>`;
+
+  const brandingForm = `
+    <form id="form-branding" class="form">
+      <div class="form-row">
+        <div class="field">
+          <label for="branding-name">Nombre en webhooks</label>
+          <input id="branding-name" type="text" maxlength="80" value="${escapeHtml(branding.name || '')}"
+                 placeholder="${escapeHtml(identity.account?.username || 'Vesper')}">
+          <span class="hint">Solo se usa si no hay nombre visible arriba.</span>
+        </div>
+        <div class="field">
+          <label for="branding-avatar">Avatar en webhooks (URL HTTPS)</label>
+          <input id="branding-avatar" type="url" maxlength="500" placeholder="https://…" value="${escapeHtml(branding.avatar || '')}">
+          <span class="hint">Alternativa de reserva si no hay avatar de identidad.</span>
+        </div>
+      </div>
+      ${formActions('Guardar branding')}
+    </form>`;
+
+  return `
+    ${card({
+      eyebrow: 'Vista previa',
+      title: 'Así te ve un miembro',
+      description: 'Se actualiza mientras escribes. El nombre y el avatar salen del primer valor que encuentres relleno: identidad, branding y, si no, la cuenta del bot.',
+      body: `
+        <div class="preview-shell">
+          <div class="discord-message" id="identity-preview"></div>
+        </div>
+        <div class="grid-3" id="identity-sources"></div>`
+    })}
+
+    ${card({
+      eyebrow: 'Identidad',
+      title: `Identidad en ${data.guild.name}`,
+      description: 'Estos valores solo afectan a este servidor. Cada Main mantiene la suya.',
+      body: identityForm
+    })}
+
+    ${card({
+      eyebrow: 'Branding',
+      title: 'Valores de reserva',
+      description: 'Lo que usaban los comandos /setbotname, /setbotavatar y /branding. Se aplican cuando la identidad de arriba está vacía.',
+      body: brandingForm
+    })}`;
+}
+
+function identityValues() {
+  const data = state.data;
+  const identity = data.identity || {};
+  const profileName = $('#profile-name')?.value.trim() || '';
+  const profileAvatar = $('#profile-avatar')?.value.trim() || '';
+  const brandingName = $('#branding-name')?.value.trim() || '';
+  const brandingAvatar = $('#branding-avatar')?.value.trim() || '';
+  const account = identity.account || {};
+
+  return {
+    name: profileName || brandingName || account.username || 'Vesper',
+    avatar: profileAvatar || brandingAvatar || account.avatar || null,
+    nameSource: profileName ? 'Identidad' : brandingName ? 'Branding' : 'Cuenta del bot',
+    avatarSource: profileAvatar ? 'Identidad' : brandingAvatar ? 'Branding' : 'Cuenta del bot',
+    account
   };
+}
+
+function refreshIdentityPreview() {
+  const preview = $('#identity-preview');
+  if (!preview) return;
+  const values = identityValues();
+
+  preview.innerHTML = `
+    ${messageHeaderMarkup(values)}
+      <div class="embed-desc">Ejemplo de mensaje publicado por Vesper en este servidor.</div>
+    </div>`;
+  wireImageFallbacks(preview);
+
+  const sources = $('#identity-sources');
+  if (sources) {
+    sources.innerHTML = `
+      <div class="stat"><small>Nombre</small><strong>${escapeHtml(values.name)}</strong><span class="stat-note">Desde: ${escapeHtml(values.nameSource)}</span></div>
+      <div class="stat"><small>Avatar</small><strong>${escapeHtml(values.avatarSource)}</strong><span class="stat-note">${values.avatar ? 'Imagen configurada' : 'Sin imagen'}</span></div>
+      <div class="stat"><small>Cuenta real del bot</small><strong>${escapeHtml(values.account.username || 'Vesper')}</strong><span class="stat-note">Global, igual en todos los servidores</span></div>`;
+  }
+
+  // El acento del panel sigue al color que estés eligiendo ahora mismo.
+  const primary = $('#profile-primary')?.value;
+  if (primary && state.data?.config?.profile) {
+    state.data.config.profile.primaryColor = primary;
+    applyTheme();
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Bienvenidas                                                       */
+/* ---------------------------------------------------------------- */
+
+function embedEditorCard(kind) {
+  const data = state.data;
+  const defaults = data.embedDefaults || {};
+  const fallback = defaults[kind] || {};
+  const saved = data.config.embeds?.[kind] || {};
+  const label = EMBED_KINDS[kind];
+  const hasColor = Boolean(saved.color);
+
+  const footerField = defaults.supportsFooter ? `
+    <div class="field wide">
+      <label for="embed-${kind}-footer">Pie de página</label>
+      <input id="embed-${kind}-footer" type="text" maxlength="200" data-embed="${kind}"
+             value="${escapeHtml(saved.footer || '')}" placeholder="${escapeHtml(`${data.identity?.webhook?.name || 'Vesper'} • ${data.guild.name}`)}">
+    </div>` : '';
+
+  const thumbnailField = defaults.supportsThumbnail ? `
+    <label class="inline-check">
+      <input id="embed-${kind}-thumbnail" type="checkbox" data-embed="${kind}" ${saved.thumbnail === false ? '' : 'checked'}>
+      <span>Mostrar el avatar del miembro</span>
+    </label>` : '';
+
+  return card({
+    eyebrow: `Embed de ${label.toLowerCase()}`,
+    title: label,
+    description: 'Deja un campo vacío para conservar el texto original del servidor.',
+    actions: `<button class="button ghost sm" type="button" data-embed-reset="${kind}">Restablecer</button>`,
+    body: `
+      <div class="editor-layout">
+        <form id="form-embed-${kind}" class="form">
+          <div class="field wide">
+            <label for="embed-${kind}-title">Título</label>
+            <input id="embed-${kind}-title" type="text" maxlength="240" data-embed="${kind}"
+                   value="${escapeHtml(saved.title || '')}" placeholder="${escapeHtml(fallback.title || '')}">
+          </div>
+          <div class="field wide">
+            <label for="embed-${kind}-message">Mensaje</label>
+            <textarea id="embed-${kind}-message" maxlength="3000" data-embed="${kind}"
+                      placeholder="${escapeHtml(fallback.message || '')}">${escapeHtml(saved.message || '')}</textarea>
+          </div>
+          ${footerField}
+          <div class="field wide">
+            <label for="embed-${kind}-image">Imagen o GIF (URL HTTPS)</label>
+            <input id="embed-${kind}-image" type="url" maxlength="500" data-embed="${kind}"
+                   value="${escapeHtml(saved.image || '')}" placeholder="${escapeHtml(fallback.image || 'https://…')}">
+          </div>
+          <div class="form-row">
+            <div class="field">
+              <span class="field-label">${defaults.layout === 'components_v2' ? 'Color del borde' : 'Color del embed'}</span>
+              <div class="color-field">
+                <input id="embed-${kind}-color" type="color" data-embed="${kind}"
+                       value="${escapeHtml(saved.color || fallback.color || '#5865F2')}" ${hasColor ? '' : 'disabled'}>
+                <label class="inline-check">
+                  <input id="embed-${kind}-usecolor" type="checkbox" data-embed="${kind}" ${hasColor ? 'checked' : ''}>
+                  <span>Usar color propio</span>
+                </label>
+              </div>
+            </div>
+            <div class="field">${thumbnailField}</div>
+          </div>
+          ${formActions(`Guardar ${label.toLowerCase()}`)}
+        </form>
+
+        <div class="editor-preview">
+          <p class="eyebrow">Vista previa</p>
+          <div class="preview-shell">
+            <div class="discord-message" id="preview-${kind}"></div>
+          </div>
+          <p class="preview-caption">Aproximación. Discord ajusta el espaciado y el tamaño de la imagen.</p>
+        </div>
+      </div>`
+  });
+}
+
+function embedValues(kind) {
+  const read = suffix => $(`#embed-${kind}-${suffix}`)?.value ?? '';
   const useColor = $(`#embed-${kind}-usecolor`)?.checked;
   const thumbnail = $(`#embed-${kind}-thumbnail`);
   return {
@@ -260,218 +710,570 @@ function embedFieldValues(kind) {
   };
 }
 
-function renderEmbedPreview(kind) {
-  const container = $(`#embed-preview-${kind}`);
+function refreshEmbedPreview(kind) {
+  const container = $(`#preview-${kind}`);
   if (!container) return;
-  const data = state.overview;
+  const data = state.data;
   const defaults = data.embedDefaults || {};
   const fallback = defaults[kind] || {};
-  const values = embedFieldValues(kind);
-
-  const title = previewVariables(values.title ?? fallback.title, data);
-  const message = previewVariables(values.message ?? fallback.message, data);
-  const footer = previewVariables(values.footer, data);
-  const color = values.color || fallback.color || '#5865F2';
-  const image = values.image ?? fallback.image ?? null;
+  const values = embedValues(kind);
   const componentsV2 = defaults.layout === 'components_v2';
 
-  const media = image
-    ? `<img class="preview-image" src="${escapeHtml(image)}" alt="" loading="lazy" referrerpolicy="no-referrer">`
-    : '';
-  const thumb = !componentsV2 && values.thumbnail
-    ? '<span class="preview-thumb" aria-hidden="true">👤</span>'
-    : '';
-  const footerRow = !componentsV2 && footer
-    ? `<div class="preview-footer">${escapeHtml(footer)} · hoy a las 14:32</div>`
-    : '';
+  const resolved = {
+    title: values.title ?? fallback.title,
+    message: values.message ?? fallback.message,
+    footer: values.footer ?? (componentsV2 ? null : `${data.identity?.webhook?.name || 'Vesper'} • ${data.guild.name}`),
+    image: values.image ?? fallback.image ?? null,
+    thumbnail: values.thumbnail
+  };
+  const color = values.color || fallback.color || '#5865F2';
+  const author = identityValues();
 
-  // La CSP del panel es `style-src 'self'`, que también cubre los atributos
-  // style en línea. El color se aplica después por CSSOM, que sí está
-  // permitido; con un atributo style el borde saldría siempre gris.
   container.innerHTML = `
-    <div class="preview-embed">
-      <div class="preview-body">
-        <div class="preview-text">
-          <div class="preview-title">${previewMarkdown(title)}</div>
-          ${componentsV2 ? '<div class="preview-divider" role="presentation"></div>' : ''}
-          <div class="preview-description">${previewMarkdown(message)}</div>
-        </div>
-        ${thumb}
-      </div>
-      ${media}
-      ${footerRow}
+    ${messageHeaderMarkup(author)}
+      ${embedPreviewMarkup(resolved, { componentsV2, memberAvatar: state.session.user.discord?.avatar || null })}
     </div>`;
 
-  const embed = container.firstElementChild;
-  if (embed) {
-    embed.style.setProperty('border-left-color', color);
-    embed.style.setProperty('--preview-accent', color);
-  }
+  const embed = container.querySelector('.embed-preview');
+  if (embed) embed.style.setProperty('--embed-accent', color);
+  wireImageFallbacks(container);
 }
 
-function embedCard(kind, config, defaults) {
-  const saved = config.embeds?.[kind] || {};
-  const fallback = defaults[kind] || {};
-  const label = EMBED_KIND_LABELS[kind];
-  const hasColor = Boolean(saved.color);
-  const colorValue = saved.color || fallback.color || '#5865F2';
+function renderBienvenidas() {
+  const data = state.data;
+  const config = data.config;
+  const defaults = data.embedDefaults || {};
+  const features = config.features || {};
 
-  const footerField = defaults.supportsFooter ? `
-    <div class="field full">
-      <label for="embed-${kind}-footer">Pie de página</label>
-      <input id="embed-${kind}-footer" data-embed="${kind}" maxlength="200" placeholder="Nombre del bot • ${escapeHtml(state.overview.guild.name)}" value="${escapeHtml(saved.footer || '')}">
-    </div>` : '';
+  const variables = VARIABLES.map(([token, description]) =>
+    `<li><button type="button" data-variable="${escapeHtml(token)}"><code>${escapeHtml(token)}</code></button> · ${escapeHtml(description)}</li>`).join('');
 
-  const thumbnailField = defaults.supportsThumbnail ? `
-    <label class="check-card compact">
-      <input id="embed-${kind}-thumbnail" data-embed="${kind}" type="checkbox" ${saved.thumbnail === false ? '' : 'checked'}>
-      <span>Mostrar el avatar del miembro</span>
-    </label>` : '';
+  const channelWarnings = [];
+  if (features.welcome && !config.general?.welcomeChannel) channelWarnings.push('El módulo de bienvenida está activo pero no hay canal elegido: el mensaje no se publica en ningún sitio.');
+  if (features.goodbye && !config.general?.goodbyeChannel) channelWarnings.push('El módulo de despedida está activo pero no hay canal elegido.');
 
   return `
-    <article class="panel embed-editor" data-embed-card="${kind}">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">EMBED DE ${label.toUpperCase()}</p>
-          <h2>${label}</h2>
-          <p>Deja un campo vacío para conservar el valor original del servidor.</p>
-        </div>
-        <button class="button ghost small" type="button" data-embed-reset="${kind}">Restablecer</button>
-      </div>
-      <div class="embed-grid">
-        <form id="embed-form-${kind}" class="form-grid embed-fields">
-          <div class="field full">
-            <label for="embed-${kind}-title">Título</label>
-            <input id="embed-${kind}-title" data-embed="${kind}" maxlength="240" placeholder="${escapeHtml(fallback.title || '')}" value="${escapeHtml(saved.title || '')}">
-          </div>
-          <div class="field full">
-            <label for="embed-${kind}-message">Mensaje</label>
-            <textarea id="embed-${kind}-message" data-embed="${kind}" rows="6" maxlength="3000" placeholder="${escapeHtml(fallback.message || '')}">${escapeHtml(saved.message || '')}</textarea>
-          </div>
-          ${footerField}
-          <div class="field full">
-            <label for="embed-${kind}-image">Imagen o GIF (HTTPS)</label>
-            <input id="embed-${kind}-image" data-embed="${kind}" type="url" maxlength="500" placeholder="${escapeHtml(fallback.image || 'https://...')}" value="${escapeHtml(saved.image || '')}">
-          </div>
-          <div class="field">
-            <label for="embed-${kind}-color">${defaults.layout === 'components_v2' ? 'Color del borde' : 'Color del embed'}</label>
-            <div class="color-row">
-              <input id="embed-${kind}-color" data-embed="${kind}" type="color" value="${escapeHtml(colorValue)}" ${hasColor ? '' : 'disabled'}>
-              <label class="check-inline">
-                <input id="embed-${kind}-usecolor" data-embed="${kind}" type="checkbox" ${hasColor ? 'checked' : ''}>
-                <span>Usar color propio</span>
-              </label>
+    ${channelWarnings.length ? `<div class="callout warn"><strong>Revisa los canales.</strong><span>${escapeHtml(channelWarnings.join(' '))}</span></div>` : ''}
+
+    ${card({
+      eyebrow: 'Dónde se publican',
+      title: 'Canales de bienvenida y despedida',
+      description: 'Solo aparecen canales de texto donde Vesper puede escribir e insertar enlaces.',
+      body: `
+        <form id="form-welcome-channels" class="form">
+          <div class="form-row">
+            <div class="field">
+              <label for="channel-welcome">Canal de bienvenida</label>
+              <select id="channel-welcome">${selectOptions(data.channels, config.general?.welcomeChannel)}</select>
+            </div>
+            <div class="field">
+              <label for="channel-goodbye">Canal de despedida</label>
+              <select id="channel-goodbye">${selectOptions(data.channels, config.general?.goodbyeChannel)}</select>
             </div>
           </div>
-          ${thumbnailField}
-          <div class="form-actions">
-            <button class="button" type="submit">Guardar ${label.toLowerCase()}</button>
+          ${formActions('Guardar canales')}
+        </form>`
+    })}
+
+    ${card({
+      eyebrow: 'Cómo escribir',
+      title: 'Variables disponibles',
+      description: `${defaults.note || ''} Pulsa una variable para copiarla.`,
+      body: `<ul class="var-list">${variables}</ul>`
+    })}
+
+    ${embedEditorCard('welcome')}
+    ${embedEditorCard('goodbye')}`;
+}
+
+/* ---------------------------------------------------------------- */
+/* Avisos de redes                                                   */
+/* ---------------------------------------------------------------- */
+
+const PLATFORMS = [
+  { id: 'tiktok', name: 'TikTok', placeholder: '@usuario o enlace del perfil',
+    channels: [['liveChannel', 'Canal de directos'], ['videoChannel', 'Canal de videos']] },
+  { id: 'twitch', name: 'Twitch', placeholder: 'nombre del streamer',
+    channels: [['liveChannel', 'Canal de directos']] },
+  { id: 'youtube', name: 'YouTube', placeholder: 'URL, @handle o nombre del canal',
+    channels: [['liveChannel', 'Canal de directos'], ['videoChannel', 'Canal de videos'], ['shortChannel', 'Canal de Shorts']] }
+];
+
+function renderAvisos() {
+  const data = state.data;
+  const config = data.config;
+  const canEdit = data.permissions.social;
+
+  const cards = PLATFORMS.map(platform => {
+    const section = config[platform.id] || {};
+    const accounts = section.users || [];
+    const enabled = config.features?.[platform.id];
+    const noChannel = accounts.length > 0 && !platform.channels.some(([field]) => section[field]);
+
+    const chips = accounts.length
+      ? accounts.map(account => `
+          <span class="chip">
+            <span>${escapeHtml(account)}</span>
+            ${canEdit ? `<button type="button" data-remove-account="${escapeHtml(account)}" data-platform="${platform.id}" aria-label="Dejar de seguir a ${escapeHtml(account)}">×</button>` : ''}
+          </span>`).join('')
+      : '<span class="hint">Todavía no sigues ninguna cuenta.</span>';
+
+    return card({
+      eyebrow: platform.name,
+      title: `${accounts.length} ${accounts.length === 1 ? 'cuenta vigilada' : 'cuentas vigiladas'}`,
+      description: `Vesper comprueba estas cuentas periódicamente y avisa en el canal que elijas.`,
+      actions: `<span class="tag ${enabled ? 'ok' : 'warn'}">${enabled ? 'Módulo activo' : 'Módulo apagado'}</span>`,
+      body: `
+        ${noChannel ? '<div class="callout warn"><strong>Falta el canal de destino.</strong><span>Tienes cuentas vigiladas pero los avisos no tienen dónde publicarse.</span></div>' : ''}
+        ${canEdit ? `
+        <form class="form" data-add-account="${platform.id}">
+          <div class="form-row">
+            <div class="field wide">
+              <label for="add-${platform.id}">Añadir cuenta</label>
+              <div class="color-field">
+                <input id="add-${platform.id}" type="text" name="account" maxlength="200" placeholder="${escapeHtml(platform.placeholder)}" required>
+                <button class="button" type="submit">Añadir</button>
+              </div>
+              <span class="hint">Vesper verifica que la cuenta existe antes de guardarla.</span>
+            </div>
           </div>
-        </form>
-        <div class="embed-preview-wrap">
-          <p class="eyebrow">VISTA PREVIA</p>
-          <div id="embed-preview-${kind}" class="embed-preview"></div>
-          <p class="muted-copy small-copy">Aproximación. Discord puede ajustar espaciado y tamaño de imagen.</p>
-        </div>
-      </div>
-    </article>`;
+        </form>` : ''}
+        <div class="chips watched-accounts">${chips}</div>
+        <form class="form" data-platform-channels="${platform.id}">
+          <div class="form-row">
+            ${platform.channels.map(([field, label]) => `
+              <div class="field">
+                <label for="${platform.id}-${field}">${escapeHtml(label)}</label>
+                <select id="${platform.id}-${field}" data-field="${field}">${selectOptions(data.channels, section[field])}</select>
+              </div>`).join('')}
+            <div class="field">
+              <label for="${platform.id}-pingRole">Rol al que avisar</label>
+              <select id="${platform.id}-pingRole" data-field="pingRole">${selectOptions(data.roles, section.pingRole, 'Sin mención')}</select>
+            </div>
+          </div>
+          ${data.permissions.configure ? formActions(`Guardar ${platform.name}`) : ''}
+        </form>`
+    });
+  }).join('');
+
+  const notice = !canEdit
+    ? '<div class="callout warn"><strong>Solo lectura.</strong><span>Necesitas el permiso de gestión de redes, o vincular tu cuenta de Discord, para añadir o quitar cuentas.</span></div>'
+    : '';
+
+  return `${notice}${cards}`;
 }
 
-function renderEmbedsSection(config, defaults) {
-  if (!defaults) return '';
-  const variables = EMBED_VARIABLES
-    .map(([token, description]) => `<li><code>${escapeHtml(token)}</code> · ${escapeHtml(description)}</li>`)
-    .join('');
+/* ---------------------------------------------------------------- */
+/* Moderación                                                        */
+/* ---------------------------------------------------------------- */
+
+function caseRowsMarkup() {
+  const data = state.data;
+  const canModerate = data.permissions.moderate;
+  if (!data.cases?.length) return `<tr><td colspan="${canModerate ? 7 : 6}">${escapeHtml('No hay casos registrados.')}</td></tr>`;
+
+  return data.cases.map(item => `
+    <tr>
+      <td class="mono">#${escapeHtml(item.id)}</td>
+      <td class="mono">${escapeHtml(item.userId)}</td>
+      <td>${escapeHtml(ACTION_LABELS[item.action] || item.action)}</td>
+      <td><span class="tag ${item.status === 'active' ? 'warn' : item.status === 'revoked' ? '' : 'ok'}">${escapeHtml(STATUS_LABELS[item.status] || item.status)}</span></td>
+      <td class="wrap">${escapeHtml(item.reason)}</td>
+      <td>${escapeHtml(formatDate(item.createdAt))}</td>
+      ${canModerate ? `<td><div class="row-actions">
+        <button class="button ghost sm" type="button" data-case-note="${escapeHtml(item.id)}">Nota</button>
+        ${item.status === 'active'
+          ? `<button class="button quiet sm" type="button" data-case-status="${escapeHtml(item.id)}" data-status="resolved">Resolver</button>`
+          : `<button class="button quiet sm" type="button" data-case-status="${escapeHtml(item.id)}" data-status="active">Reabrir</button>`}
+        ${item.status !== 'revoked' ? `<button class="button danger sm" type="button" data-case-status="${escapeHtml(item.id)}" data-status="revoked">Revocar</button>` : ''}
+      </div></td>` : ''}
+    </tr>`).join('');
+}
+
+function renderModeracion() {
+  const data = state.data;
+  const config = data.config;
+  const canModerate = data.permissions.moderate;
+  const canConfigure = data.permissions.configure;
+  const moderationOn = data.modules?.moderation;
+
+  const automod = canConfigure ? card({
+    eyebrow: 'Automático',
+    title: 'Filtros de mensajes',
+    description: 'Vesper revisa cada mensaje y actúa solo cuando se cumple una de estas reglas. Los administradores y los roles excluidos nunca se filtran.',
+    actions: `<span class="tag ${moderationOn ? 'ok' : 'warn'}">${moderationOn ? 'Módulo activo' : 'Módulo apagado'}</span>`,
+    body: `
+      <form id="form-automod" class="form">
+        <div class="switch-list">
+          <label class="switch">
+            <input id="automod-links" type="checkbox" ${config.moderation?.filterLinks ? 'checked' : ''}>
+            <span class="switch-copy"><strong>Filtrar enlaces</strong><small>Borra mensajes con enlaces a dominios que no estén en la lista permitida.</small></span>
+          </label>
+          <label class="switch">
+            <input id="automod-invites" type="checkbox" ${config.moderation?.blockInvites ? 'checked' : ''}>
+            <span class="switch-copy"><strong>Bloquear invitaciones de Discord</strong><small>Borra los enlaces discord.gg y similares.</small></span>
+          </label>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="automod-mentions">Máximo de menciones por mensaje</label>
+            <input id="automod-mentions" type="number" min="1" max="25" value="${Number(config.moderation?.maxMentions ?? 5)}">
+          </div>
+          <div class="field">
+            <label for="automod-repeat">Repeticiones permitidas</label>
+            <input id="automod-repeat" type="number" min="2" max="15" value="${Number(config.moderation?.repeatLimit ?? 4)}">
+            <span class="hint">Mismo mensaje repetido en menos de 30 segundos.</span>
+          </div>
+          <div class="field">
+            <label for="automod-action">Qué hacer al detectar</label>
+            <select id="automod-action">
+              ${[['delete', 'Solo borrar el mensaje'], ['warn', 'Borrar y advertir'], ['timeout', 'Borrar y aislar 5 minutos']]
+                .map(([value, label]) => `<option value="${value}"${config.moderation?.action === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <div class="field wide">
+          <label for="automod-domains">Dominios permitidos</label>
+          <textarea id="automod-domains" placeholder="youtube.com&#10;twitch.tv">${escapeHtml((config.moderation?.allowedDomains || []).join('\n'))}</textarea>
+          <span class="hint">Uno por línea, sin rutas. Solo se aplica si «Filtrar enlaces» está activo.</span>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="automod-exempt-channels">Canales excluidos</label>
+            <select id="automod-exempt-channels" multiple>${multiOptions(data.channels, config.moderation?.exemptChannels)}</select>
+          </div>
+          <div class="field">
+            <label for="automod-exempt-roles">Roles excluidos</label>
+            <select id="automod-exempt-roles" multiple>${multiOptions(data.roles, config.moderation?.exemptRoles)}</select>
+            <span class="hint">Mantén Ctrl o Cmd para elegir varios.</span>
+          </div>
+        </div>
+        ${formActions('Guardar filtros')}
+      </form>`
+  }) : '';
+
+  const newCase = canModerate ? card({
+    eyebrow: 'Manual',
+    title: 'Registrar una sanción',
+    description: 'Busca al miembro por su nombre; no hace falta copiar IDs.',
+    body: `
+      ${!moderationOn ? '<div class="callout warn"><strong>El módulo de moderación está apagado.</strong><span>Actívalo en «Módulos y permisos» para poder registrar casos.</span></div>' : ''}
+      <form id="form-case" class="form">
+        <div class="field wide">
+          <label for="case-search">Buscar miembro</label>
+          <input id="case-search" type="search" autocomplete="off" placeholder="Escribe al menos dos letras de su nombre">
+          <span class="hint" id="case-search-status">Escribe al menos dos caracteres.</span>
+        </div>
+        <div class="form-row">
+          <div class="field">
+            <label for="case-user">Miembro</label>
+            <select id="case-user" name="userId" required><option value="">Busca y selecciona</option></select>
+          </div>
+          <div class="field">
+            <label for="case-action">Acción</label>
+            <select id="case-action" name="action">
+              <option value="warning">Advertencia</option>
+              <option value="timeout">Aislamiento temporal</option>
+            </select>
+          </div>
+          <div class="field" id="case-minutes-field" hidden>
+            <label for="case-minutes">Duración en minutos</label>
+            <input id="case-minutes" name="minutes" type="number" min="1" max="40320" value="10">
+          </div>
+        </div>
+        <div class="field wide">
+          <label for="case-reason">Motivo</label>
+          <textarea id="case-reason" name="reason" maxlength="1000" required placeholder="Queda registrado en el caso y se envía al miembro si es una advertencia."></textarea>
+        </div>
+        <div class="form-actions">
+          <button class="button" type="submit" ${moderationOn ? '' : 'disabled'}>Registrar sanción</button>
+        </div>
+      </form>`
+  }) : '';
+
+  const history = card({
+    eyebrow: 'Historial',
+    title: canModerate ? 'Casos recientes' : 'Mis casos',
+    description: canModerate
+      ? 'Los 25 casos más recientes del servidor.'
+      : 'Solo tú puedes ver esta lista. Ningún otro miembro tiene acceso a tus casos.',
+    actions: '<button class="button quiet sm" type="button" id="reload-cases">Recargar</button>',
+    body: `
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>Caso</th><th>Usuario</th><th>Acción</th><th>Estado</th><th>Motivo</th><th>Fecha</th>${canModerate ? '<th>Acciones</th>' : ''}</tr></thead>
+          <tbody id="case-rows">${caseRowsMarkup()}</tbody>
+        </table>
+      </div>`
+  });
+
+  return `${automod}${newCase}${history}`;
+}
+
+/* ---------------------------------------------------------------- */
+/* Comunidad                                                         */
+/* ---------------------------------------------------------------- */
+
+function renderComunidad() {
+  const data = state.data;
+  const config = data.config;
+  const community = config.community || {};
+  const features = config.features || {};
+
+  const suggestions = (data.suggestions || []).map(item => `
+    <tr>
+      <td class="mono">${escapeHtml(item.userId)}</td>
+      <td class="wrap">${escapeHtml(item.text)}${item.reviewNote ? `<br><small>Nota: ${escapeHtml(item.reviewNote)}</small>` : ''}</td>
+      <td><span class="tag ${item.status === 'approved' ? 'ok' : item.status === 'rejected' ? 'bad' : 'warn'}">${escapeHtml(SUGGESTION_LABELS[item.status] || item.status)}</span></td>
+      <td>${escapeHtml(formatDate(item.createdAt))}</td>
+      <td><div class="row-actions">
+        <button class="button ghost sm" type="button" data-suggestion="${escapeHtml(item.messageId)}" data-status="open" ${item.status === 'open' ? 'disabled' : ''}>Pendiente</button>
+        <button class="button quiet sm" type="button" data-suggestion="${escapeHtml(item.messageId)}" data-status="approved" ${item.status === 'approved' ? 'disabled' : ''}>Aprobar</button>
+        <button class="button danger sm" type="button" data-suggestion="${escapeHtml(item.messageId)}" data-status="rejected" ${item.status === 'rejected' ? 'disabled' : ''}>Rechazar</button>
+      </div></td>
+    </tr>`).join('') || '<tr><td colspan="5">Todavía no hay sugerencias.</td></tr>';
+
   return `
-    <article class="panel">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">EMBEDS</p>
-          <h2>Bienvenida y despedida</h2>
-          <p>${escapeHtml(defaults.note || '')}</p>
-        </div>
-      </div>
-      <ul class="variable-list">${variables}</ul>
-    </article>
-    ${embedCard('welcome', config, defaults)}
-    ${embedCard('goodbye', config, defaults)}`;
+    ${card({
+      eyebrow: 'Tickets',
+      title: 'Soporte por tickets',
+      description: 'Los miembros abren un ticket desde un panel y Vesper crea un canal privado con el equipo.',
+      actions: `<span class="tag ${features.tickets ? 'ok' : 'warn'}">${features.tickets ? 'Activo' : 'Apagado'}</span>
+                <button class="button quiet sm" type="button" id="publish-tickets">Publicar panel</button>`,
+      body: `
+        <form id="form-tickets" class="form">
+          <div class="form-row">
+            <div class="field">
+              <label for="ticket-panel">Canal del panel</label>
+              <select id="ticket-panel">${selectOptions(data.channels, community.tickets?.panelChannel)}</select>
+            </div>
+            <div class="field">
+              <label for="ticket-category">Categoría para los tickets</label>
+              <select id="ticket-category">${selectOptions(data.categories || [], community.tickets?.category, 'Sin categoría')}</select>
+            </div>
+            <div class="field">
+              <label for="ticket-transcripts">Canal de transcripciones</label>
+              <select id="ticket-transcripts">${selectOptions(data.channels, community.tickets?.transcriptChannel)}</select>
+            </div>
+            <div class="field">
+              <label for="ticket-limit">Tickets abiertos por usuario</label>
+              <input id="ticket-limit" type="number" min="1" max="5" value="${Number(community.tickets?.maxOpenPerUser ?? 1)}">
+            </div>
+            <div class="field wide">
+              <label for="ticket-staff">Roles de soporte</label>
+              <select id="ticket-staff" multiple>${multiOptions(data.roles, community.tickets?.staffRoles)}</select>
+            </div>
+          </div>
+          ${formActions('Guardar tickets')}
+        </form>`
+    })}
+
+    ${card({
+      eyebrow: 'Sugerencias',
+      title: 'Buzón de sugerencias',
+      description: 'Los miembros usan /sugerir y tú apruebas o rechazas desde aquí.',
+      actions: `<span class="tag ${features.suggestions ? 'ok' : 'warn'}">${features.suggestions ? 'Activo' : 'Apagado'}</span>`,
+      body: `
+        <form id="form-suggestions" class="form">
+          <div class="field wide">
+            <label for="suggestions-channel">Canal de sugerencias</label>
+            <select id="suggestions-channel">${selectOptions(data.channels, community.suggestions?.channel)}</select>
+          </div>
+          ${formActions('Guardar canal')}
+        </form>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>Usuario</th><th>Sugerencia</th><th>Estado</th><th>Fecha</th><th>Acciones</th></tr></thead>
+            <tbody>${suggestions}</tbody>
+          </table>
+        </div>`
+    })}
+
+    ${card({
+      eyebrow: 'Autorroles',
+      title: 'Roles que los miembros eligen',
+      description: 'Solo se ofrecen roles que Vesper puede asignar por jerarquía.',
+      actions: `<span class="tag ${features.selfroles ? 'ok' : 'warn'}">${features.selfroles ? 'Activo' : 'Apagado'}</span>
+                <button class="button quiet sm" type="button" id="publish-selfroles">Publicar panel</button>`,
+      body: `
+        <form id="form-selfroles" class="form">
+          <div class="form-row">
+            <div class="field">
+              <label for="selfroles-channel">Canal del panel</label>
+              <select id="selfroles-channel">${selectOptions(data.channels, community.selfRoles?.panelChannel)}</select>
+            </div>
+            <div class="field">
+              <label for="selfroles-roles">Roles disponibles</label>
+              <select id="selfroles-roles" multiple>${multiOptions(data.assignableRoles || [], (community.selfRoles?.roles || []).map(item => item.roleId))}</select>
+            </div>
+          </div>
+          ${formActions('Guardar autorroles')}
+        </form>`
+    })}
+
+    ${card({
+      eyebrow: 'Destacados',
+      title: 'Mensajes destacados',
+      description: 'Cuando un mensaje supera el número de reacciones, Vesper lo copia al canal de destacados.',
+      actions: `<span class="tag ${features.starboard ? 'ok' : 'warn'}">${features.starboard ? 'Activo' : 'Apagado'}</span>`,
+      body: `
+        <form id="form-starboard" class="form">
+          <div class="form-row">
+            <div class="field">
+              <label for="starboard-channel">Canal de destacados</label>
+              <select id="starboard-channel">${selectOptions(data.channels, community.starboard?.channel)}</select>
+            </div>
+            <div class="field">
+              <label for="starboard-threshold">Reacciones necesarias</label>
+              <input id="starboard-threshold" type="number" min="2" max="50" value="${Number(community.starboard?.threshold ?? 3)}">
+            </div>
+            <div class="field">
+              <label for="starboard-emoji">Emoji</label>
+              <input id="starboard-emoji" type="text" maxlength="100" value="${escapeHtml(community.starboard?.emoji || '⭐')}">
+            </div>
+            <div class="field">
+              <label for="starboard-ignored">Canales ignorados</label>
+              <select id="starboard-ignored" multiple>${multiOptions(data.channels, community.starboard?.ignoredChannels)}</select>
+            </div>
+          </div>
+          ${formActions('Guardar destacados')}
+        </form>`
+    })}`;
 }
 
-function bindEmbedEditor() {
-  for (const kind of ['welcome', 'goodbye']) {
-    const form = $(`#embed-form-${kind}`);
-    if (!form) continue;
+/* ---------------------------------------------------------------- */
+/* Música                                                            */
+/* ---------------------------------------------------------------- */
 
-    form.addEventListener('input', event => {
-      if (event.target.id === `embed-${kind}-usecolor`) {
-        const picker = $(`#embed-${kind}-color`);
-        if (picker) picker.disabled = !event.target.checked;
-      }
-      renderEmbedPreview(kind);
-    });
-    form.addEventListener('change', () => renderEmbedPreview(kind));
+function renderMusica() {
+  const data = state.data;
+  const config = data.config;
+  const music = config.music || {};
+  const health = state.health || {};
+  const limits = [
+    ['defaultVolume', 'Volumen por defecto', 1, 100, 'Con el que empieza cada sesión.'],
+    ['maxQueue', 'Máximo de canciones en cola', 1, 500, ''],
+    ['maxPerUser', 'Canciones pendientes por usuario', 1, 25, 'Evita que una persona ocupe toda la cola.'],
+    ['maxTrackMinutes', 'Duración máxima por pista', 1, 180, ''],
+    ['idleSeconds', 'Segundos de inactividad antes de salir', 30, 3600, 'Vesper abandona el canal si se queda solo.']
+  ];
 
-    form.addEventListener('submit', event => {
-      event.preventDefault();
-      saveConfig(
-        { embeds: { [kind]: embedFieldValues(kind) } },
-        `Embed de ${EMBED_KIND_LABELS[kind].toLowerCase()} actualizado.`,
-        event.submitter
-      );
-    });
+  return `
+    ${!config.features?.music ? '<div class="callout warn"><strong>El módulo de música está apagado.</strong><span>Actívalo en «Módulos y permisos» para que /musica funcione.</span></div>' : ''}
+    ${health.music?.configured === false ? '<div class="callout"><strong>Lavalink no está configurado en el alojamiento.</strong><span>Sin él, el reproductor no puede conectarse aunque el módulo esté activo.</span></div>' : ''}
 
-    $(`[data-embed-reset="${kind}"]`)?.addEventListener('click', event => {
-      if (!confirm(`¿Restablecer el embed de ${EMBED_KIND_LABELS[kind].toLowerCase()} al diseño original del servidor?`)) return;
-      saveConfig(
-        { embeds: { [kind]: { title: null, message: null, footer: null, image: null, color: null, thumbnail: true } } },
-        `Embed de ${EMBED_KIND_LABELS[kind].toLowerCase()} restablecido.`,
-        event.currentTarget
-      );
-    });
-
-    renderEmbedPreview(kind);
-  }
+    ${card({
+      eyebrow: 'Música',
+      title: 'Dónde se puede pedir música',
+      description: 'Deja los campos vacíos para permitir cualquier canal.',
+      body: `
+        <form id="form-music" class="form">
+          <div class="form-row">
+            <div class="field">
+              <label for="music-request">Canal de solicitudes</label>
+              <select id="music-request">${selectOptions(data.channels, music.requestChannel, 'Cualquier canal de texto')}</select>
+            </div>
+            <div class="field">
+              <label for="music-voice">Canal de voz preferido</label>
+              <select id="music-voice">${selectOptions(data.voiceChannels || [], music.preferredVoiceChannel, 'Cualquier canal de voz')}</select>
+            </div>
+          </div>
+          <div class="form-row">
+            ${limits.map(([field, label, min, max, hint]) => `
+              <div class="field">
+                <label for="music-${field}">${escapeHtml(label)}</label>
+                <input id="music-${field}" type="number" min="${min}" max="${max}" value="${Number(music[field] ?? min)}">
+                ${hint ? `<span class="hint">${escapeHtml(hint)}</span>` : ''}
+              </div>`).join('')}
+          </div>
+          ${formActions('Guardar música')}
+        </form>`
+    })}`;
 }
 
-function renderSummary() {
-  const data = state.overview;
-  const activeCases = data.cases.filter(item => item.status === 'active').length;
-  // `ready` es el estado estricto (bot + base de datos + monitores + música).
-  // `healthy` solo dice que el proceso sigue vivo, y serviría de poco aquí.
-  const ready = data.health.ready ?? data.health.healthy;
-  $('#summary-grid').innerHTML = `
-    <article class="metric"><small>Estado de Vesper</small><strong class="${ready ? 'good' : 'warn'}">${ready ? 'Operativo' : 'Requiere atención'}</strong></article>
-    <article class="metric"><small>Configuración</small><strong>${data.setup.percentage}%</strong></article>
-    <article class="metric"><small>Casos visibles</small><strong>${data.cases.length}</strong></article>
-    <article class="metric"><small>Casos activos</small><strong>${activeCases}</strong></article>`;
+/* ---------------------------------------------------------------- */
+/* Módulos y permisos                                                */
+/* ---------------------------------------------------------------- */
+
+function renderModulos() {
+  const data = state.data;
+  const config = data.config;
+
+  const switches = Object.entries(config.features || {}).map(([key, value]) => `
+    <label class="switch">
+      <input type="checkbox" name="${escapeHtml(key)}" ${value ? 'checked' : ''}>
+      <span class="switch-copy"><strong>${escapeHtml(moduleLabel(key))}</strong><small>${escapeHtml(moduleHint(key))}</small></span>
+    </label>`).join('');
+
+  return `
+    ${card({
+      eyebrow: 'Módulos',
+      title: 'Qué hace Vesper en este servidor',
+      description: 'Apagar un módulo detiene su función al instante, sin perder la configuración.',
+      body: `<form id="form-features" class="form"><div class="switch-list">${switches}</div>${formActions('Guardar módulos')}</form>`
+    })}
+
+    ${card({
+      eyebrow: 'Permisos',
+      title: 'Roles autorizados',
+      description: 'Los permisos nativos de Discord (Administrador, Moderar miembros, Gestionar canales) siguen funcionando además de estos roles.',
+      body: `
+        <form id="form-permissions" class="form">
+          <div class="form-row">
+            <div class="field">
+              <label for="roles-social">Gestión de redes</label>
+              <select id="roles-social" multiple>${multiOptions(data.roles, config.permissions?.socialManagerRoles)}</select>
+              <span class="hint">Pueden añadir y quitar cuentas vigiladas.</span>
+            </div>
+            <div class="field">
+              <label for="roles-moderator">Moderación</label>
+              <select id="roles-moderator" multiple>${multiOptions(data.roles, config.permissions?.moderatorRoles)}</select>
+              <span class="hint">Pueden advertir, aislar y gestionar casos.</span>
+            </div>
+            <div class="field">
+              <label for="roles-dj">DJ de música</label>
+              <select id="roles-dj" multiple>${multiOptions(data.roles, config.permissions?.musicDjRoles)}</select>
+              <span class="hint">Pueden saltar, parar y cambiar el volumen.</span>
+            </div>
+          </div>
+          ${formActions('Guardar permisos')}
+        </form>`
+    })}
+
+    ${card({
+      eyebrow: 'Canales generales',
+      title: 'Registros y rol de bots',
+      description: 'Dónde deja Vesper el rastro de lo que pasa en el servidor.',
+      body: `
+        <form id="form-general" class="form">
+          <div class="form-row">
+            <div class="field">
+              <label for="general-log">Registro general</label>
+              <select id="general-log">${selectOptions(data.channels, config.general?.logChannel)}</select>
+            </div>
+            <div class="field">
+              <label for="general-botlog">Registro de bots</label>
+              <select id="general-botlog">${selectOptions(data.channels, config.general?.botLogChannel)}</select>
+            </div>
+            <div class="field">
+              <label for="general-botrole">Rol automático para bots</label>
+              <select id="general-botrole">${selectOptions(data.assignableRoles || [], config.general?.botRole, 'Sin rol')}</select>
+            </div>
+          </div>
+          ${formActions('Guardar canales')}
+        </form>`
+    })}`;
 }
 
-function renderOverview() {
-  const data = state.overview;
-  const checks = data.setup.checks.map(check => `
-    <div class="status-item"><span>${escapeHtml(check.label)}</span><strong class="status-dot ${check.ready ? '' : 'missing'}">${check.ready ? 'Listo' : 'Pendiente'}</strong></div>`).join('');
-  const identityNotice = !state.session.user.discord ? `
-    <div class="notice danger">Vincula una cuenta de Discord para ver tus casos y ejecutar acciones de moderación.</div>` : '';
-  $('#tab-overview').innerHTML = `
-    ${identityNotice}
-    <article class="panel">
-      <div class="panel-header"><div><p class="eyebrow">PREPARACIÓN</p><h2>Estado de configuración</h2></div><strong>${data.setup.ready}/${data.setup.total}</strong></div>
-      <progress class="progress" max="100" value="${data.setup.percentage}" aria-label="Configuración ${data.setup.percentage}%"></progress>
-      <div class="status-list spaced">${checks}</div>
-    </article>
-    <div class="two-columns">
-      <article class="panel"><p class="eyebrow">SERVIDOR</p><h2>${escapeHtml(data.guild.name)}</h2><p>${data.guild.memberCount.toLocaleString('es-CO')} miembros. Tus permisos se comprueban directamente en Discord cada vez que abres el panel.</p></article>
-      <article class="panel"><p class="eyebrow">ACCESO</p><h2>${data.permissions.configure ? 'Administración' : data.permissions.moderate ? 'Moderación' : 'Usuario'}</h2><p>${data.permissions.configure ? 'Puedes cambiar módulos, canales, roles y filtros.' : data.permissions.moderate ? 'Puedes consultar y administrar casos.' : 'Puedes consultar únicamente tus propios casos.'}</p></article>
-    </div>`;
-}
+/* ---------------------------------------------------------------- */
+/* Configuración completa                                            */
+/* ---------------------------------------------------------------- */
 
-// Vista de solo lectura con TODA la configuración del servidor, resolviendo
-// los IDs a nombres. Sirve para revisar de un vistazo qué tiene puesto cada
-// Main sin abrir la base de datos.
 function nameOf(collection, id, empty = 'Sin configurar') {
   if (!id) return empty;
   const found = (collection || []).find(item => String(item.id) === String(id));
-  return found ? (found.parent ? `${found.parent} / ${found.name}` : found.name) : `ID ${id} (no encontrado)`;
+  if (!found) return `ID ${id} (ya no existe)`;
+  return found.parent ? `${found.parent} / ${found.name}` : found.name;
 }
 
 function namesOf(collection, ids, empty = 'Ninguno') {
@@ -479,17 +1281,15 @@ function namesOf(collection, ids, empty = 'Ninguno') {
   return list.length ? list.join(', ') : empty;
 }
 
-function definitionRows(rows) {
-  return rows.map(([label, value]) => `
-    <div class="definition-row"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`).join('');
-}
-
-function renderConfigOverview(config, data) {
+function renderResumen() {
+  const data = state.data;
+  const config = data.config;
   const channels = data.channels || [];
   const roles = data.roles || [];
-  const categories = data.categories || [];
   const voice = data.voiceChannels || [];
+  const categories = data.categories || [];
   const yesNo = value => (value ? 'Sí' : 'No');
+
   const embedSummary = kind => {
     const saved = config.embeds?.[kind] || {};
     const custom = ['title', 'message', 'footer', 'image', 'color'].filter(field => saved[field]);
@@ -497,6 +1297,15 @@ function renderConfigOverview(config, data) {
   };
 
   const blocks = [
+    ['Identidad', [
+      ['Nombre visible', config.profile?.displayName || `El de la cuenta (${data.identity?.account?.username || 'Vesper'})`],
+      ['Autor de los mensajes', data.identity?.webhook?.name || '—'],
+      ['Apodo en el servidor', data.identity?.nickname || 'Sin apodo'],
+      ['Tema', config.profile?.theme || 'neutral'],
+      ['Color principal', config.profile?.primaryColor || '—'],
+      ['Color secundario', config.profile?.secondaryColor || '—'],
+      ['Rol automático de miembros', nameOf(roles, config.profile?.memberRole, 'Sin rol')]
+    ]],
     ['Canales', [
       ['Bienvenida', nameOf(channels, config.general?.welcomeChannel)],
       ['Despedida', nameOf(channels, config.general?.goodbyeChannel)],
@@ -504,38 +1313,35 @@ function renderConfigOverview(config, data) {
       ['Registro de bots', nameOf(channels, config.general?.botLogChannel)],
       ['Rol automático de bots', nameOf(roles, config.general?.botRole, 'Sin rol')]
     ]],
-    ['Redes sociales', [
-      ['TikTok · directos', nameOf(channels, config.tiktok?.liveChannel)],
-      ['TikTok · videos', nameOf(channels, config.tiktok?.videoChannel)],
-      ['TikTok · cuentas', (config.tiktok?.users || []).join(', ') || 'Ninguna'],
-      ['TikTok · rol de aviso', nameOf(roles, config.tiktok?.pingRole, 'Sin mención')],
-      ['Twitch · directos', nameOf(channels, config.twitch?.liveChannel)],
-      ['Twitch · cuentas', (config.twitch?.users || []).join(', ') || 'Ninguna'],
-      ['Twitch · rol de aviso', nameOf(roles, config.twitch?.pingRole, 'Sin mención')],
-      ['YouTube · directos', nameOf(channels, config.youtube?.liveChannel)],
-      ['YouTube · videos', nameOf(channels, config.youtube?.videoChannel)],
-      ['YouTube · Shorts', nameOf(channels, config.youtube?.shortChannel)],
-      ['YouTube · canales', (config.youtube?.users || []).join(', ') || 'Ninguno'],
-      ['YouTube · rol de aviso', nameOf(roles, config.youtube?.pingRole, 'Sin mención')]
-    ]],
     ['Embeds', [
       ['Bienvenida', embedSummary('welcome')],
       ['Despedida', embedSummary('goodbye')],
       ['Formato', data.embedDefaults?.layout === 'components_v2' ? 'Components V2 (diseño propio)' : 'Embed clásico']
     ]],
-    ['Identidad', [
-      ['Nombre visible', config.profile?.displayName || 'El del bot'],
-      ['Tema', config.profile?.theme || 'neutral'],
-      ['Color principal', config.profile?.primaryColor || '—'],
-      ['Color secundario', config.profile?.secondaryColor || '—'],
-      ['Rol automático de miembros', nameOf(roles, config.profile?.memberRole, 'Sin rol')]
+    ['TikTok', [
+      ['Directos', nameOf(channels, config.tiktok?.liveChannel)],
+      ['Videos', nameOf(channels, config.tiktok?.videoChannel)],
+      ['Cuentas', (config.tiktok?.users || []).join(', ') || 'Ninguna'],
+      ['Rol de aviso', nameOf(roles, config.tiktok?.pingRole, 'Sin mención')]
+    ]],
+    ['Twitch', [
+      ['Directos', nameOf(channels, config.twitch?.liveChannel)],
+      ['Cuentas', (config.twitch?.users || []).join(', ') || 'Ninguna'],
+      ['Rol de aviso', nameOf(roles, config.twitch?.pingRole, 'Sin mención')]
+    ]],
+    ['YouTube', [
+      ['Directos', nameOf(channels, config.youtube?.liveChannel)],
+      ['Videos', nameOf(channels, config.youtube?.videoChannel)],
+      ['Shorts', nameOf(channels, config.youtube?.shortChannel)],
+      ['Canales', (config.youtube?.users || []).join(', ') || 'Ninguno'],
+      ['Rol de aviso', nameOf(roles, config.youtube?.pingRole, 'Sin mención')]
     ]],
     ['Permisos', [
-      ['Gestores de redes', namesOf(roles, config.permissions?.socialManagerRoles)],
-      ['Moderadores', namesOf(roles, config.permissions?.moderatorRoles)],
+      ['Gestión de redes', namesOf(roles, config.permissions?.socialManagerRoles)],
+      ['Moderación', namesOf(roles, config.permissions?.moderatorRoles)],
       ['DJ de música', namesOf(roles, config.permissions?.musicDjRoles)]
     ]],
-    ['Moderación automática', [
+    ['Moderación', [
       ['Filtrar enlaces', yesNo(config.moderation?.filterLinks)],
       ['Bloquear invitaciones', yesNo(config.moderation?.blockInvites)],
       ['Máximo de menciones', config.moderation?.maxMentions ?? 5],
@@ -548,214 +1354,388 @@ function renderConfigOverview(config, data) {
     ['Música', [
       ['Canal de solicitudes', nameOf(channels, config.music?.requestChannel, 'Cualquiera')],
       ['Canal de voz preferido', nameOf(voice, config.music?.preferredVoiceChannel, 'Cualquiera')],
-      ['Volumen por defecto', config.music?.defaultVolume ?? 50],
+      ['Volumen', config.music?.defaultVolume ?? 50],
       ['Cola máxima', config.music?.maxQueue ?? 100],
-      ['Canciones por usuario', config.music?.maxPerUser ?? 3],
+      ['Por usuario', config.music?.maxPerUser ?? 3],
       ['Minutos por pista', config.music?.maxTrackMinutes ?? 15],
       ['Inactividad (s)', config.music?.idleSeconds ?? 180]
     ]],
     ['Comunidad', [
       ['Panel de tickets', nameOf(channels, config.community?.tickets?.panelChannel)],
-      ['Categoría de tickets', nameOf(categories, config.community?.tickets?.category, 'Sin categoría')],
+      ['Categoría', nameOf(categories, config.community?.tickets?.category, 'Sin categoría')],
       ['Transcripciones', nameOf(channels, config.community?.tickets?.transcriptChannel)],
       ['Roles de soporte', namesOf(roles, config.community?.tickets?.staffRoles)],
       ['Tickets por usuario', config.community?.tickets?.maxOpenPerUser ?? 1],
-      ['Canal de sugerencias', nameOf(channels, config.community?.suggestions?.channel)],
+      ['Sugerencias', nameOf(channels, config.community?.suggestions?.channel)],
       ['Panel de autorroles', nameOf(channels, config.community?.selfRoles?.panelChannel)],
       ['Autorroles', namesOf(roles, (config.community?.selfRoles?.roles || []).map(item => item.roleId))],
-      ['Canal de destacados', nameOf(channels, config.community?.starboard?.channel)],
-      ['Reacciones necesarias', config.community?.starboard?.threshold ?? 3],
-      ['Emoji de destacados', config.community?.starboard?.emoji || '⭐']
+      ['Destacados', nameOf(channels, config.community?.starboard?.channel)],
+      ['Reacciones', config.community?.starboard?.threshold ?? 3],
+      ['Emoji', config.community?.starboard?.emoji || '⭐']
     ]]
   ];
 
-  const modules = Object.entries(config.features || {})
-    .map(([key, value]) => `<span class="badge ${value ? 'approved' : 'rejected'}">${escapeHtml(moduleLabel(key))}: ${value ? 'activo' : 'apagado'}</span>`)
-    .join(' ');
-
-  return `
-    <article class="panel">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow">RESUMEN</p>
-          <h2>Configuración actual de ${escapeHtml(data.guild.name)}</h2>
-          <p>Todo lo que Vesper tiene guardado para este servidor, con los nombres ya resueltos.</p>
-        </div>
-        <button id="copy-config" class="button ghost small" type="button">Copiar como JSON</button>
+  return card({
+    eyebrow: 'Resumen',
+    title: `Todo lo guardado de ${data.guild.name}`,
+    description: 'Vista de solo lectura con los identificadores ya traducidos a nombres.',
+    actions: '<button class="button quiet sm" type="button" id="copy-config">Copiar como JSON</button>',
+    body: `
+      <div class="chips">
+        <span class="tag accent">${escapeHtml(TIER_LABELS[data.guild.tier] || data.guild.tier)}</span>
+        <span class="tag">${formatNumber(data.guild.memberCount)} miembros</span>
+        ${Object.entries(config.features || {}).map(([key, value]) => `<span class="tag ${value ? 'ok' : ''}">${escapeHtml(moduleLabel(key))}</span>`).join('')}
       </div>
-      <div class="chip-list spaced">${modules}</div>
-      <div class="definition-grid">
+      <div class="def-grid">
         ${blocks.map(([title, rows]) => `
-          <section class="definition-block">
+          <div class="def-block">
             <h3>${escapeHtml(title)}</h3>
-            <dl>${definitionRows(rows)}</dl>
-          </section>`).join('')}
-      </div>
-    </article>`;
+            <dl>${rows.map(([label, value]) => `<div class="def-row"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`).join('')}</dl>
+          </div>`).join('')}
+      </div>`
+  });
 }
 
-function renderConfig() {
-  const root = $('#tab-config');
-  const data = state.overview;
-  if (!data.permissions.configure || !data.config) {
-    root.innerHTML = '<article class="panel"><h2>Configuración restringida</h2><p>Necesitas ser propietario o tener Administrar servidor.</p></article>';
-    return;
-  }
-  const config = data.config;
-  const themedMain = data.guild.tier === 'themed_main';
-  const primaryMain = data.guild.tier === 'primary_main';
-  const anyMain = themedMain || primaryMain;
-  const channelFields = [
-    ['general','welcomeChannel','Canal de bienvenida'], ['general','goodbyeChannel','Canal de despedida'],
-    ['general','logChannel','Registro general'], ['general','botLogChannel','Registro de bots'],
-    ['tiktok','liveChannel','TikTok · directos'], ['tiktok','videoChannel','TikTok · videos'],
-    ['twitch','liveChannel','Twitch · directos'], ['youtube','liveChannel','YouTube · directos'],
-    ['youtube','videoChannel','YouTube · videos'], ['youtube','shortChannel','YouTube · Shorts'],
-    ['music','requestChannel','Solicitudes de música']
-  ];
-  const profileTitle = themedMain
-    ? `Identidad de ${escapeHtml(config.profile?.displayName || 'AnkeBot')} en ${escapeHtml(data.guild.name)}`
-    : `Identidad de Vesper en ${escapeHtml(data.guild.name)}`;
-  const profilePanel = anyMain ? `
-    <article class="panel profile-panel">
-      <div class="panel-header"><div><p class="eyebrow">IDENTIDAD DEL BOT</p><h2>${profileTitle}</h2><p>Estos valores solo afectan a este servidor. Cada Main mantiene su propia identidad.</p></div></div>
-      <form id="profile-form" class="form-grid">
-        <div class="field"><label for="profile-name">Nombre visible</label><input id="profile-name" maxlength="80" value="${escapeHtml(config.profile?.displayName || '')}" placeholder="${escapeHtml(themedMain ? 'AnkeBot' : 'Vesper')}"></div>
-        <div class="field"><label for="profile-theme">Tema</label><select id="profile-theme">${(primaryMain ? [['void', 'Void · morado profundo']] : [['cinnamoroll', 'Cinnamoroll · nubes pastel']]).concat([['custom', 'Personalizado']]).map(([value, label]) => `<option value="${value}" ${config.profile?.theme === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
-        <div class="field full"><label for="profile-avatar">Avatar de webhooks</label><input id="profile-avatar" type="url" maxlength="500" placeholder="https://..." value="${escapeHtml(config.profile?.avatar || '')}"><small>El avatar de la cuenta Discord es global; este sí puede cambiar por servidor.</small></div>
-        <div class="field"><label for="profile-primary">Color principal</label><input id="profile-primary" type="color" value="${escapeHtml(config.profile?.primaryColor || (primaryMain ? '#9D63FF' : '#8DDCF4'))}"></div>
-        <div class="field"><label for="profile-secondary">Color secundario</label><input id="profile-secondary" type="color" value="${escapeHtml(config.profile?.secondaryColor || (primaryMain ? '#100C18' : '#F8C8DC'))}"></div>
-        <div class="field full"><label for="profile-member-role">Rol temático automático para miembros</label><select id="profile-member-role">${selectOptions(data.assignableRoles || [], config.profile?.memberRole, 'Sin rol automático')}</select></div>
-        <div class="field full"><div class="notice">Los textos y colores de los embeds de bienvenida y despedida se editan más abajo, en «Bienvenida y despedida», con vista previa.</div></div>
-        <div class="form-actions"><button class="button" type="submit">Guardar identidad</button></div>
-      </form>
-    </article>` : '';
-  root.innerHTML = `
-    ${profilePanel}
-    ${renderEmbedsSection(config, data.embedDefaults)}
-    <article class="panel">
-      <div class="panel-header"><div><p class="eyebrow">MÓDULOS</p><h2>Funciones activas</h2></div></div>
-      <form id="features-form" class="check-grid">
-        ${Object.entries(config.features || {}).map(([key,value]) => `<label class="check-card"><input type="checkbox" name="${escapeHtml(key)}" ${value ? 'checked' : ''}><span><strong>${escapeHtml(moduleLabel(key))}</strong><small>${escapeHtml(MODULE_HINTS[key] || '')}</small></span></label>`).join('')}
-        <div class="form-actions"><button class="button" type="submit">Guardar módulos</button></div>
-      </form>
-    </article>
-    <article class="panel">
-      <div class="panel-header"><div><p class="eyebrow">CANALES</p><h2>Portales y notificaciones</h2></div></div>
-      <form id="channels-form" class="form-grid">
-        ${channelFields.map(([section,field,label]) => `<div class="field"><label for="channel-${section}-${field}">${escapeHtml(label)}</label><select id="channel-${section}-${field}" data-section="${section}" data-field="${field}">${selectOptions(data.channels, config[section]?.[field])}</select></div>`).join('')}
-        <div class="field"><label for="music-voice-channel">Canal de voz preferido</label><select id="music-voice-channel" data-section="music" data-field="preferredVoiceChannel">${selectOptions(data.voiceChannels || [], config.music?.preferredVoiceChannel, 'Cualquier canal de voz')}</select></div>
-        <div class="field"><label for="bot-role">Rol automático de bots</label><select id="bot-role">${selectOptions(data.assignableRoles || [], config.general?.botRole, 'Sin rol')}</select></div>
-        <div class="field"><label for="tiktok-ping-role">Rol de avisos TikTok</label><select id="tiktok-ping-role" data-section="tiktok" data-field="pingRole">${selectOptions(data.roles, config.tiktok?.pingRole, 'Sin mención')}</select></div>
-        <div class="field"><label for="twitch-ping-role">Rol de avisos Twitch</label><select id="twitch-ping-role" data-section="twitch" data-field="pingRole">${selectOptions(data.roles, config.twitch?.pingRole, 'Sin mención')}</select></div>
-        <div class="field"><label for="youtube-ping-role">Rol de avisos YouTube</label><select id="youtube-ping-role" data-section="youtube" data-field="pingRole">${selectOptions(data.roles, config.youtube?.pingRole, 'Sin mención')}</select></div>
-        <div class="form-actions"><button class="button" type="submit">Guardar canales</button></div>
-      </form>
-    </article>
-    <article class="panel">
-      <div class="panel-header"><div><p class="eyebrow">REDES SOCIALES</p><h2>Cuentas monitoreadas</h2><p>Añade y elimina cuentas aquí; el panel verifica cada nueva cuenta antes de guardarla.</p></div></div>
-      <div class="social-grid">
-        ${[['tiktok','TikTok','@usuario'],['twitch','Twitch','streamer'],['youtube','YouTube','URL, @handle o nombre']].map(([platform,label,placeholder]) => `
-          <section class="social-card">
-            <h3>${label}</h3>
-            <form class="social-add-form" data-platform="${platform}"><input name="account" maxlength="200" placeholder="${placeholder}" required><button class="button small" type="submit">Añadir</button></form>
-            <div class="chip-list">${(config[platform]?.users || []).length ? (config[platform].users).map(account => `<span class="account-chip"><span>${escapeHtml(account)}</span><button type="button" data-social-remove="${platform}" data-account="${escapeHtml(account)}" aria-label="Eliminar ${escapeHtml(account)}">×</button></span>`).join('') : '<span class="muted-copy">Sin cuentas configuradas</span>'}</div>
-          </section>`).join('')}
-      </div>
-    </article>
-    <div class="two-columns">
-      <article class="panel">
-        <div class="panel-header"><div><p class="eyebrow">CAPACIDADES</p><h2>Roles autorizados</h2></div></div>
-        <form id="permissions-form" class="form-grid">
-          <div class="field full"><label for="roles-social">Gestores de redes</label><select id="roles-social" multiple>${multiOptions(data.roles, config.permissions?.socialManagerRoles)}</select></div>
-          <div class="field full"><label for="roles-moderator">Moderadores</label><select id="roles-moderator" multiple>${multiOptions(data.roles, config.permissions?.moderatorRoles)}</select></div>
-          <div class="field full"><label for="roles-dj">DJ de música</label><select id="roles-dj" multiple>${multiOptions(data.roles, config.permissions?.musicDjRoles)}</select><small>Usa Ctrl o Cmd para elegir varios roles.</small></div>
-          <div class="form-actions"><button class="button" type="submit">Guardar roles</button></div>
-        </form>
-      </article>
-      <article class="panel">
-        <div class="panel-header"><div><p class="eyebrow">MÚSICA</p><h2>Límites de reproducción</h2></div></div>
-        <form id="music-form" class="form-grid">
-          ${[['defaultVolume','Volumen',1,100],['maxQueue','Cola máxima',1,500],['maxPerUser','Por usuario',1,25],['maxTrackMinutes','Minutos por pista',1,180],['idleSeconds','Inactividad (s)',30,3600]].map(([field,label,min,max]) => `<div class="field"><label for="music-${field}">${label}</label><input id="music-${field}" name="${field}" type="number" min="${min}" max="${max}" value="${Number(config.music?.[field] ?? 0) || min}"></div>`).join('')}
-          <div class="form-actions"><button class="button" type="submit">Guardar música</button></div>
-        </form>
-      </article>
-    </div>
-    <article class="panel">
-      <div class="panel-header"><div><p class="eyebrow">AUTOMOD</p><h2>Filtros y exclusiones</h2></div></div>
-      <form id="moderation-config-form" class="form-grid">
-        <label class="check-card"><input id="filter-links" type="checkbox" ${config.moderation?.filterLinks ? 'checked' : ''}><span>Filtrar enlaces</span></label>
-        <label class="check-card"><input id="block-invites" type="checkbox" ${config.moderation?.blockInvites ? 'checked' : ''}><span>Bloquear invitaciones</span></label>
-        <div class="field"><label for="max-mentions">Máximo de menciones</label><input id="max-mentions" type="number" min="1" max="25" value="${Number(config.moderation?.maxMentions ?? 5)}"></div>
-        <div class="field"><label for="repeat-limit">Repeticiones permitidas</label><input id="repeat-limit" type="number" min="2" max="15" value="${Number(config.moderation?.repeatLimit ?? 4)}"></div>
-        <div class="field"><label for="automod-action">Acción automática</label><select id="automod-action">${[['delete','Eliminar'],['warn','Advertir'],['timeout','Aislar 5 minutos']].map(([value,label]) => `<option value="${value}" ${config.moderation?.action === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
-        <div class="field"><label for="allowed-domains">Dominios permitidos</label><textarea id="allowed-domains" placeholder="youtube.com&#10;twitch.tv">${escapeHtml((config.moderation?.allowedDomains || []).join('\n'))}</textarea><small>Uno por línea, sin rutas.</small></div>
-        <div class="field"><label for="exempt-channels">Canales excluidos</label><select id="exempt-channels" multiple>${multiOptions(data.channels, config.moderation?.exemptChannels)}</select></div>
-        <div class="field"><label for="exempt-roles">Roles excluidos</label><select id="exempt-roles" multiple>${multiOptions(data.roles, config.moderation?.exemptRoles)}</select></div>
-        <div class="form-actions"><button class="button" type="submit">Guardar moderación</button></div>
-      </form>
-    </article>
-    <article class="panel">
-      <div class="panel-header"><div><p class="eyebrow">COMUNIDAD</p><h2>Tickets, sugerencias y destacados</h2></div></div>
-      <form id="community-form" class="form-grid">
-        <div class="field"><label for="ticket-panel">Panel de tickets</label><select id="ticket-panel">${selectOptions(data.channels, config.community?.tickets?.panelChannel)}</select></div>
-        <div class="field"><label for="ticket-category">Categoría de tickets</label><select id="ticket-category">${selectOptions(data.categories || [], config.community?.tickets?.category, 'Sin categoría')}</select></div>
-        <div class="field"><label for="ticket-transcripts">Transcripciones</label><select id="ticket-transcripts">${selectOptions(data.channels, config.community?.tickets?.transcriptChannel)}</select></div>
-        <div class="field"><label for="ticket-staff">Roles de soporte</label><select id="ticket-staff" multiple>${multiOptions(data.roles, config.community?.tickets?.staffRoles)}</select></div>
-        <div class="field"><label for="ticket-limit">Tickets abiertos por usuario</label><input id="ticket-limit" type="number" min="1" max="5" value="${Number(config.community?.tickets?.maxOpenPerUser || 1)}"></div>
-        <div class="field"><label for="suggestions-channel">Canal de sugerencias</label><select id="suggestions-channel">${selectOptions(data.channels, config.community?.suggestions?.channel)}</select></div>
-        <div class="field"><label for="selfroles-channel">Panel de autorroles</label><select id="selfroles-channel">${selectOptions(data.channels, config.community?.selfRoles?.panelChannel)}</select></div>
-        <div class="field"><label for="selfroles-roles">Roles disponibles</label><select id="selfroles-roles" multiple>${multiOptions(data.assignableRoles || [], (config.community?.selfRoles?.roles || []).map(item => item.roleId))}</select><small>Usa Ctrl o Cmd para elegir varios.</small></div>
-        <div class="field"><label for="starboard-channel">Canal de destacados</label><select id="starboard-channel">${selectOptions(data.channels, config.community?.starboard?.channel)}</select></div>
-        <div class="field"><label for="starboard-threshold">Reacciones necesarias</label><input id="starboard-threshold" type="number" min="2" max="50" value="${Number(config.community?.starboard?.threshold || 3)}"></div>
-        <div class="field"><label for="starboard-emoji">Emoji del starboard</label><input id="starboard-emoji" maxlength="100" value="${escapeHtml(config.community?.starboard?.emoji || '⭐')}"></div>
-        <div class="field"><label for="starboard-ignored">Canales ignorados</label><select id="starboard-ignored" multiple>${multiOptions(data.channels, config.community?.starboard?.ignoredChannels)}</select></div>
-        <div class="form-actions">
-          <button class="button" type="submit">Guardar comunidad</button>
-          <button id="publish-ticket-panel" class="button secondary" type="button">Guardar y publicar tickets</button>
-          <button id="publish-selfroles-panel" class="button secondary" type="button">Guardar y publicar autorroles</button>
-        </div>
-      </form>
-      <div class="panel-header section-gap"><div><p class="eyebrow">REVISIÓN</p><h3>Sugerencias recientes</h3><p>Aprueba, rechaza o devuelve a pendiente sin copiar el ID del mensaje.</p></div></div>
-      <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Sugerencia</th><th>Estado</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>${(data.suggestions || []).length ? data.suggestions.map(item => `
-        <tr>
-          <td>${escapeHtml(item.userId)}</td>
-          <td class="case-reason">${escapeHtml(item.text)}${item.reviewNote ? `<small class="review-note">Nota: ${escapeHtml(item.reviewNote)}</small>` : ''}</td>
-          <td><span class="badge ${escapeHtml(item.status)}">${escapeHtml(suggestionStatusLabel(item.status))}</span></td>
-          <td>${escapeHtml(formatDate(item.createdAt))}</td>
-          <td><div class="case-actions">
-            <button class="button ghost small suggestion-status" data-suggestion="${escapeHtml(item.messageId)}" data-status="open" type="button" ${item.status === 'open' ? 'disabled' : ''}>Pendiente</button>
-            <button class="button secondary small suggestion-status" data-suggestion="${escapeHtml(item.messageId)}" data-status="approved" type="button" ${item.status === 'approved' ? 'disabled' : ''}>Aprobar</button>
-            <button class="button danger small suggestion-status" data-suggestion="${escapeHtml(item.messageId)}" data-status="rejected" type="button" ${item.status === 'rejected' ? 'disabled' : ''}>Rechazar</button>
-          </div></td>
-        </tr>`).join('') : '<tr><td colspan="5">Todavía no hay sugerencias.</td></tr>'}</tbody></table></div>
-    </article>
-    ${renderConfigOverview(config, data)}`;
-  bindConfigForms();
+/* ---------------------------------------------------------------- */
+/* Auditoría                                                         */
+/* ---------------------------------------------------------------- */
+
+function renderAuditoria() {
+  return card({
+    eyebrow: 'Trazabilidad',
+    title: 'Cambios hechos desde el panel',
+    description: 'Los últimos 100 movimientos. Se conservan según WEB_AUDIT_DAYS.',
+    body: '<div id="audit-body"><div class="skeleton block"></div></div>'
+  });
 }
 
-async function saveConfig(body, success, submitter = null) {
-  // document.activeElement puede haber cambiado tras el await (o no ser el
-  // botón si se envía con Enter), así que el que envía se pasa explícitamente.
-  const button = submitter && submitter.tagName === 'BUTTON'
-    ? submitter
-    : (document.activeElement?.tagName === 'BUTTON' ? document.activeElement : null);
-  if (button) button.disabled = true;
+async function loadAudit() {
+  const body = $('#audit-body');
+  if (!body) return;
   try {
-    const result = await api(`/guilds/${state.selectedGuildId}/config`, { method: 'PATCH', body: JSON.stringify(body) });
-    state.overview.config = result.config;
-    state.overview.setup = result.setup;
-    renderAll();
-    toast(result.warning || success, Boolean(result.warning));
+    const result = await api(`/guilds/${state.guildId}/audit`);
+    const rows = (result.audit || []).map(item => `
+      <tr>
+        <td>${escapeHtml(formatDate(item.createdAt))}</td>
+        <td class="mono">${escapeHtml(item.actorDiscordId || item.actorGoogleEmail || 'Desconocido')}</td>
+        <td>${escapeHtml(item.action)}</td>
+        <td class="wrap">${escapeHtml(item.target || '—')}</td>
+        <td class="wrap">${escapeHtml((item.metadata?.fields || []).join(', ') || '—')}</td>
+      </tr>`).join('');
+
+    body.innerHTML = rows
+      ? `<div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Responsable</th><th>Acción</th><th>Objetivo</th><th>Campos</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      : emptyBlock('Sin movimientos', 'Todavía nadie ha cambiado nada desde el panel.');
+  } catch (error) {
+    body.innerHTML = `<div class="callout danger"><strong>No se pudo cargar la auditoría.</strong><span>${escapeHtml(error.message)}</span></div>`;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Guardado                                                          */
+/* ---------------------------------------------------------------- */
+
+async function saveConfig(body, successMessage, submitter = null) {
+  const button = submitter?.tagName === 'BUTTON' ? submitter : null;
+  const previousLabel = button?.textContent;
+  if (button) { button.disabled = true; button.textContent = 'Guardando…'; }
+
+  try {
+    const result = await api(`/guilds/${state.guildId}/config`, { method: 'PATCH', body: JSON.stringify(body) });
+    state.data.config = result.config;
+    state.data.setup = result.setup;
+    state.dirty.clear();
+    if (result.warning) toast(result.warning, 'bad');
+    else toast(successMessage, 'ok');
+    // Se recarga el servidor para que la identidad efectiva, los avisos y el
+    // resumen reflejen lo recién guardado sin tener que refrescar a mano.
+    await selectGuild(state.guildId, { keepSection: true, silent: true });
     return result;
   } catch (error) {
-    toast(error.message, true);
+    toast(error.message, 'bad');
     return null;
+  } finally {
+    if (button) { button.disabled = false; button.textContent = previousLabel; }
   }
-  finally { if (button) button.disabled = false; }
 }
 
-function communityConfigBody() {
+function markDirty(form) {
+  if (!form) return;
+  state.dirty.add(form.id);
+  const flag = form.querySelector('.dirty-flag');
+  if (flag) flag.hidden = false;
+}
+
+function watchDirty(root) {
+  root.querySelectorAll('form').forEach(form => {
+    form.addEventListener('input', () => markDirty(form));
+    form.addEventListener('change', () => markDirty(form));
+  });
+}
+
+/* ---------------------------------------------------------------- */
+/* Enlaces de comportamiento por sección                             */
+/* ---------------------------------------------------------------- */
+
+function bindCommon(root) {
+  watchDirty(root);
+  wireImageFallbacks(root);
+
+  root.querySelectorAll('[data-goto]').forEach(button => {
+    button.addEventListener('click', () => showSection(button.dataset.goto));
+  });
+
+  root.querySelectorAll('[data-meter]').forEach(meter => {
+    meter.style.setProperty('width', `${Math.max(0, Math.min(100, Number(meter.dataset.meter) || 0))}%`);
+  });
+}
+
+function bindIdentidad(root) {
+  refreshIdentityPreview();
+  ['#profile-name', '#profile-avatar', '#branding-name', '#branding-avatar', '#profile-primary']
+    .forEach(selector => root.querySelector(selector)?.addEventListener('input', refreshIdentityPreview));
+
+  root.querySelector('#form-profile')?.addEventListener('submit', event => {
+    event.preventDefault();
+    saveConfig({ profile: {
+      theme: $('#profile-theme').value,
+      displayName: $('#profile-name').value.trim() || null,
+      avatar: $('#profile-avatar').value.trim() || null,
+      primaryColor: $('#profile-primary').value,
+      secondaryColor: $('#profile-secondary').value,
+      memberRole: $('#profile-member-role').value || null
+    } }, 'Identidad actualizada.', event.submitter);
+  });
+
+  root.querySelector('#form-branding')?.addEventListener('submit', event => {
+    event.preventDefault();
+    saveConfig({ branding: {
+      name: $('#branding-name').value.trim() || null,
+      avatar: $('#branding-avatar').value.trim() || null
+    } }, 'Branding actualizado.', event.submitter);
+  });
+}
+
+function bindBienvenidas(root) {
+  root.querySelector('#form-welcome-channels')?.addEventListener('submit', event => {
+    event.preventDefault();
+    saveConfig({ general: {
+      welcomeChannel: $('#channel-welcome').value || null,
+      goodbyeChannel: $('#channel-goodbye').value || null
+    } }, 'Canales actualizados.', event.submitter);
+  });
+
+  root.querySelectorAll('[data-variable]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const token = button.dataset.variable;
+      try {
+        await navigator.clipboard.writeText(token);
+        toast(`${token} copiado.`, 'ok');
+      } catch {
+        toast(`Copia manualmente: ${token}`, 'bad');
+      }
+    });
+  });
+
+  for (const kind of Object.keys(EMBED_KINDS)) {
+    const form = root.querySelector(`#form-embed-${kind}`);
+    if (!form) continue;
+
+    const update = () => refreshEmbedPreview(kind);
+    form.addEventListener('input', event => {
+      if (event.target.id === `embed-${kind}-usecolor`) {
+        const picker = $(`#embed-${kind}-color`);
+        if (picker) picker.disabled = !event.target.checked;
+      }
+      update();
+    });
+    form.addEventListener('change', update);
+
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      saveConfig({ embeds: { [kind]: embedValues(kind) } }, `Embed de ${EMBED_KINDS[kind].toLowerCase()} guardado.`, event.submitter);
+    });
+
+    root.querySelector(`[data-embed-reset="${kind}"]`)?.addEventListener('click', event => {
+      if (!confirm(`¿Restablecer el embed de ${EMBED_KINDS[kind].toLowerCase()} al diseño original del servidor?`)) return;
+      saveConfig(
+        { embeds: { [kind]: { title: null, message: null, footer: null, image: null, color: null, thumbnail: true } } },
+        `Embed de ${EMBED_KINDS[kind].toLowerCase()} restablecido.`,
+        event.currentTarget
+      );
+    });
+
+    update();
+  }
+}
+
+function bindAvisos(root) {
+  root.querySelectorAll('[data-add-account]').forEach(form => {
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      const platform = form.dataset.addAccount;
+      const input = form.querySelector('input[name="account"]');
+      const button = form.querySelector('button[type="submit"]');
+      const account = input.value.trim();
+      if (!account) return;
+
+      button.disabled = true;
+      const label = button.textContent;
+      button.textContent = 'Verificando…';
+      try {
+        await api(`/guilds/${state.guildId}/social/${platform}`, { method: 'POST', body: JSON.stringify({ account }) });
+        input.value = '';
+        toast('Cuenta verificada y añadida.', 'ok');
+        await selectGuild(state.guildId, { keepSection: true, silent: true });
+      } catch (error) {
+        toast(error.message, 'bad');
+      } finally {
+        button.disabled = false;
+        button.textContent = label;
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-remove-account]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const account = button.dataset.removeAccount;
+      if (!confirm(`¿Dejar de vigilar ${account}?`)) return;
+      button.disabled = true;
+      try {
+        await api(`/guilds/${state.guildId}/social/${button.dataset.platform}/${encodeURIComponent(account)}`, { method: 'DELETE' });
+        toast('Cuenta retirada.', 'ok');
+        await selectGuild(state.guildId, { keepSection: true, silent: true });
+      } catch (error) {
+        toast(error.message, 'bad');
+        button.disabled = false;
+      }
+    });
+  });
+
+  root.querySelectorAll('[data-platform-channels]').forEach(form => {
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      const platform = form.dataset.platformChannels;
+      const body = { [platform]: {} };
+      form.querySelectorAll('select[data-field]').forEach(select => {
+        body[platform][select.dataset.field] = select.value || null;
+      });
+      saveConfig(body, `Canales de ${platform} actualizados.`, event.submitter);
+    });
+  });
+}
+
+function bindModeracion(root) {
+  root.querySelector('#form-automod')?.addEventListener('submit', event => {
+    event.preventDefault();
+    saveConfig({ moderation: {
+      filterLinks: $('#automod-links').checked,
+      blockInvites: $('#automod-invites').checked,
+      maxMentions: Number($('#automod-mentions').value),
+      repeatLimit: Number($('#automod-repeat').value),
+      action: $('#automod-action').value,
+      allowedDomains: $('#automod-domains').value.split(/\n|,/).map(value => value.trim()).filter(Boolean),
+      exemptChannels: selectedValues($('#automod-exempt-channels')),
+      exemptRoles: selectedValues($('#automod-exempt-roles'))
+    } }, 'Filtros actualizados.', event.submitter);
+  });
+
+  const actionSelect = root.querySelector('#case-action');
+  actionSelect?.addEventListener('change', () => {
+    $('#case-minutes-field').hidden = actionSelect.value !== 'timeout';
+  });
+
+  let searchTimer = null;
+  root.querySelector('#case-search')?.addEventListener('input', event => {
+    clearTimeout(searchTimer);
+    const query = event.target.value.trim();
+    const status = $('#case-search-status');
+    const select = $('#case-user');
+    if (query.length < 2) {
+      select.innerHTML = '<option value="">Busca y selecciona</option>';
+      status.textContent = 'Escribe al menos dos caracteres.';
+      return;
+    }
+    status.textContent = 'Buscando en Discord…';
+    searchTimer = setTimeout(async () => {
+      try {
+        const result = await api(`/guilds/${state.guildId}/members?q=${encodeURIComponent(query)}`);
+        select.innerHTML = `<option value="">Selecciona un miembro</option>${(result.members || [])
+          .map(member => `<option value="${escapeHtml(member.id)}">${escapeHtml(member.displayName)} · @${escapeHtml(member.username)}</option>`).join('')}`;
+        status.textContent = result.members?.length
+          ? `${result.members.length} ${result.members.length === 1 ? 'resultado' : 'resultados'}.`
+          : 'No se encontró a nadie con ese nombre.';
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    }, 350);
+  });
+
+  root.querySelector('#form-case')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form));
+    const button = form.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      await api(`/guilds/${state.guildId}/cases`, {
+        method: 'POST',
+        body: JSON.stringify({ ...values, minutes: Number(values.minutes || 0) })
+      });
+      form.reset();
+      $('#case-minutes-field').hidden = true;
+      toast('Sanción registrada.', 'ok');
+      await reloadCases();
+    } catch (error) {
+      toast(error.message, 'bad');
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  root.querySelector('#reload-cases')?.addEventListener('click', reloadCases);
+  bindCaseRowActions();
+}
+
+function bindCaseRowActions() {
+  $$('[data-case-note]').forEach(button => button.addEventListener('click', async () => {
+    const note = prompt(`Nota interna para el caso #${button.dataset.caseNote}`);
+    if (!note?.trim()) return;
+    await updateCase(button.dataset.caseNote, { note: note.trim() });
+  }));
+
+  $$('[data-case-status]').forEach(button => button.addEventListener('click', async () => {
+    const labels = { active: 'reabrir', resolved: 'resolver', revoked: 'revocar' };
+    if (!confirm(`¿Deseas ${labels[button.dataset.status]} el caso #${button.dataset.caseStatus}?`)) return;
+    await updateCase(button.dataset.caseStatus, { status: button.dataset.status, note: prompt('Nota opcional') || '' });
+  }));
+}
+
+async function updateCase(caseId, body) {
+  try {
+    await api(`/guilds/${state.guildId}/cases/${caseId}`, { method: 'PATCH', body: JSON.stringify(body) });
+    toast(`Caso #${caseId} actualizado.`, 'ok');
+    await reloadCases();
+  } catch (error) {
+    toast(error.message, 'bad');
+  }
+}
+
+async function reloadCases() {
+  try {
+    const result = await api(`/guilds/${state.guildId}/cases`);
+    state.data.cases = result.cases || [];
+    const body = $('#case-rows');
+    if (body) {
+      body.innerHTML = caseRowsMarkup();
+      bindCaseRowActions();
+    }
+  } catch (error) {
+    toast(error.message, 'bad');
+  }
+}
+
+function communityBody() {
   return { community: {
     tickets: {
       panelChannel: $('#ticket-panel').value || null,
@@ -775,354 +1755,428 @@ function communityConfigBody() {
   } };
 }
 
-async function publishCommunityPanel(kind, button) {
-  button.disabled = true;
-  try {
-    const saved = await saveConfig(communityConfigBody(), 'Configuración de comunidad guardada.');
-    if (!saved) return;
-    await api(`/guilds/${state.selectedGuildId}/community/publish`, { method: 'POST', body: JSON.stringify({ kind }) });
-    await selectGuild(state.selectedGuildId);
-    toast(kind === 'tickets' ? 'Panel de tickets publicado.' : 'Panel de autorroles publicado.');
-  } catch (error) { toast(error.message, true); }
-  finally { button.disabled = false; }
+function bindComunidad(root) {
+  ['#form-tickets', '#form-suggestions', '#form-selfroles', '#form-starboard'].forEach(selector => {
+    root.querySelector(selector)?.addEventListener('submit', event => {
+      event.preventDefault();
+      saveConfig(communityBody(), 'Configuración de comunidad guardada.', event.submitter);
+    });
+  });
+
+  const publish = async (kind, button) => {
+    button.disabled = true;
+    try {
+      const saved = await saveConfig(communityBody(), 'Configuración guardada.', null);
+      if (!saved) return;
+      await api(`/guilds/${state.guildId}/community/publish`, { method: 'POST', body: JSON.stringify({ kind }) });
+      toast(kind === 'tickets' ? 'Panel de tickets publicado.' : 'Panel de autorroles publicado.', 'ok');
+      await selectGuild(state.guildId, { keepSection: true, silent: true });
+    } catch (error) {
+      toast(error.message, 'bad');
+    } finally {
+      button.disabled = false;
+    }
+  };
+
+  root.querySelector('#publish-tickets')?.addEventListener('click', event => publish('tickets', event.currentTarget));
+  root.querySelector('#publish-selfroles')?.addEventListener('click', event => publish('selfroles', event.currentTarget));
+
+  root.querySelectorAll('[data-suggestion]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const labels = { open: 'devolver a pendiente', approved: 'aprobar', rejected: 'rechazar' };
+      if (!confirm(`¿Deseas ${labels[button.dataset.status]} esta sugerencia?`)) return;
+      const note = prompt('Nota opcional para quien la propuso') || '';
+      button.disabled = true;
+      try {
+        await api(`/guilds/${state.guildId}/suggestions/${button.dataset.suggestion}`, {
+          method: 'PATCH', body: JSON.stringify({ status: button.dataset.status, note })
+        });
+        toast('Sugerencia actualizada.', 'ok');
+        await selectGuild(state.guildId, { keepSection: true, silent: true });
+      } catch (error) {
+        toast(error.message, 'bad');
+        button.disabled = false;
+      }
+    });
+  });
 }
 
-function bindConfigForms() {
-  bindEmbedEditor();
-  $('#copy-config')?.addEventListener('click', async event => {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(state.overview.config, null, 2));
-      toast('Configuración copiada al portapapeles.');
-    } catch {
-      // Sin permiso de portapapeles: se ofrece el JSON en una ventana nueva.
-      const view = window.open('', '_blank');
-      if (!view) return toast('Tu navegador bloqueó la copia y la ventana emergente.', true);
-      view.document.title = 'Configuración de Vesper';
-      const pre = view.document.createElement('pre');
-      pre.textContent = JSON.stringify(state.overview.config, null, 2);
-      view.document.body.appendChild(pre);
-    }
-  });
-  $('#profile-form')?.addEventListener('submit', event => {
+function bindMusica(root) {
+  root.querySelector('#form-music')?.addEventListener('submit', event => {
     event.preventDefault();
-    saveConfig({ profile: {
-      theme: $('#profile-theme').value,
-      displayName: $('#profile-name').value,
-      avatar: $('#profile-avatar').value || null,
-      primaryColor: $('#profile-primary').value,
-      secondaryColor: $('#profile-secondary').value,
-      memberRole: $('#profile-member-role').value || null
-    } }, 'Identidad del bot actualizada.', event.submitter);
+    saveConfig({ music: {
+      requestChannel: $('#music-request').value || null,
+      preferredVoiceChannel: $('#music-voice').value || null,
+      defaultVolume: Number($('#music-defaultVolume').value),
+      maxQueue: Number($('#music-maxQueue').value),
+      maxPerUser: Number($('#music-maxPerUser').value),
+      maxTrackMinutes: Number($('#music-maxTrackMinutes').value),
+      idleSeconds: Number($('#music-idleSeconds').value)
+    } }, 'Ajustes de música guardados.', event.submitter);
   });
-  $('#features-form')?.addEventListener('submit', event => {
+}
+
+function bindModulos(root) {
+  root.querySelector('#form-features')?.addEventListener('submit', event => {
     event.preventDefault();
-    const features = Object.fromEntries([...event.currentTarget.elements].filter(item => item.type === 'checkbox').map(item => [item.name, item.checked]));
+    const features = Object.fromEntries(
+      [...event.currentTarget.querySelectorAll('input[type="checkbox"]')].map(input => [input.name, input.checked])
+    );
     saveConfig({ features }, 'Módulos actualizados.', event.submitter);
   });
-  $('#channels-form')?.addEventListener('submit', event => {
-    event.preventDefault();
-    const body = { general: { botRole: $('#bot-role').value || null } };
-    event.currentTarget.querySelectorAll('select[data-section]').forEach(select => {
-      body[select.dataset.section] ||= {};
-      body[select.dataset.section][select.dataset.field] = select.value || null;
-    });
-    saveConfig(body, 'Canales actualizados.', event.submitter);
-  });
-  $('#permissions-form')?.addEventListener('submit', event => {
+
+  root.querySelector('#form-permissions')?.addEventListener('submit', event => {
     event.preventDefault();
     saveConfig({ permissions: {
       socialManagerRoles: selectedValues($('#roles-social')),
       moderatorRoles: selectedValues($('#roles-moderator')),
       musicDjRoles: selectedValues($('#roles-dj'))
-    } }, 'Roles autorizados actualizados.', event.submitter);
+    } }, 'Permisos actualizados.', event.submitter);
   });
-  $('#music-form')?.addEventListener('submit', event => {
+
+  root.querySelector('#form-general')?.addEventListener('submit', event => {
     event.preventDefault();
-    const music = Object.fromEntries([...new FormData(event.currentTarget).entries()].map(([key,value]) => [key, Number(value)]));
-    saveConfig({ music }, 'Límites de música actualizados.', event.submitter);
+    saveConfig({ general: {
+      logChannel: $('#general-log').value || null,
+      botLogChannel: $('#general-botlog').value || null,
+      botRole: $('#general-botrole').value || null
+    } }, 'Canales actualizados.', event.submitter);
   });
-  $('#moderation-config-form')?.addEventListener('submit', event => {
-    event.preventDefault();
-    saveConfig({ moderation: {
-      filterLinks: $('#filter-links').checked,
-      blockInvites: $('#block-invites').checked,
-      maxMentions: Number($('#max-mentions').value),
-      repeatLimit: Number($('#repeat-limit').value),
-      action: $('#automod-action').value,
-      allowedDomains: $('#allowed-domains').value.split(/\n|,/).map(value => value.trim()).filter(Boolean),
-      exemptChannels: selectedValues($('#exempt-channels')),
-      exemptRoles: selectedValues($('#exempt-roles'))
-    } }, 'Moderación automática actualizada.', event.submitter);
-  });
-  $('#community-form')?.addEventListener('submit', event => {
-    event.preventDefault();
-    saveConfig(communityConfigBody(), 'Configuración de comunidad actualizada.', event.submitter);
-  });
-  $('#publish-ticket-panel')?.addEventListener('click', event => publishCommunityPanel('tickets', event.currentTarget));
-  $('#publish-selfroles-panel')?.addEventListener('click', event => publishCommunityPanel('selfroles', event.currentTarget));
-  $$('.suggestion-status').forEach(button => button.addEventListener('click', async () => {
-    const labels = { open: 'devolver a pendiente', approved: 'aprobar', rejected: 'rechazar' };
-    if (!confirm(`¿Deseas ${labels[button.dataset.status]} esta sugerencia?`)) return;
-    const note = prompt('Nota opcional para la revisión') || '';
-    button.disabled = true;
+}
+
+function bindResumen(root) {
+  root.querySelector('#copy-config')?.addEventListener('click', async () => {
+    const json = JSON.stringify(state.data.config, null, 2);
     try {
-      await api(`/guilds/${state.selectedGuildId}/suggestions/${button.dataset.suggestion}`, {
-        method: 'PATCH', body: JSON.stringify({ status: button.dataset.status, note })
-      });
-      await selectGuild(state.selectedGuildId);
-      toast('Sugerencia actualizada.');
-    } catch (error) { toast(error.message, true); }
-    finally { button.disabled = false; }
-  }));
-  $$('.social-add-form').forEach(form => form.addEventListener('submit', async event => {
-    event.preventDefault();
-    const button = form.querySelector('button');
-    const account = new FormData(form).get('account');
-    button.disabled = true;
-    try {
-      await api(`/guilds/${state.selectedGuildId}/social/${form.dataset.platform}`, { method: 'POST', body: JSON.stringify({ account }) });
-      await selectGuild(state.selectedGuildId);
-      toast('Cuenta verificada y añadida.');
-    } catch (error) { toast(error.message, true); }
-    finally { button.disabled = false; }
-  }));
-  $$('[data-social-remove]').forEach(button => button.addEventListener('click', async () => {
-    if (!confirm(`¿Dejar de monitorear ${button.dataset.account}?`)) return;
-    button.disabled = true;
-    try {
-      await api(`/guilds/${state.selectedGuildId}/social/${button.dataset.socialRemove}/${encodeURIComponent(button.dataset.account)}`, { method: 'DELETE' });
-      await selectGuild(state.selectedGuildId);
-      toast('Cuenta eliminada del monitoreo.');
-    } catch (error) { toast(error.message, true); }
-    finally { button.disabled = false; }
-  }));
-}
-
-function caseRows() {
-  const canModerate = state.overview.permissions.moderate;
-  if (!state.overview.cases.length) return '<tr><td colspan="7">No hay casos para mostrar.</td></tr>';
-  return state.overview.cases.map(item => `
-    <tr>
-      <td><strong>#${escapeHtml(item.id)}</strong></td>
-      <td>${escapeHtml(item.userId)}</td>
-      <td>${escapeHtml(actionLabel(item.action))}</td>
-      <td><span class="badge ${escapeHtml(item.status)}">${escapeHtml(statusLabel(item.status))}</span></td>
-      <td class="case-reason">${escapeHtml(item.reason)}</td>
-      <td>${escapeHtml(formatDate(item.createdAt))}</td>
-      <td>${canModerate ? `<div class="case-actions">
-        <button class="button ghost small case-note" data-case="${item.id}" type="button">Nota</button>
-        ${item.status === 'active' ? `<button class="button secondary small case-status" data-case="${item.id}" data-status="resolved" type="button">Resolver</button>` : `<button class="button secondary small case-status" data-case="${item.id}" data-status="active" type="button">Reabrir</button>`}
-        ${item.status !== 'revoked' ? `<button class="button danger small case-status" data-case="${item.id}" data-status="revoked" type="button">Revocar</button>` : ''}
-      </div>` : '—'}</td>
-    </tr>`).join('');
-}
-
-function renderModeration() {
-  const data = state.overview;
-  const createForm = data.permissions.moderate ? `
-    <article class="panel">
-      <div class="panel-header"><div><p class="eyebrow">NUEVO CASO</p><h2>Aplicar una acción</h2></div></div>
-      ${!data.modules.moderation ? '<div class="notice danger">El módulo de moderación está desactivado. Un administrador debe activarlo antes de crear casos.</div>' : ''}
-      <form id="case-form" class="form-grid">
-        <div class="field full"><label for="case-member-search">Buscar miembro</label><input id="case-member-search" autocomplete="off" placeholder="Escribe su nombre de Discord"><small id="case-member-status">Escribe al menos dos caracteres.</small></div>
-        <div class="field"><label for="case-user">Miembro seleccionado</label><select id="case-user" name="userId" required><option value="">Busca y selecciona un miembro</option></select></div>
-        <div class="field"><label for="case-action">Acción</label><select id="case-action" name="action"><option value="warning">Advertencia</option><option value="timeout">Aislamiento</option></select></div>
-        <div id="minutes-field" class="field" hidden><label for="case-minutes">Duración en minutos</label><input id="case-minutes" name="minutes" type="number" min="1" max="40320" value="10"></div>
-        <div class="field full"><label for="case-reason">Motivo</label><textarea id="case-reason" name="reason" maxlength="1000" required></textarea></div>
-        <div class="form-actions"><button class="button" type="submit" ${!data.modules.moderation ? 'disabled' : ''}>Registrar acción</button></div>
-      </form>
-    </article>` : `
-    <article class="panel"><p class="eyebrow">MI HISTORIAL</p><h2>Casos asociados a tu cuenta</h2><p>Esta vista es privada. Otros miembros no pueden ver tus registros.</p></article>`;
-  $('#tab-moderation').innerHTML = `${createForm}
-    <article class="panel">
-      <div class="panel-header"><div><p class="eyebrow">REGISTRO</p><h2>${data.permissions.moderate ? 'Casos recientes' : 'Mis casos'}</h2></div><button id="reload-cases" class="button ghost small" type="button">Recargar</button></div>
-      <div class="table-wrap"><table><thead><tr><th>Caso</th><th>Usuario</th><th>Acción</th><th>Estado</th><th>Motivo</th><th>Fecha</th><th>Acciones</th></tr></thead><tbody>${caseRows()}</tbody></table></div>
-    </article>`;
-  bindModeration();
-}
-
-async function reloadCases() {
-  try {
-    const result = await api(`/guilds/${state.selectedGuildId}/cases`);
-    state.overview.cases = result.cases;
-    renderSummary();
-    renderModeration();
-  } catch (error) { toast(error.message, true); }
-}
-
-function bindModeration() {
-  $('#case-action')?.addEventListener('change', event => { $('#minutes-field').hidden = event.target.value !== 'timeout'; });
-  let memberSearchTimer = null;
-  $('#case-member-search')?.addEventListener('input', event => {
-    clearTimeout(memberSearchTimer);
-    const query = event.target.value.trim();
-    const status = $('#case-member-status');
-    if (query.length < 2) {
-      $('#case-user').innerHTML = '<option value="">Busca y selecciona un miembro</option>';
-      status.textContent = 'Escribe al menos dos caracteres.';
-      return;
+      await navigator.clipboard.writeText(json);
+      toast('Configuración copiada al portapapeles.', 'ok');
+    } catch {
+      const view = window.open('', '_blank');
+      if (!view) return toast('El navegador bloqueó la copia y la ventana emergente.', 'bad');
+      view.document.title = 'Configuración de Vesper';
+      const pre = view.document.createElement('pre');
+      pre.textContent = json;
+      view.document.body.appendChild(pre);
     }
-    status.textContent = 'Buscando en Discord…';
-    memberSearchTimer = setTimeout(async () => {
-      try {
-        const result = await api(`/guilds/${state.selectedGuildId}/members?q=${encodeURIComponent(query)}`);
-        $('#case-user').innerHTML = `<option value="">Selecciona un miembro</option>${result.members.map(member => `<option value="${member.id}">${escapeHtml(member.displayName)} · @${escapeHtml(member.username)}</option>`).join('')}`;
-        status.textContent = result.members.length ? `${result.members.length} resultado(s).` : 'No se encontraron miembros.';
-      } catch (error) { status.textContent = error.message; }
-    }, 350);
   });
-  $('#case-form')?.addEventListener('submit', async event => {
-    event.preventDefault();
-    const values = Object.fromEntries(new FormData(event.currentTarget));
-    const body = { ...values, minutes: Number(values.minutes || 0) };
-    const button = event.currentTarget.querySelector('button[type="submit"]');
-    button.disabled = true;
-    try {
-      await api(`/guilds/${state.selectedGuildId}/cases`, { method: 'POST', body: JSON.stringify(body) });
-      event.currentTarget.reset();
-      $('#minutes-field').hidden = true;
-      await reloadCases();
-      toast('Caso registrado correctamente.');
-    } catch (error) { toast(error.message, true); }
-    finally { button.disabled = false; }
-  });
-  $('#reload-cases')?.addEventListener('click', reloadCases);
-  $$('.case-note').forEach(button => button.addEventListener('click', async () => {
-    const note = prompt(`Nota interna para el caso #${button.dataset.case}`);
-    if (!note?.trim()) return;
-    await updateCase(button.dataset.case, { note: note.trim() });
-  }));
-  $$('.case-status').forEach(button => button.addEventListener('click', async () => {
-    const labels = { active: 'reabrir', resolved: 'resolver', revoked: 'revocar' };
-    if (!confirm(`¿Deseas ${labels[button.dataset.status]} el caso #${button.dataset.case}?`)) return;
-    const note = prompt('Nota opcional para esta acción') || '';
-    await updateCase(button.dataset.case, { status: button.dataset.status, note });
-  }));
 }
 
-async function updateCase(caseId, body) {
-  try {
-    await api(`/guilds/${state.selectedGuildId}/cases/${caseId}`, { method: 'PATCH', body: JSON.stringify(body) });
-    await reloadCases();
-    toast(`Caso #${caseId} actualizado.`);
-  } catch (error) { toast(error.message, true); }
+const RENDERERS = {
+  inicio: { render: renderInicio, bind: () => {} },
+  identidad: { render: renderIdentidad, bind: bindIdentidad },
+  bienvenidas: { render: renderBienvenidas, bind: bindBienvenidas },
+  avisos: { render: renderAvisos, bind: bindAvisos },
+  moderacion: { render: renderModeracion, bind: bindModeracion },
+  comunidad: { render: renderComunidad, bind: bindComunidad },
+  musica: { render: renderMusica, bind: bindMusica },
+  modulos: { render: renderModulos, bind: bindModulos },
+  resumen: { render: renderResumen, bind: bindResumen },
+  auditoria: { render: renderAuditoria, bind: () => loadAudit() }
+};
+
+/* ---------------------------------------------------------------- */
+/* Navegación y estructura                                           */
+/* ---------------------------------------------------------------- */
+
+function renderNav() {
+  const nav = $('#section-nav');
+  const available = SECTIONS.filter(sectionAllowed);
+  let lastGroup = null;
+  nav.innerHTML = available.map(section => {
+    const heading = section.group !== lastGroup ? `<p class="nav-group-label">${escapeHtml(section.group)}</p>` : '';
+    lastGroup = section.group;
+    const tally = section.id === 'moderacion' && state.data?.cases
+      ? `<span class="nav-tally">${state.data.cases.filter(item => item.status === 'active').length}</span>`
+      : '';
+    return `${heading}
+      <button class="nav-item" type="button" data-section="${section.id}"${state.section === section.id ? ' aria-current="page"' : ''}>
+        <span class="nav-icon" aria-hidden="true">${section.icon}</span>
+        <span>${escapeHtml(section.label)}</span>
+        ${tally}
+      </button>`;
+  }).join('');
+
+  nav.querySelectorAll('[data-section]').forEach(button => {
+    button.addEventListener('click', () => showSection(button.dataset.section));
+  });
 }
 
-async function renderAudit() {
-  const root = $('#tab-audit');
-  if (!state.overview.permissions.configure) {
-    root.innerHTML = '<article class="panel"><h2>Auditoría restringida</h2><p>Solo los administradores del servidor pueden consultarla.</p></article>';
+function renderGuildSwitcher() {
+  const container = $('#guild-switcher');
+  if (!state.guilds.length) {
+    container.innerHTML = '<p class="hint">No hay servidores disponibles para esta cuenta.</p>';
     return;
   }
-  root.innerHTML = '<article class="panel"><p>Cargando auditoría…</p></article>';
-  try {
-    const result = await api(`/guilds/${state.selectedGuildId}/audit`);
-    const rows = result.audit.length ? result.audit.map(item => `<tr><td>${escapeHtml(formatDate(item.createdAt))}</td><td>${escapeHtml(item.actorDiscordId || item.actorGoogleEmail || 'Desconocido')}</td><td>${escapeHtml(item.action)}</td><td>${escapeHtml(item.target || '—')}</td><td>${escapeHtml((item.metadata?.fields || []).join(', ') || '—')}</td></tr>`).join('') : '<tr><td colspan="5">Todavía no hay acciones web.</td></tr>';
-    root.innerHTML = `<article class="panel"><div class="panel-header"><div><p class="eyebrow">TRAZABILIDAD</p><h2>Acciones realizadas desde el panel</h2></div></div><div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Responsable</th><th>Acción</th><th>Objetivo</th><th>Campos</th></tr></thead><tbody>${rows}</tbody></table></div></article>`;
-  } catch (error) { root.innerHTML = `<article class="panel"><div class="notice danger">${escapeHtml(error.message)}</div></article>`; }
-}
+  container.innerHTML = state.guilds.map(guild => `
+    <button class="guild-option" type="button" data-guild="${escapeHtml(guild.id)}" aria-pressed="${guild.id === state.guildId}">
+      ${avatarMarkup(guild.icon, guild.name, 'guild-badge')}
+      <span class="guild-option-text">
+        <strong>${escapeHtml(guild.name)}</strong>
+        <small>${escapeHtml(TIER_LABELS[guild.tier] || guild.tier)}</small>
+      </span>
+    </button>`).join('');
 
-function tabAllowed(name) {
-  if (name === 'config' || name === 'audit') return state.overview?.permissions.configure;
-  return true;
-}
-
-function showTab(name) {
-  if (!tabAllowed(name)) name = 'overview';
-  state.activeTab = name;
-  $$('.tab').forEach(tab => {
-    const active = tab.dataset.tab === name;
-    tab.classList.toggle('active', active);
-    tab.setAttribute('aria-selected', active ? 'true' : 'false');
+  container.querySelectorAll('[data-guild]').forEach(button => {
+    button.addEventListener('click', () => selectGuild(button.dataset.guild));
   });
-  $$('.tab-panel').forEach(panel => { panel.hidden = panel.id !== `tab-${name}`; });
-  if (name === 'audit') renderAudit();
 }
 
-function renderAll() {
-  applyGuildTheme();
-  renderGuildList();
-  renderSummary();
-  renderOverview();
-  renderConfig();
-  renderModeration();
-  $$('.tab[data-tab="config"], .tab[data-tab="audit"]').forEach(tab => { tab.hidden = !state.overview.permissions.configure; });
-  showTab(state.activeTab);
+function renderBrand() {
+  const identity = state.data?.identity;
+  const name = identity?.webhook?.name || state.data?.guild?.name || 'Vesper';
+  $('#brand-avatar').innerHTML = identity?.webhook?.avatar
+    ? `<img src="${escapeHtml(identity.webhook.avatar)}" alt="" referrerpolicy="no-referrer">`
+    : escapeHtml(name.slice(0, 1).toUpperCase());
+  $('#brand-name').textContent = name;
+  $('#brand-sub').textContent = state.data?.guild?.name || 'Panel de control';
 }
 
-async function selectGuild(guildId) {
-  state.selectedGuildId = guildId;
-  renderGuildList();
-  $('#empty-state').hidden = true;
-  $('#guild-view').hidden = false;
-  $('#page-title').textContent = 'Cargando…';
-  try {
-    state.overview = await api(`/guilds/${guildId}`);
-    $('#page-title').textContent = state.overview.guild.name;
-    renderAll();
-  } catch (error) {
-    $('#guild-view').hidden = true;
-    $('#empty-state').hidden = false;
-    toast(error.message, true);
+function renderAccount() {
+  const user = state.session.user;
+  const preferred = user.discord || user.google;
+  const name = user.discord?.globalName || user.discord?.username || user.google?.name || user.google?.email || 'Cuenta vinculada';
+  const detail = user.globalOwner ? 'Propietario global' : user.discord ? 'Cuenta de Discord' : 'Cuenta de Google';
+
+  const actions = [];
+  if (!user.discord && state.publicConfig?.discordEnabled) actions.push('<a class="button sm" href="/auth/discord">Vincular Discord</a>');
+  if (!user.google && state.publicConfig?.googleEnabled) actions.push('<a class="button quiet sm" href="/auth/google">Vincular Google</a>');
+  if (user.discord && user.google) actions.push('<button class="button ghost sm" type="button" id="unlink-google">Separar Google</button>');
+  actions.push('<button class="button ghost sm" type="button" id="logout">Cerrar sesión</button>');
+
+  $('#account-card').innerHTML = `
+    <div class="account-row">
+      ${avatarMarkup(preferred?.avatar || preferred?.picture, name)}
+      <div class="account-copy"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(detail)}</small></div>
+    </div>
+    <div class="account-actions">${actions.join('')}</div>`;
+
+  $('#logout')?.addEventListener('click', async () => {
+    try {
+      await api('/logout', { method: 'POST' });
+      location.href = '/panel';
+    } catch (error) { toast(error.message, 'bad'); }
+  });
+
+  $('#unlink-google')?.addEventListener('click', async () => {
+    if (!confirm('¿Separar las cuentas de Google y Discord? Podrás volver a vincularlas después.')) return;
+    try {
+      const result = await api('/unlink', { method: 'POST', body: JSON.stringify({ provider: 'google' }) });
+      state.session = { ...state.session, ...result };
+      renderAccount();
+      toast('Identidades separadas.', 'ok');
+    } catch (error) { toast(error.message, 'bad'); }
+  });
+}
+
+function showSection(id) {
+  const section = SECTIONS.find(item => item.id === id);
+  if (!section || !sectionAllowed(section)) return showSection('inicio');
+
+  if (state.dirty.size && !confirm('Tienes cambios sin guardar en esta pantalla. ¿Salir de todos modos?')) return;
+  state.dirty.clear();
+  state.section = id;
+  closeNav();
+  renderNav();
+  renderView();
+  $('#view').focus({ preventScroll: true });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderView() {
+  const section = currentSection();
+  const view = $('#view');
+
+  $('#view-eyebrow').textContent = section.group;
+  $('#view-title').textContent = section.title;
+  $('#view-hint').textContent = section.hint || '';
+
+  if (!state.data) {
+    view.innerHTML = '<div class="card"><div class="skeleton line"></div><div class="skeleton block"></div></div>';
+    return;
   }
+
+  if (!state.data.permissions.configure && section.needs === 'configure') {
+    view.innerHTML = card({
+      eyebrow: 'Acceso',
+      title: 'Necesitas permisos de administración',
+      description: 'Esta pantalla requiere Administrar servidor o ser propietario del bot. Puedes seguir viendo el resumen y tus propios casos.',
+      body: ''
+    });
+    return;
+  }
+
+  const renderer = RENDERERS[section.id];
+  view.innerHTML = renderer.render();
+  bindCommon(view);
+  renderer.bind(view);
 }
+
+function openNav() {
+  document.body.dataset.nav = 'open';
+  $('#nav-toggle').setAttribute('aria-expanded', 'true');
+  $('#nav-scrim').hidden = false;
+}
+
+function closeNav() {
+  delete document.body.dataset.nav;
+  $('#nav-toggle')?.setAttribute('aria-expanded', 'false');
+  const scrim = $('#nav-scrim');
+  if (scrim) scrim.hidden = true;
+}
+
+/* ---------------------------------------------------------------- */
+/* Carga de datos                                                    */
+/* ---------------------------------------------------------------- */
 
 async function refreshStatus() {
+  const pill = $('#status-pill');
   try {
     const health = await api('/status');
-    const pill = $('#connection-pill');
+    state.health = health;
     const ready = health.ready ?? health.healthy;
-    const paused = (health.monitors || []).filter(monitor => monitor.disabledUntil).map(monitor => monitor.name);
-    pill.textContent = ready
-      ? 'Vesper operativo'
-      : !health.botReady ? 'Bot desconectado'
-      : !health.database?.connected ? 'Base de datos caída'
-      : paused.length ? `Monitor en pausa: ${paused.join(', ')}`
-      : 'Estado degradado';
-    pill.className = `pill ${ready ? 'good' : 'warn'}`;
-    pill.title = pill.textContent;
+    pill.textContent = ready ? 'Vesper operativo' : healthSummary(health);
+    pill.className = `pill ${ready ? 'ok' : health.botReady ? 'warn' : 'bad'}`;
   } catch {
-    $('#connection-pill').textContent = 'Sin conexión';
-    $('#connection-pill').className = 'pill warn';
+    state.health = null;
+    pill.textContent = 'Sin conexión con Vesper';
+    pill.className = 'pill bad';
   }
+}
+
+async function selectGuild(guildId, { keepSection = false, silent = false } = {}) {
+  state.guildId = guildId;
+  if (!keepSection) state.section = 'inicio';
+  state.dirty.clear();
+  renderGuildSwitcher();
+
+  if (!silent) {
+    $('#view').innerHTML = '<div class="card"><div class="skeleton line"></div><div class="skeleton block"></div></div>';
+    $('#view-title').textContent = 'Cargando…';
+  }
+
+  try {
+    state.data = await api(`/guilds/${guildId}`);
+    applyTheme();
+    renderBrand();
+    renderNav();
+    renderView();
+  } catch (error) {
+    state.data = null;
+    $('#view').innerHTML = card({
+      eyebrow: 'Error',
+      title: 'No se pudo cargar este servidor',
+      description: error.message,
+      actions: '<button class="button quiet sm" type="button" data-goto="inicio">Reintentar</button>',
+      body: ''
+    });
+    toast(error.message, 'bad');
+  }
+}
+
+function showLogin() {
+  $('#boot-view').hidden = true;
+  $('#app-view').hidden = true;
+  $('#login-view').hidden = false;
+
+  const params = new URLSearchParams(location.search);
+  const message = $('#login-message');
+  if (params.get('message')) {
+    message.textContent = params.get('message');
+    message.className = 'callout danger';
+    message.hidden = false;
+  }
+
+  const actions = [];
+  if (state.bootError) {
+    message.innerHTML = `<strong>No se pudo contactar con Vesper.</strong><span>${escapeHtml(state.bootError)} Puede estar reiniciando; inténtalo en un momento.</span>`;
+    message.className = 'callout danger';
+    message.hidden = false;
+    actions.push('<a class="button" href="/panel">Reintentar</a>');
+  } else if (!state.publicConfig?.enabled) {
+    actions.push('<div class="callout danger"><strong>El panel está desactivado.</strong><span>Pon WEB_DASHBOARD_ENABLED=true en el alojamiento.</span></div>');
+  } else if (!state.publicConfig.ready) {
+    actions.push('<div class="callout danger"><strong>Falta la clave de sesión.</strong><span>Configura WEB_SESSION_SECRET con al menos 32 caracteres.</span></div>');
+  } else {
+    if (state.publicConfig.discordEnabled) actions.push('<a class="button" href="/auth/discord">Continuar con Discord</a>');
+    if (state.publicConfig.googleEnabled) actions.push('<a class="button quiet" href="/auth/google">Continuar con Google</a>');
+    if (!state.publicConfig.discordEnabled && !state.publicConfig.googleEnabled) {
+      actions.push('<div class="callout danger"><strong>No hay proveedor de acceso configurado.</strong><span>Añade DISCORD_OAUTH_CLIENT_SECRET para poder entrar.</span></div>');
+    }
+  }
+  $('#login-actions').innerHTML = actions.join('');
 }
 
 async function boot() {
   try {
     const response = await fetch('/api/web/public', { headers: { Accept: 'application/json' } });
-    if (!response.ok) throw new Error(`El servidor respondió ${response.status}`);
+    if (!response.ok) throw new Error(`El servidor respondió ${response.status}.`);
     state.publicConfig = await response.json();
   } catch (error) {
-    // Sin esta distinción, un fallo de red se mostraba como «el panel no está
-    // habilitado», que es un mensaje falso y manda a revisar lo que no es.
-    state.publicConfig = null;
     state.bootError = error.message;
     showLogin();
     return;
   }
+
   try {
     state.session = await api('/session');
   } catch {
     showLogin();
     return;
   }
+
   history.replaceState({}, '', '/panel');
+  $('#boot-view').hidden = true;
   $('#login-view').hidden = true;
   $('#app-view').hidden = false;
-  renderIdentity();
+
+  renderAccount();
   await refreshStatus();
+
   try {
     const result = await api('/guilds');
-    state.guilds = result.guilds;
-    renderGuildList();
-    if (state.guilds.length) await selectGuild(state.guilds[0].id);
-  } catch (error) { toast(error.message, true); }
+    state.guilds = result.guilds || [];
+    renderGuildSwitcher();
+    if (state.guilds.length) {
+      await selectGuild(state.guilds[0].id);
+    } else {
+      $('#view-title').textContent = 'Sin servidores';
+      $('#view-hint').textContent = '';
+      $('#view').innerHTML = card({
+        eyebrow: 'Acceso',
+        title: 'No hay servidores disponibles para esta cuenta',
+        description: 'Solo aparecen servidores aprobados en los que Vesper pueda comprobar tu membresía. Si acabas de entrar a uno, pulsa Actualizar.',
+        body: ''
+      });
+    }
+  } catch (error) {
+    toast(error.message, 'bad');
+  }
 }
 
-$$('.tab').forEach(tab => tab.addEventListener('click', () => showTab(tab.dataset.tab)));
+/* ---------------------------------------------------------------- */
+/* Arranque                                                          */
+/* ---------------------------------------------------------------- */
+
 $('#refresh-button').addEventListener('click', async () => {
   await refreshStatus();
-  if (state.selectedGuildId) await selectGuild(state.selectedGuildId);
+  if (state.guildId) await selectGuild(state.guildId, { keepSection: true });
 });
+
+$('#nav-toggle').addEventListener('click', () => {
+  if (document.body.dataset.nav === 'open') closeNav(); else openNav();
+});
+$('#nav-scrim').addEventListener('click', closeNav);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && document.body.dataset.nav === 'open') closeNav();
+});
+
+window.addEventListener('beforeunload', event => {
+  if (!state.dirty.size) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
+
+// El estado del bot se refresca solo para que la insignia no se quede antigua.
+setInterval(() => { if (state.session) refreshStatus(); }, 45_000);
 
 boot();

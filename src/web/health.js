@@ -35,12 +35,19 @@ function buildRuntimeHealth({ getClient, getMongoStatus, getMonitorStats, isShut
 }
 
 function mountHealthRoutes(app, { runtimeHealth, getClient, isShuttingDown }) {
-  app.get('/', (req, res) => res.json({
-    status: 'online',
-    timestamp: new Date().toISOString(),
-    bot: getClient()?.isReady?.() || false,
-    uptime: getClient()?.uptime || 0
-  }));
+  // La raíz la abre una persona en el navegador, no una sonda: llevarla al
+  // panel evita que lo primero que vea sea un JSON. Los monitores de uptime que
+  // apunten a "/" y pidan JSON siguen recibiendo el estado de siempre.
+  app.get('/', (req, res) => {
+    const wantsJson = req.accepts(['html', 'json']) === 'json';
+    if (!wantsJson) return res.redirect(302, '/panel');
+    return res.json({
+      status: 'online',
+      timestamp: new Date().toISOString(),
+      bot: getClient()?.isReady?.() || false,
+      uptime: getClient()?.uptime || 0
+    });
+  });
 
   app.get('/live', (req, res) => {
     const alive = !isShuttingDown();

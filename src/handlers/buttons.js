@@ -50,7 +50,11 @@ async function updateDashboardDirectly(client, guildId) {
 }
 
 async function handleButton(interaction, client) {
-  const customId = interaction.customId;
+  // Discord puede entregar componentes sin customId (o con uno no textual).
+  // Antes, `customId.startsWith` lanzaba un TypeError y tumbaba el manejador
+  // entero, dejando la interacción colgada para el usuario.
+  const customId = String(interaction.customId ?? '');
+  if (!customId) return;
 
   if (customId.startsWith('community_')) {
     const { handleCommunityButton } = require('../core/CommunityService');

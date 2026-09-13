@@ -51,7 +51,9 @@ async function resolveChannel(client, guildData, kind) {
   const channel = await client.channels.fetch(guildData.channelId).catch(() => null);
   if (!channel) throw new Error(`Canal ${guildData.channelId} no encontrado`);
 
-  const permissions = channel.permissionsFor(channel.guild.members.me);
+  const botMember = channel.guild?.members?.me;
+  if (!botMember) return false;
+  const permissions = channel.permissionsFor(botMember);
   if (!permissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
     throw new Error('Faltan permisos ViewChannel, SendMessages o EmbedLinks');
   }
