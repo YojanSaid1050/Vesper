@@ -1,8 +1,8 @@
 const { Events } = require('discord.js');
 const { startAllMonitors } = require('../platforms');
 const { updateDashboard } = require('../dashboard/updater');
-const { connectMongo } = require('../database/mongoManager'); // Añadido para verificar conexión
-const { getMainGuildId } = require('../config/guildPolicy');
+const { connectMongo, getGuildConfig } = require('../database/mongoManager'); // Añadido para verificar conexión
+const { getMainGuildId, isThemedMainGuild } = require('../config/guildPolicy');
 const { auditGuild } = require('../core/DiagnosticsService');
 
 module.exports = {
@@ -50,9 +50,25 @@ module.exports = {
 
     try {
       await client.music.start();
-      console.log(client.music.status().configured ? '🎵 Servicio de música iniciado' : 'ℹ️ Música disponible pero Lavalink no está configurado');
+      if (client.music.status().configured) {
+        await client.music.waitUntilReady(15_000);
+        console.log('🎵 Servicio de música conectado y listo');
+      } else {
+        console.log('ℹ️ Música disponible pero Lavalink no está configurado');
+      }
     } catch (error) {
-      console.error('❌ Error iniciando música:', error.message);
+      console.error('⚠️ Música no disponible por ahora; el resto de Vesper seguirá activo:', error.message);
+    }
+
+    for (const guild of client.guilds.cache.values()) {
+      if (!isThemedMainGuild(guild.id)) continue;
+      const config = await getGuildConfig(guild.id).catch(() => null);
+      const displayName = config?.profile?.displayName;
+      if (displayName && guild.members.me?.displayName !== displayName) {
+        await guild.members.me.setNickname(displayName, 'Perfil Main temático de Vesper').catch(error => {
+          console.warn(`⚠️ No fue posible aplicar el apodo ${displayName} en ${guild.name}: ${error.message}`);
+        });
+      }
     }
 
     const mainGuild = client.guilds.cache.get(getMainGuildId());

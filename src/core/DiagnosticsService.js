@@ -69,12 +69,19 @@ async function auditGuild(guild) {
     bienvenida: config.general?.welcomeChannel,
     despedida: config.general?.goodbyeChannel,
     logs: config.general?.logChannel,
+    'logs de bots': config.general?.botLogChannel,
     'TikTok live': config.tiktok?.liveChannel,
     'TikTok videos': config.tiktok?.videoChannel,
     Twitch: config.twitch?.liveChannel,
     'YouTube live': config.youtube?.liveChannel,
     'YouTube videos': config.youtube?.videoChannel,
-    'YouTube shorts': config.youtube?.shortChannel
+    'YouTube shorts': config.youtube?.shortChannel,
+    'solicitudes de música': config.music?.requestChannel,
+    'panel de tickets': config.community?.tickets?.panelChannel,
+    'transcripciones de tickets': config.community?.tickets?.transcriptChannel,
+    sugerencias: config.community?.suggestions?.channel,
+    'panel de autorroles': config.community?.selfRoles?.panelChannel,
+    starboard: config.community?.starboard?.channel
   })) {
     if (!channelId) continue;
     const channel = guild.channels.cache.get(channelId);
@@ -97,6 +104,49 @@ async function auditGuild(guild) {
   ];
   const missingRoles = exclusiveRoleIds.filter(roleId => !guild.roles.cache.has(roleId));
   if (missingRoles.length) issues.push(`${missingRoles.length} roles exclusivos ya no existen`);
+
+  const configuredRoleIds = [
+    config.general?.botRole,
+    ...(config.permissions?.socialManagerRoles || []),
+    ...(config.permissions?.moderatorRoles || []),
+    ...(config.permissions?.musicDjRoles || []),
+    ...(config.moderation?.exemptRoles || []),
+    ...(config.community?.tickets?.staffRoles || []),
+    ...(config.community?.selfRoles?.roles || []).map(item => item.roleId)
+  ].filter(Boolean);
+  const staleConfiguredRoles = [...new Set(configuredRoleIds)].filter(roleId => !guild.roles.cache.has(roleId));
+  if (staleConfiguredRoles.length) issues.push(`${staleConfiguredRoles.length} roles configurados ya no existen`);
+
+  const staleExemptChannels = (config.moderation?.exemptChannels || []).filter(channelId => !guild.channels.cache.has(channelId));
+  if (staleExemptChannels.length) issues.push(`${staleExemptChannels.length} exclusiones de canal ya no existen`);
+  const staleStarboardChannels = (config.community?.starboard?.ignoredChannels || []).filter(channelId => !guild.channels.cache.has(channelId));
+  if (staleStarboardChannels.length) issues.push(`${staleStarboardChannels.length} exclusiones del starboard ya no existen`);
+
+  const transcriptChannel = config.community?.tickets?.transcriptChannel && guild.channels.cache.get(config.community.tickets.transcriptChannel);
+  if (transcriptChannel && !transcriptChannel.permissionsFor(botMember)?.has(PermissionFlagsBits.AttachFiles)) {
+    issues.push('Transcripciones: falta Adjuntar archivos');
+  }
+
+  const ticketCategory = config.community?.tickets?.category && guild.channels.cache.get(config.community.tickets.category);
+  if (config.community?.tickets?.category && ticketCategory?.type !== 4) issues.push('La categoría de tickets ya no existe');
+
+  const unmanageableSelfRoles = (config.community?.selfRoles?.roles || []).filter(item => {
+    const role = guild.roles.cache.get(item.roleId);
+    return role && (role.managed || role.position >= botMember.roles.highest.position);
+  });
+  if (unmanageableSelfRoles.length) issues.push(`${unmanageableSelfRoles.length} autorroles están por encima de Vesper o son administrados`);
+
+  if (isModuleEnabledConfig(config, 'tickets') && !botMember.permissions.has([PermissionFlagsBits.ManageChannels, PermissionFlagsBits.ManageRoles])) {
+    issues.push('Tickets: faltan Gestionar canales o Gestionar roles');
+  }
+  if (isModuleEnabledConfig(config, 'selfroles') && !botMember.permissions.has(PermissionFlagsBits.ManageRoles)) {
+    issues.push('Autorroles: falta Gestionar roles');
+  }
+
+  const botRole = config.general?.botRole && guild.roles.cache.get(config.general.botRole);
+  if (botRole && (botRole.managed || botRole.position >= botMember.roles.highest.position)) {
+    issues.push('El rol automático de bots está por encima de Vesper o es administrado');
+  }
 
   if (!process.env.MONGODB_URI) issues.push('MONGODB_URI no configurada');
   if (!process.env.MAIN_GUILD_ID && !process.env.GUILD_ID) issues.push('MAIN_GUILD_ID no configurado');

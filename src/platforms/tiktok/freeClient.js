@@ -15,6 +15,7 @@ const CONFIG = {
   USER_AGENT: DEFAULT_USER_AGENT,
   REQUEST_TIMEOUT_MS: positiveInteger(process.env.TIKTOK_REQUEST_TIMEOUT_MS, 30_000, 5_000, 120_000),
   REQUEST_DELAY_MS: positiveInteger(process.env.TIKTOK_REQUEST_DELAY_MS, 900, 0, 10_000),
+  CONCURRENCY: positiveInteger(process.env.TIKTOK_CONCURRENCY, 2, 1, 5),
   BROWSER_PATH: process.env.TIKTOK_BROWSER_PATH || '',
   BROWSER_TIMEOUT_MS: positiveInteger(process.env.TIKTOK_BROWSER_TIMEOUT_MS, 60_000, 10_000, 180_000),
   PAGE_SETTLE_MS: positiveInteger(process.env.TIKTOK_PAGE_SETTLE_MS, 3_000, 500, 15_000)
@@ -216,8 +217,9 @@ class TikTokBrowserService {
         headless: true,
         timeout: CONFIG.BROWSER_TIMEOUT_MS,
         args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
+          ...(String(process.env.TIKTOK_BROWSER_NO_SANDBOX || 'false').toLowerCase() === 'true'
+            ? ['--no-sandbox', '--disable-setuid-sandbox']
+            : []),
           '--disable-dev-shm-usage',
           '--disable-blink-features=AutomationControlled',
           '--disable-gpu'
@@ -354,7 +356,9 @@ class TikTokBrowserService {
 class FreeTikTokClient {
   constructor() {
     this.browser = new TikTokBrowserService();
-    this.queue = Promise.resolve();
+    this.activeOperations = 0;
+    this.waiters = [];
+    this.nextStartAt = 0;
     this.metrics = {
       profileRequests: 0,
       videoRequests: 0,
@@ -366,12 +370,19 @@ class FreeTikTokClient {
   }
 
   async queued(operation) {
-    const task = this.queue.then(async () => {
-      if (CONFIG.REQUEST_DELAY_MS) await sleep(CONFIG.REQUEST_DELAY_MS);
-      return operation();
-    });
-    this.queue = task.catch(() => {});
-    return task;
+    if (this.activeOperations >= CONFIG.CONCURRENCY) {
+      await new Promise(resolve => this.waiters.push(resolve));
+    }
+    this.activeOperations++;
+    const delay = Math.max(0, this.nextStartAt - Date.now());
+    this.nextStartAt = Math.max(Date.now(), this.nextStartAt) + CONFIG.REQUEST_DELAY_MS;
+    if (delay) await sleep(delay);
+    try {
+      return await operation();
+    } finally {
+      this.activeOperations--;
+      this.waiters.shift()?.();
+    }
   }
 
   recordSuccess() {

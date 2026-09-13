@@ -1,5 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { CAPABILITIES, can } = require('../../core/PermissionService');
+const { CAPABILITIES, canWithGuildConfig } = require('../../core/PermissionService');
+const { getGuildConfig } = require('../../database/mongoManager');
+const { isModuleEnabledConfig } = require('../../config/guildPolicy');
+const { voicePermissionIssues } = require('../../core/MusicService');
 
 function trackName(track) {
   return track?.info?.title || 'Canción desconocida';
@@ -14,6 +17,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('musica')
     .setDescription('Reproductor musical gratuito de Vesper.')
+    .addSubcommand(command => command.setName('diagnostico').setDescription('Comprueba configuración, conexión y permisos de voz'))
     .addSubcommand(command => command.setName('reproducir').setDescription('Busca o reproduce una canción').addStringOption(option => option.setName('busqueda').setDescription('Título o URL').setRequired(true)))
     .addSubcommand(command => command.setName('pausar').setDescription('Pausa la canción actual'))
     .addSubcommand(command => command.setName('continuar').setDescription('Continúa la reproducción'))
@@ -27,6 +31,34 @@ module.exports = {
     const music = client.music;
     const subcommand = interaction.options.getSubcommand();
     try {
+      if (subcommand === 'diagnostico') {
+        await interaction.deferReply({ flags: 64 });
+        const config = await getGuildConfig(interaction.guildId);
+        if (music.status().configured && !music.status().connected) await music.waitUntilReady(3_000).catch(() => null);
+        const status = music.status();
+        const voiceChannel = interaction.member?.voice?.channel;
+        const permissionIssues = voiceChannel ? voicePermissionIssues(interaction.guild, voiceChannel) : [];
+        const moduleEnabled = isModuleEnabledConfig(config, 'music');
+        const rows = [
+          `**Módulo:** ${moduleEnabled ? '✅ activo' : '❌ desactivado'}`,
+          `**Motor Lavalink:** ${status.configured ? `✅ configurado (${status.mode})` : '❌ sin configurar'}`,
+          `**Conexión Lavalink:** ${status.connected ? '✅ conectada' : '❌ desconectada'}`,
+          `**Canal de solicitudes:** ${config.music?.requestChannel ? `<#${config.music.requestChannel}>` : 'cualquier canal de texto'}`,
+          `**Canal de voz configurado:** ${config.music?.preferredVoiceChannel ? `<#${config.music.preferredVoiceChannel}>` : 'cualquier canal de voz'}`,
+          `**Tu canal de voz:** ${voiceChannel || '❌ no estás en uno'}`,
+          `**Permisos de Vesper:** ${!voiceChannel ? '⚠️ entra a un canal para comprobarlos' : permissionIssues.length ? `❌ faltan ${permissionIssues.join(', ')}` : '✅ Ver canal, Conectar y Hablar'}`,
+          `**Sesiones activas:** ${status.players}`
+        ];
+        if (status.lastError) rows.push(`**Último error:** \`${String(status.lastError).replace(/`/g, '').slice(0, 220)}\``);
+        if (!moduleEnabled) rows.push('\nUsa `/vesper-setup modulos` o el panel web para activar música.');
+        else if (!status.configured) rows.push('\nConfigura `LAVALINK_PASSWORD` en el alojamiento y vuelve a desplegar.');
+        else if (!status.connected) rows.push('\nRevisa los logs de arranque de Lavalink y que la contraseña coincida.');
+        else if (!voiceChannel) rows.push('\nEntra a un canal de voz y repite este diagnóstico.');
+        else if (permissionIssues.length) rows.push('\nConcede esos permisos al rol de Vesper en ese canal o categoría.');
+        else rows.push('\n✅ Todo está listo para `/musica reproducir`.');
+        return interaction.editReply(rows.join('\n'));
+      }
+
       if (subcommand === 'reproducir') {
         await interaction.deferReply();
         const result = await music.enqueue(interaction, interaction.options.getString('busqueda'));
@@ -43,7 +75,7 @@ module.exports = {
       }
       if (subcommand === 'actual') return interaction.reply(`▶️ **${trackName(player.current)}** · volumen ${player.volume}%${player.loop ? ' · bucle activo' : ''}`);
 
-      const dj = can(interaction, CAPABILITIES.MUSIC_DJ);
+      const dj = await canWithGuildConfig(interaction, CAPABILITIES.MUSIC_DJ);
       if (subcommand === 'saltar' && !dj) {
         player.skipVotes = music.players.get(interaction.guildId).skipVotes;
         player.skipVotes.add(interaction.user.id);

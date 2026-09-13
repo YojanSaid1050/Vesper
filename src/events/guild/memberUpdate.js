@@ -1,6 +1,7 @@
 const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
 
 module.exports = {
   name: Events.GuildMemberUpdate,
@@ -32,10 +33,9 @@ module.exports = {
       let executor = 'Desconocido';
       let reason = 'Sin razón';
       try {
-        const fetchedLogs = await newMember.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.MemberUpdate });
-        const timeoutLog = fetchedLogs.entries.first();
+        const timeoutLog = await findRecentAuditEntry(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
         if (timeoutLog) {
-          executor = timeoutLog.executor.tag;
+          executor = auditExecutor(timeoutLog);
           reason = timeoutLog.reason || 'Sin razón';
         }
       } catch {}

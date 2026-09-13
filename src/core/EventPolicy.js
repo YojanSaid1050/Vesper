@@ -1,19 +1,40 @@
 const { Events, EmbedBuilder } = require('discord.js');
 const { getGuildConfig } = require('../database/mongoManager');
-const { isApprovedGuild, isMainGuild, isModuleEnabledConfig } = require('../config/guildPolicy');
-const { neutralWelcomePayload, neutralGoodbyePayload } = require('./PersonalityService');
+const { isApprovedGuild, isMainGuild, isThemedMainGuild, isModuleEnabledConfig } = require('../config/guildPolicy');
+const { neutralWelcomePayload, neutralGoodbyePayload, themedWelcomePayload, themedGoodbyePayload, colorNumber } = require('./PersonalityService');
 const { sendBrandedMessage } = require('../utils/webhookSender');
 const { handleMessage } = require('./ModerationService');
 
+const LOG_EVENTS = new Set([
+  Events.MessageDelete,
+  Events.MessageUpdate,
+  Events.GuildMemberUpdate,
+  Events.ChannelCreate,
+  Events.ChannelDelete,
+  Events.GuildRoleCreate,
+  Events.GuildRoleDelete,
+  Events.GuildBanAdd,
+  Events.GuildBanRemove,
+  Events.VoiceStateUpdate
+]);
+
+function requiredModuleForEvent(eventName) {
+  return LOG_EVENTS.has(eventName) ? 'logs' : null;
+}
+
 async function satelliteMemberAdd(member, config) {
   const general = config.general || {};
+  const themed = isThemedMainGuild(member.guild.id);
   if (member.user.bot) {
     const role = member.guild.roles.cache.get(general.botRole);
     if (role) await member.roles.add(role).catch(() => null);
+  } else if (themed && config.profile?.memberRole) {
+    const memberRole = member.guild.roles.cache.get(config.profile.memberRole);
+    if (memberRole) await member.roles.add(memberRole).catch(() => null);
   }
   if (isModuleEnabledConfig(config, 'welcome') && general.welcomeChannel) {
     const channel = member.guild.channels.cache.get(general.welcomeChannel);
-    if (channel) await sendBrandedMessage(channel, neutralWelcomePayload(member));
+    if (channel) await sendBrandedMessage(channel, themed ? themedWelcomePayload(member, config.profile) : neutralWelcomePayload(member));
   }
   if (isModuleEnabledConfig(config, 'logs') && general.logChannel) {
     const channel = member.guild.channels.cache.get(general.logChannel);
@@ -21,7 +42,7 @@ async function satelliteMemberAdd(member, config) {
       const embed = new EmbedBuilder()
         .setTitle(member.user.bot ? 'Bot añadido' : 'Miembro añadido')
         .setDescription(`${member.user.tag} (${member.id})`)
-        .setColor(member.user.bot ? 0x5865F2 : 0x57F287)
+        .setColor(member.user.bot ? 0x5865F2 : themed ? colorNumber(config.profile?.primaryColor, 0x8DDCF4) : 0x57F287)
         .setTimestamp();
       await sendBrandedMessage(channel, { embeds: [embed] });
     }
@@ -30,9 +51,10 @@ async function satelliteMemberAdd(member, config) {
 
 async function satelliteMemberRemove(member, config) {
   const general = config.general || {};
+  const themed = isThemedMainGuild(member.guild.id);
   if (isModuleEnabledConfig(config, 'goodbye') && general.goodbyeChannel) {
     const channel = member.guild.channels.cache.get(general.goodbyeChannel);
-    if (channel) await sendBrandedMessage(channel, neutralGoodbyePayload(member));
+    if (channel) await sendBrandedMessage(channel, themed ? themedGoodbyePayload(member, config.profile) : neutralGoodbyePayload(member));
   }
   if (isModuleEnabledConfig(config, 'logs') && general.logChannel) {
     const channel = member.guild.channels.cache.get(general.logChannel);
@@ -40,7 +62,7 @@ async function satelliteMemberRemove(member, config) {
       const embed = new EmbedBuilder()
         .setTitle(member.user.bot ? 'Bot retirado' : 'Miembro retirado')
         .setDescription(`${member.user.tag} (${member.id})`)
-        .setColor(0xED4245)
+        .setColor(themed ? colorNumber(config.profile?.secondaryColor, 0xF8C8DC) : 0xED4245)
         .setTimestamp();
       await sendBrandedMessage(channel, { embeds: [embed] });
     }
@@ -124,6 +146,12 @@ async function executeEventWithPolicy(event, args, client) {
   const guildId = subject?.guildId || subject?.guild?.id || subject?.guild_id;
   if (guildId && !isApprovedGuild(guildId)) return;
 
+  const requiredModule = requiredModuleForEvent(event.name);
+  if (guildId && requiredModule) {
+    const config = await getGuildConfig(guildId);
+    if (!isModuleEnabledConfig(config, requiredModule)) return;
+  }
+
   if (event.name === Events.MessageCreate && guildId) {
     const handled = await handleMessage(subject);
     if (handled || !isMainGuild(guildId)) return;
@@ -142,4 +170,4 @@ async function executeEventWithPolicy(event, args, client) {
   return event.execute(...args, client);
 }
 
-module.exports = { executeEventWithPolicy, satelliteMemberAdd, satelliteMemberRemove, mainMemberAdd, mainMemberRemove };
+module.exports = { LOG_EVENTS, requiredModuleForEvent, executeEventWithPolicy, satelliteMemberAdd, satelliteMemberRemove, mainMemberAdd, mainMemberRemove };

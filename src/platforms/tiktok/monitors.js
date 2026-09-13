@@ -75,7 +75,7 @@ async function monitorLives(client) {
 
   try {
     const startedAt = Date.now();
-    const guilds = await getAllGuildConfigs();
+    const guilds = await getAllGuildConfigs({ approvedOnly: true });
     const eligible = collectEligibleGuilds(guilds, 'live');
     if (eligible.length === 0) {
       return { success: true, guilds: 0, users: 0, lives: 0, requests: 0, skipped: 'not_configured' };
@@ -161,7 +161,7 @@ async function monitorLives(client) {
     });
 
     return {
-      success: true,
+      success: !(errors > 0 && errors >= eligible.length),
       guilds: eligible.length,
       users: usernames.length,
       lives: newLives,
@@ -183,7 +183,7 @@ async function monitorVideos(client) {
 
   try {
     const startedAt = Date.now();
-    const guilds = await getAllGuildConfigs();
+    const guilds = await getAllGuildConfigs({ approvedOnly: true });
     const eligible = collectEligibleGuilds(guilds, 'video');
     if (eligible.length === 0) {
       return { success: true, guilds: 0, users: 0, videos: 0, requests: 0, skipped: 'not_configured' };
@@ -270,7 +270,7 @@ async function monitorVideos(client) {
     });
 
     return {
-      success: true,
+      success: !(errors > 0 && errors >= eligible.length),
       guilds: eligible.length,
       users: usernames.length,
       videos: newVideos,

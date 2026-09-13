@@ -1,13 +1,13 @@
 // src/platforms/youtube/monitors.js
 const { getAllGuildConfigs, getGuildConfig } = require('../../database/mongoManager');
 const { sendNotification, completeActiveLive } = require('../../core/NotificationService');
-const CacheManager = require('../../core/CacheManager');
+const PersistentStateStore = require('../../core/PersistentStateStore');
 const { checkLiveUsers, checkVideos, checkShorts, clearChannelCache } = require('./checks');
 const { youtubeLive, youtubeVideo, youtubeShort } = require('../messageFactory');
 const { monitor } = require('../../utils/logger');
 const { isModuleEnabledConfig } = require('../../config/guildPolicy');
 
-const cache = new CacheManager('./data/youtube');
+const stateStore = new PersistentStateStore('youtube');
 
 const CONFIG = {
   MAX_RETRIES: 3,
@@ -60,38 +60,38 @@ async function withRetry(fn, context, maxRetries = CONFIG.MAX_RETRIES) {
 // ==================================================
 // NUEVA FUNCIÓN: Limpiar caché de un canal específico en el almacenamiento persistente
 // ==================================================
-function cleanYouTubeChannelCache(guildId, channelId) {
+async function cleanYouTubeChannelCache(guildId, channelId) {
   // Limpiar liveStatus
-  const liveStatus = cache.load('liveStatus', {});
+  const liveStatus = await stateStore.load('liveStatus', {});
   if (liveStatus[guildId] && liveStatus[guildId][channelId] !== undefined) {
     delete liveStatus[guildId][channelId];
     // Si el objeto del guild queda vacío, eliminarlo
     if (Object.keys(liveStatus[guildId]).length === 0) {
       delete liveStatus[guildId];
     }
-    cache.save('liveStatus', liveStatus);
+    await stateStore.save('liveStatus', liveStatus);
     console.log(`[YouTube] Cache de liveStatus eliminado para canal ${channelId} en guild ${guildId}`);
   }
   
   // Limpiar videos
-  const videos = cache.load('videos', {});
+  const videos = await stateStore.load('videos', {});
   if (videos[guildId] && videos[guildId][channelId] !== undefined) {
     delete videos[guildId][channelId];
     if (Object.keys(videos[guildId]).length === 0) {
       delete videos[guildId];
     }
-    cache.save('videos', videos);
+    await stateStore.save('videos', videos);
     console.log(`[YouTube] Cache de videos eliminado para canal ${channelId} en guild ${guildId}`);
   }
   
   // Limpiar shorts
-  const shorts = cache.load('shorts', {});
+  const shorts = await stateStore.load('shorts', {});
   if (shorts[guildId] && shorts[guildId][channelId] !== undefined) {
     delete shorts[guildId][channelId];
     if (Object.keys(shorts[guildId]).length === 0) {
       delete shorts[guildId];
     }
-    cache.save('shorts', shorts);
+    await stateStore.save('shorts', shorts);
     console.log(`[YouTube] Cache de shorts eliminado para canal ${channelId} en guild ${guildId}`);
   }
   
@@ -100,18 +100,20 @@ function cleanYouTubeChannelCache(guildId, channelId) {
 }
 
 // Mantener la función original para compatibilidad (aunque ya no se debería usar)
-function clearGuildCache(guildId) {
-  const liveStatus = cache.load('liveStatus', {});
-  const videos = cache.load('videos', {});
-  const shorts = cache.load('shorts', {});
+async function clearGuildCache(guildId) {
+  const liveStatus = await stateStore.load('liveStatus', {});
+  const videos = await stateStore.load('videos', {});
+  const shorts = await stateStore.load('shorts', {});
   
   delete liveStatus[guildId];
   delete videos[guildId];
   delete shorts[guildId];
   
-  cache.save('liveStatus', liveStatus);
-  cache.save('videos', videos);
-  cache.save('shorts', shorts);
+  await Promise.all([
+    stateStore.save('liveStatus', liveStatus),
+    stateStore.save('videos', videos),
+    stateStore.save('shorts', shorts)
+  ]);
   
   monitor('YouTube', 'Cache Cleared', guildId, { action: 'Manual cache clear' });
 }
@@ -126,8 +128,8 @@ async function monitorLives(client) {
   try {
     console.log('🔴 [YouTube] Starting live monitoring cycle...');
     const startTime = Date.now();
-    const liveStatus = cache.load('liveStatus', {});
-    const guilds = await getAllGuildConfigs();
+    const liveStatus = await stateStore.load('liveStatus', {});
+    const guilds = await getAllGuildConfigs({ approvedOnly: true });
     let totalGuilds = 0, totalChannels = 0, totalLives = 0, totalErrors = 0;
 
     const guildEntries = Object.entries(guilds);
@@ -152,14 +154,14 @@ async function monitorLives(client) {
       if (i + batchSize < guildEntries.length) await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    cache.save('liveStatus', liveStatus);
+    await stateStore.save('liveStatus', liveStatus);
     
     const duration = Date.now() - startTime;
     monitor('YouTube', 'Live Monitoring Complete', null, {
       guilds: totalGuilds, channels: totalChannels, lives: totalLives, errors: totalErrors, duration: `${duration}ms`
     });
     
-    return { success: true, guilds: totalGuilds, channels: totalChannels, lives: totalLives, errors: totalErrors, duration };
+    return { success: !(totalErrors > 0 && totalGuilds === 0), guilds: totalGuilds, channels: totalChannels, lives: totalLives, errors: totalErrors, duration };
   } catch (error) {
     console.error('[YouTube] Live Monitor Fatal:', error);
     return { success: false, error: error.message };
@@ -185,17 +187,13 @@ async function processGuildLives(guildId, config, client, liveStatus) {
   try {
     const channel = await withRetry(() => client.channels.fetch(liveChannelId), `Fetch channel ${liveChannelId}`).catch(() => null);
     if (!channel) {
-      const error = new Error(`Channel ${liveChannelId} not found`);
-      recordError(guildId, 'lives', error);
-      return null;
+      throw new Error(`Channel ${liveChannelId} not found`);
     }
 
     const botMember = channel.guild.members.me;
     const permissions = channel.permissionsFor(botMember);
     if (!permissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
-      const error = new Error('Missing permissions');
-      recordError(guildId, 'lives', error);
-      return null;
+      throw new Error('Missing permissions');
     }
 
     if (!liveStatus[guildId]) liveStatus[guildId] = {};
@@ -293,7 +291,7 @@ async function processGuildLives(guildId, config, client, liveStatus) {
   } catch (error) {
     console.error(`[YouTube] Error en processGuildLives para guild ${guildId}:`, error);
     recordError(guildId, 'lives', error);
-    return null;
+    throw error;
   }
 }
 
@@ -307,8 +305,8 @@ async function monitorVideos(client) {
   try {
     console.log('📹 [YouTube] Starting video monitoring cycle...');
     const startTime = Date.now();
-    const videos = cache.load('videos', {});
-    const guilds = await getAllGuildConfigs();
+    const videos = await stateStore.load('videos', {});
+    const guilds = await getAllGuildConfigs({ approvedOnly: true });
     let totalGuilds = 0, totalChannels = 0, totalNewVideos = 0, totalErrors = 0;
 
     const guildEntries = Object.entries(guilds);
@@ -333,14 +331,14 @@ async function monitorVideos(client) {
       if (i + batchSize < guildEntries.length) await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    cache.save('videos', videos);
+    await stateStore.save('videos', videos);
     
     const duration = Date.now() - startTime;
     monitor('YouTube', 'Video Monitoring Complete', null, {
       guilds: totalGuilds, channels: totalChannels, videos: totalNewVideos, errors: totalErrors, duration: `${duration}ms`
     });
     
-    return { success: true, guilds: totalGuilds, channels: totalChannels, videos: totalNewVideos, errors: totalErrors, duration };
+    return { success: !(totalErrors > 0 && totalGuilds === 0), guilds: totalGuilds, channels: totalChannels, videos: totalNewVideos, errors: totalErrors, duration };
   } catch (error) {
     console.error('[YouTube] Video Monitor Fatal:', error);
     return { success: false, error: error.message };
@@ -366,17 +364,13 @@ async function processGuildVideos(guildId, config, client, videos) {
   try {
     const channel = await withRetry(() => client.channels.fetch(videoChannelId), `Fetch channel ${videoChannelId}`).catch(() => null);
     if (!channel) {
-      const error = new Error(`Channel ${videoChannelId} not found`);
-      recordError(guildId, 'videos', error);
-      return null;
+      throw new Error(`Channel ${videoChannelId} not found`);
     }
 
     const botMember = channel.guild.members.me;
     const permissions = channel.permissionsFor(botMember);
     if (!permissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
-      const error = new Error('Missing permissions');
-      recordError(guildId, 'videos', error);
-      return null;
+      throw new Error('Missing permissions');
     }
 
     const guildVideos = videos[guildId] || {};
@@ -469,7 +463,7 @@ async function processGuildVideos(guildId, config, client, videos) {
   } catch (error) {
     console.error(`[YouTube] Error en processGuildVideos para guild ${guildId}:`, error);
     recordError(guildId, 'videos', error);
-    return null;
+    throw error;
   }
 }
 
@@ -483,8 +477,8 @@ async function monitorShorts(client) {
   try {
     console.log('📱 [YouTube] Starting shorts monitoring cycle...');
     const startTime = Date.now();
-    const shorts = cache.load('shorts', {});
-    const guilds = await getAllGuildConfigs();
+    const shorts = await stateStore.load('shorts', {});
+    const guilds = await getAllGuildConfigs({ approvedOnly: true });
     let totalGuilds = 0, totalChannels = 0, totalNewShorts = 0, totalErrors = 0;
 
     const guildEntries = Object.entries(guilds);
@@ -509,14 +503,14 @@ async function monitorShorts(client) {
       if (i + batchSize < guildEntries.length) await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    cache.save('shorts', shorts);
+    await stateStore.save('shorts', shorts);
     
     const duration = Date.now() - startTime;
     monitor('YouTube', 'Shorts Monitoring Complete', null, {
       guilds: totalGuilds, channels: totalChannels, shorts: totalNewShorts, errors: totalErrors, duration: `${duration}ms`
     });
     
-    return { success: true, guilds: totalGuilds, channels: totalChannels, shorts: totalNewShorts, errors: totalErrors, duration };
+    return { success: !(totalErrors > 0 && totalGuilds === 0), guilds: totalGuilds, channels: totalChannels, shorts: totalNewShorts, errors: totalErrors, duration };
   } catch (error) {
     console.error('[YouTube] Shorts Monitor Fatal:', error);
     return { success: false, error: error.message };
@@ -542,17 +536,13 @@ async function processGuildShorts(guildId, config, client, shorts) {
   try {
     const channel = await withRetry(() => client.channels.fetch(shortChannelId), `Fetch channel ${shortChannelId}`).catch(() => null);
     if (!channel) {
-      const error = new Error(`Channel ${shortChannelId} not found`);
-      recordError(guildId, 'shorts', error);
-      return null;
+      throw new Error(`Channel ${shortChannelId} not found`);
     }
 
     const botMember = channel.guild.members.me;
     const permissions = channel.permissionsFor(botMember);
     if (!permissions?.has(['ViewChannel', 'SendMessages', 'EmbedLinks'])) {
-      const error = new Error('Missing permissions');
-      recordError(guildId, 'shorts', error);
-      return null;
+      throw new Error('Missing permissions');
     }
 
     const guildShorts = shorts[guildId] || {};
@@ -645,14 +635,14 @@ async function processGuildShorts(guildId, config, client, shorts) {
   } catch (error) {
     console.error(`[YouTube] Error en processGuildShorts para guild ${guildId}:`, error);
     recordError(guildId, 'shorts', error);
-    return null;
+    throw error;
   }
 }
 
 async function getMonitorStats() {
-  const liveStatus = cache.load('liveStatus', {});
-  const videos = cache.load('videos', {});
-  const shorts = cache.load('shorts', {});
+  const liveStatus = await stateStore.load('liveStatus', {});
+  const videos = await stateStore.load('videos', {});
+  const shorts = await stateStore.load('shorts', {});
   
   let totalLiveEntries = 0, totalVideoEntries = 0, totalShortEntries = 0;
   for (const guild of Object.values(liveStatus)) totalLiveEntries += Object.keys(guild).length;

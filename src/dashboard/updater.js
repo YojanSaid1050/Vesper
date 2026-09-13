@@ -63,7 +63,7 @@ async function updateDashboard(client, guildId = null, panelType = null, mode = 
         console.log(`[DEBUG] Guild ${guildId} no tiene dashboard configurado`);
       }
     } else {
-      const guildsConfig = await getAllGuildConfigs();
+      const guildsConfig = await getAllGuildConfigs({ approvedOnly: true });
       guildsToUpdate = Object.entries(guildsConfig || {})
         .map(([id, config]) => ({
           guildId: id,

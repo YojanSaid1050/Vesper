@@ -1,24 +1,9 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 const { getChannelInfo } = require('../../platforms/youtube/utils');
-const CacheManager = require('../../core/CacheManager');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
-
-const youtubeCache = new CacheManager('./data/youtube');
-
-function cleanYouTubeGuild(guildId) {
-  const liveStatus = youtubeCache.load('liveStatus', {});
-  delete liveStatus[guildId];
-  youtubeCache.save('liveStatus', liveStatus);
-
-  const videos = youtubeCache.load('videos', {});
-  delete videos[guildId];
-  youtubeCache.save('videos', videos);
-
-  const shorts = youtubeCache.load('shorts', {});
-  delete shorts[guildId];
-  youtubeCache.save('shorts', shorts);
-}
+const { CAPABILITIES, requireCapability } = require('../../core/PermissionService');
+const { clearGuildCache } = require('../../platforms/youtube/monitors');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -67,9 +52,10 @@ module.exports = {
 
       collector.on('collect', async i => {
         try {
+          if (!await requireCapability(i, CAPABILITIES.SOCIAL_MANAGE)) return;
           if (i.customId === 'youtube_clear_confirm') {
-            await updateGuildSection(interaction.guildId, 'youtube', { ...config.youtube, users: [] });
-            cleanYouTubeGuild(interaction.guildId);
+            await updateGuildSection(interaction.guildId, 'youtube', { users: [] });
+            await clearGuildCache(interaction.guildId);
             await i.update({ content: `✅ Se eliminaron **${currentCount}** canales del monitoreo de YouTube.`, embeds: [], components: [] });
             
             // Refrescar dashboard automáticamente

@@ -1,21 +1,36 @@
 services:
   - type: web
     name: vesper-bot
-    runtime: node
+    runtime: docker
     repo: https://github.com/YojanSaid1050/Vesper
-    buildCommand: npm install
-    startCommand: node src/index.js
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     envVars:
       - key: TOKEN
         sync: false
         required: true
       - key: CLIENT_ID
-        sync: false
-        required: true
-      - key: GUILD_ID
+        value: "1507223570860867725"
+      - key: MAIN_GUILD_ID
+        value: "1506580021232406540"
+      - key: APPROVED_GUILD_IDS
         sync: false
         required: false
+      - key: THEMED_MAIN_GUILD_IDS
+        value: "1124871897688055818"
+      - key: THEMED_MAIN_DEFAULT_NAME
+        value: "AnkeBot"
+      - key: ALLOW_UNLISTED_GUILDS
+        value: "false"
       - key: BOT_OWNER_IDS
+        value: "649059737635258389"
+      - key: SOCIAL_MANAGER_ROLE_IDS
+        sync: false
+        required: false
+      - key: MODERATOR_ROLE_IDS
+        sync: false
+        required: false
+      - key: MUSIC_DJ_ROLE_IDS
         sync: false
         required: false
       - key: TWITCH_CLIENT_ID
@@ -32,16 +47,49 @@ services:
       - key: MONGODB_URI
         sync: false
         required: true
+      - key: LAVALINK_URL
+        sync: false
+        required: false
+      - key: LAVALINK_PASSWORD
+        sync: false
+        required: false
+      - key: LAVALINK_EMBEDDED
+        value: "true"
+      - key: JAVA_TOOL_OPTIONS
+        value: "-Xms64m -Xmx256m -XX:+UseG1GC"
+      - key: MUSIC_REQUIRED
+        value: "false"
+      - key: LAVALINK_REQUEST_TIMEOUT_MS
+        value: "15000"
       - key: USE_GUILD_COMMANDS
+        value: "false"
+      - key: REGISTER_COMMANDS
         value: "true"
       - key: PORT
         value: "3000"
+      - key: WEB_DASHBOARD_ENABLED
+        value: "true"
+      - key: WEB_ADMIN_MODE
+        value: "false"
+      - key: WEB_BASE_URL
+        value: "https://vesper-q5jv.onrender.com"
+      - key: WEB_SESSION_SECRET
+        generateValue: true
+      - key: DISCORD_OAUTH_CLIENT_SECRET
+        sync: false
+        required: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+        required: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+        required: false
+      - key: GOOGLE_OWNER_EMAILS
+        value: "xyojansaidx@gmail.com"
       - key: DEBUG
         value: "false"
       - key: LOG_ERRORS
         value: "true"
-      - key: NODE_VERSION
-        value: "24"
     healthCheckPath: /health
     autoDeploy: true
     plan: free

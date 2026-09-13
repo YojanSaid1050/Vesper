@@ -1,6 +1,8 @@
 const { Events, EmbedBuilder, AuditLogEvent, ChannelType } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { createLog } = require('../../utils/logCache');
+const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
 
 module.exports = {
   name: Events.ChannelDelete,
@@ -24,9 +26,7 @@ module.exports = {
 
     let executor = 'Desconocido';
     try {
-      const fetchedLogs = await channel.guild.fetchAuditLogs({ limit: 1, type: AuditLogEvent.ChannelDelete });
-      const entry = fetchedLogs.entries.first();
-      if (entry) executor = entry.executor.tag;
+      executor = auditExecutor(await findRecentAuditEntry(channel.guild, AuditLogEvent.ChannelDelete, channel.id));
     } catch {}
 
     const embed = new EmbedBuilder()
@@ -38,6 +38,6 @@ module.exports = {
         { name: '🛠️ Eliminado por', value: executor, inline: true }
       )
       .setTimestamp();
-    await logChannel.send({ embeds: [embed] });
+    await sendBrandedMessage(logChannel, { embeds: [embed] });
   }
 };

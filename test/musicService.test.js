@@ -1,10 +1,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { MusicService, lavalinkConfig, wsUrl, sessionDefaults } = require('../src/core/MusicService');
+const { PermissionFlagsBits } = require('discord.js');
+const { MusicService, lavalinkConfig, normalizeLavalinkUrl, wsUrl, sessionDefaults, voicePermissionIssues } = require('../src/core/MusicService');
 
 test('convierte correctamente las URLs HTTP de Lavalink a WebSocket', () => {
   assert.equal(wsUrl('http://127.0.0.1:2333'), 'ws://127.0.0.1:2333/v4/websocket');
   assert.equal(wsUrl('https://music.example.com'), 'wss://music.example.com/v4/websocket');
+});
+
+test('normaliza URLs WebSocket y barras finales para las llamadas REST', () => {
+  assert.equal(normalizeLavalinkUrl('wss://music.example.com///'), 'https://music.example.com');
+  assert.equal(normalizeLavalinkUrl(' ws://127.0.0.1:2333/ '), 'http://127.0.0.1:2333');
 });
 
 test('la música permanece desconfigurada sin URL y contraseña', () => {
@@ -18,6 +24,40 @@ test('la música permanece desconfigurada sin URL y contraseña', () => {
   assert.equal(session.queue.length, 0);
   if (oldUrl !== undefined) process.env.LAVALINK_URL = oldUrl;
   if (oldPassword !== undefined) process.env.LAVALINK_PASSWORD = oldPassword;
+});
+
+test('usa el Lavalink local cuando el modo integrado está activo', () => {
+  const previous = {
+    embedded: process.env.LAVALINK_EMBEDDED,
+    url: process.env.LAVALINK_URL,
+    password: process.env.LAVALINK_PASSWORD
+  };
+  process.env.LAVALINK_EMBEDDED = 'true';
+  delete process.env.LAVALINK_URL;
+  process.env.LAVALINK_PASSWORD = 'test-password';
+  assert.deepEqual(lavalinkConfig(), {
+    url: 'http://127.0.0.1:2333',
+    password: 'test-password',
+    configured: true,
+    mode: 'integrado'
+  });
+  for (const [key, value] of Object.entries({ LAVALINK_EMBEDDED: previous.embedded, LAVALINK_URL: previous.url, LAVALINK_PASSWORD: previous.password })) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+});
+
+test('informa exactamente los permisos de voz que faltan', () => {
+  const allowed = new Set([PermissionFlagsBits.ViewChannel]);
+  const guild = { members: { me: { id: 'bot' } } };
+  const voiceChannel = { permissionsFor: () => ({ has: permission => allowed.has(permission) }) };
+  assert.deepEqual(voicePermissionIssues(guild, voiceChannel), ['Conectar', 'Hablar']);
+});
+
+test('espera una conexión Lavalink que termina de iniciar', async () => {
+  const service = new MusicService({});
+  service.connect = () => setTimeout(() => { service.sessionId = 'ready'; }, 25);
+  assert.equal(await service.waitUntilReady(500), true);
 });
 
 test('rechaza canciones duplicadas y respeta el límite pendiente por usuario', async () => {

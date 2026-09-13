@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const { createDefaultGuildConfig } = require('../src/config/defaultGuild');
 
 const DATA_PATH = process.env.DATA_PATH || path.join(process.cwd(), 'data');
 const CONFIG_PATH = path.join(DATA_PATH, 'server');
@@ -26,15 +27,7 @@ async function resetServerConfig(guildId) {
   fs.copyFileSync(configFile, backupFile);
   console.log(`💾 Backup guardado en: ${backupFile}`);
   
-  const defaultConfig = {
-    general: {},
-    dashboard: { channel: null, message: null, enabled: false },
-    tiktok: { liveChannel: null, videoChannel: null, users: [], showUsers: false },
-    twitch: { liveChannel: null, users: [], showUsers: false },
-    youtube: { liveChannel: null, videoChannel: null, shortChannel: null, users: [], showUsers: false },
-    branding: { name: null, avatar: null },
-    testPanel: { activeSection: 'general' }
-  };
+  const defaultConfig = createDefaultGuildConfig(guildId);
   
   fs.writeFileSync(configFile, JSON.stringify(defaultConfig, null, 2));
   console.log(`✅ Configuración del servidor ${guildId} reseteada`);

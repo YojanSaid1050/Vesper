@@ -40,6 +40,7 @@ async function sendBrandedMessageNow(channel, payload, options = {}) {
   try {
     const config = await getGuildConfig(channel.guild.id);
     const branding = config.branding || {};
+    const profile = config.profile || {};
     const allowedRoleIds = [
       config.tiktok?.pingRole,
       config.twitch?.pingRole,
@@ -52,8 +53,8 @@ async function sendBrandedMessageNow(channel, payload, options = {}) {
       // Usar branding solo si está configurado, si no usar los valores del bot
       const webhookOptions = {
         ...payload,
-        username: branding.name || channel.client.user.username,
-        avatarURL: branding.avatar || channel.client.user.displayAvatarURL(),
+        username: profile.displayName || branding.name || channel.client.user.username,
+        avatarURL: profile.avatar || branding.avatar || channel.client.user.displayAvatarURL(),
         allowedMentions: {
           parse: [],
           roles: allowedRoleIds,

@@ -6,36 +6,14 @@ const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, Button
 const { checkUser } = require('../platforms/tiktok/checks');
 const { verifyStreamer } = require('../platforms/twitch/utils');
 const { verifyChannel } = require('../platforms/youtube/utils');
-const CacheManager = require('../core/CacheManager');
 const verifyButton = require('./verifyButton');
 const { requireAdministrator, requireMainGuild } = require('../utils/interactionGuards');
 const { clearGuildCache: clearTikTokGuild } = require('../platforms/tiktok/monitors');
+const { clearGuildCache: clearTwitchGuild } = require('../platforms/twitch/monitors');
+const { clearGuildCache: clearYouTubeGuild } = require('../platforms/youtube/monitors');
 const { buildDiagnosticsEmbed, buildAuditEmbed } = require('../core/DiagnosticsService');
 const { controlCenterPayload, modulesPayload, historyPayload } = require('../dashboard/controlCenter');
 const { CAPABILITIES, requireCapability } = require('../core/PermissionService');
-
-const twitchCache = new CacheManager('./data/twitch');
-const youtubeCache = new CacheManager('./data/youtube');
-
-function cleanTwitchGuild(guildId) {
-  const data = twitchCache.load('status', {});
-  for (const key of Object.keys(data)) {
-    if (key.startsWith(`${guildId}_`)) delete data[key];
-  }
-  twitchCache.save('status', data);
-}
-
-function cleanYouTubeGuild(guildId) {
-  const liveStatus = youtubeCache.load('liveStatus', {});
-  delete liveStatus[guildId];
-  youtubeCache.save('liveStatus', liveStatus);
-  const videos = youtubeCache.load('videos', {});
-  delete videos[guildId];
-  youtubeCache.save('videos', videos);
-  const shorts = youtubeCache.load('shorts', {});
-  delete shorts[guildId];
-  youtubeCache.save('shorts', shorts);
-}
 
 async function getPanelMode(guildId, platform) {
   const config = await getGuildConfig(guildId);
@@ -73,6 +51,11 @@ async function updateDashboardDirectly(client, guildId) {
 
 async function handleButton(interaction, client) {
   const customId = interaction.customId;
+
+  if (customId.startsWith('community_')) {
+    const { handleCommunityButton } = require('../core/CommunityService');
+    if (await handleCommunityButton(interaction, client)) return;
+  }
 
   const safeUpdate = async (data) => {
     try {
@@ -396,9 +379,7 @@ async function handleButton(interaction, client) {
   if (customId === 'confirm_tiktok_delete_all') {
     await interaction.deferUpdate();
     const guildId = interaction.guild.id;
-    let config = await getGuildConfig(guildId);
-    config.tiktok.users = [];
-    await updateGuildConfig(guildId, config);
+    await updateGuildSection(guildId, 'tiktok', { users: [] });
     await clearTikTokGuild(guildId);
     
     const successEmbed = new EmbedBuilder()
@@ -413,10 +394,8 @@ async function handleButton(interaction, client) {
   if (customId === 'confirm_twitch_delete_all') {
     await interaction.deferUpdate();
     const guildId = interaction.guild.id;
-    let config = await getGuildConfig(guildId);
-    config.twitch.users = [];
-    await updateGuildConfig(guildId, config);
-    cleanTwitchGuild(guildId);
+    await updateGuildSection(guildId, 'twitch', { users: [] });
+    await clearTwitchGuild(guildId);
     
     const successEmbed = new EmbedBuilder()
       .setDescription('✅ Todos los streamers de Twitch han sido eliminados.')
@@ -430,10 +409,8 @@ async function handleButton(interaction, client) {
   if (customId === 'confirm_youtube_delete_all') {
     await interaction.deferUpdate();
     const guildId = interaction.guild.id;
-    let config = await getGuildConfig(guildId);
-    config.youtube.users = [];
-    await updateGuildConfig(guildId, config);
-    cleanYouTubeGuild(guildId);
+    await updateGuildSection(guildId, 'youtube', { users: [] });
+    await clearYouTubeGuild(guildId);
     
     const successEmbed = new EmbedBuilder()
       .setDescription('✅ Todos los canales de YouTube han sido eliminados.')

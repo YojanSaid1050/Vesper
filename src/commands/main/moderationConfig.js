@@ -2,6 +2,7 @@ const { SlashCommandBuilder } = require('discord.js');
 const { CAPABILITIES } = require('../../core/PermissionService');
 const { updateGuildSection } = require('../../database/mongoManager');
 const { isApprovedGuild } = require('../../config/guildPolicy');
+const { normalizeAllowedDomain } = require('../../core/ModerationService');
 
 module.exports = {
   scope: 'main',
@@ -37,7 +38,14 @@ module.exports = {
     if (mentions !== null) values.maxMentions = mentions;
     if (repeats !== null) values.repeatLimit = repeats;
     if (action) values.action = action;
-    if (domains !== null) values.allowedDomains = [...new Set(domains.split(',').map(value => value.trim().toLowerCase().replace(/^www\./, '')).filter(Boolean))];
+    if (domains !== null) {
+      const rawDomains = domains.split(',').map(value => value.trim()).filter(Boolean);
+      const normalizedDomains = rawDomains.map(normalizeAllowedDomain).filter(Boolean);
+      if (normalizedDomains.length !== rawDomains.length) {
+        return interaction.reply({ content: 'Uno o más dominios no son válidos. Usa formatos como `example.com` separados por coma.', flags: 64 });
+      }
+      values.allowedDomains = [...new Set(normalizedDomains)];
+    }
     if (Object.keys(values).length === 0) return interaction.reply({ content: 'Indica al menos un valor para actualizar.', flags: 64 });
     await updateGuildSection(guildId, 'moderation', values);
     await interaction.reply({ content: `✅ Moderación actualizada para **${client.guilds.cache.get(guildId).name}**.`, flags: 64 });
