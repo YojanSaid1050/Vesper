@@ -41,8 +41,7 @@ module.exports = {
         const moduleEnabled = isModuleEnabledConfig(config, 'music');
         const rows = [
           `**Módulo:** ${moduleEnabled ? '✅ activo' : '❌ desactivado'}`,
-          `**Motor Lavalink:** ${status.configured ? `✅ configurado (${status.mode})` : '❌ sin configurar'}`,
-          `**Conexión Lavalink:** ${status.connected ? '✅ conectada' : '❌ desconectada'}`,
+          `**Motor de audio:** ${status.available ? '✅ integrado en el bot (yt-dlp + ffmpeg)' : '❌ no disponible'}`,
           `**Canal de solicitudes:** ${config.music?.requestChannel ? `<#${config.music.requestChannel}>` : 'cualquier canal de texto'}`,
           `**Canal de voz configurado:** ${config.music?.preferredVoiceChannel ? `<#${config.music.preferredVoiceChannel}>` : 'cualquier canal de voz'}`,
           `**Tu canal de voz:** ${voiceChannel || '❌ no estás en uno'}`,
@@ -51,8 +50,7 @@ module.exports = {
         ];
         if (status.lastError) rows.push(`**Último error:** \`${String(status.lastError).replace(/`/g, '').slice(0, 220)}\``);
         if (!moduleEnabled) rows.push('\nUsa `/vesper-setup modulos` o el panel web para activar música.');
-        else if (!status.configured) rows.push('\nConfigura `LAVALINK_PASSWORD` en el alojamiento y vuelve a desplegar.');
-        else if (!status.connected) rows.push('\nRevisa los logs de arranque de Lavalink y que la contraseña coincida.');
+        else if (status.reason) rows.push(`\n${status.reason}`);
         else if (!voiceChannel) rows.push('\nEntra a un canal de voz y repite este diagnóstico.');
         else if (permissionIssues.length) rows.push('\nConcede esos permisos al rol de Vesper en ese canal o categoría.');
         else rows.push('\n✅ Todo está listo para `/musica reproducir`.');

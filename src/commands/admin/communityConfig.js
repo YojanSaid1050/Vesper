@@ -5,6 +5,7 @@ const {
   SlashCommandBuilder
 } = require('discord.js');
 const { CAPABILITIES } = require('../../core/PermissionService');
+const { joinWithinLimit, LIMITS } = require('../../utils/discordLimits');
 const { getGuildConfig, updateCommunitySection, updateGuildSection } = require('../../database/mongoManager');
 const { publishSelfRolePanel, publishTicketPanel, reviewSuggestion } = require('../../core/CommunityService');
 const { isModuleEnabledConfig } = require('../../config/guildPolicy');
@@ -131,7 +132,16 @@ module.exports = {
       if (active !== null) await updateGuildSection(interaction.guildId, 'features', { selfroles: active });
       const current = [...(config.community?.selfRoles?.roles || [])].map(item => ({ roleId: item.roleId, label: item.label, emoji: item.emoji || null, description: item.description || null }));
       if (action === 'list') {
-        return interaction.reply({ content: current.length ? current.map(item => `• <@&${item.roleId}> — ${item.label}`).join('\n') : 'No hay autorroles configurados.', flags: 64, allowedMentions: { parse: [] } });
+        // Con 25 autorroles de etiqueta larga esto pasaba de los 2000
+        // caracteres que admite un mensaje y el comando fallaba entero.
+        return interaction.reply({
+          content: joinWithinLimit(current.map(item => `• <@&${item.roleId}> — ${item.label}`), {
+            limit: LIMITS.content,
+            empty: 'No hay autorroles configurados.'
+          }),
+          flags: 64,
+          allowedMentions: { parse: [] }
+        });
       }
       if (action === 'add') {
         const role = interaction.options.getRole('rol');

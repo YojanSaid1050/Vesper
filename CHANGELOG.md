@@ -1,5 +1,113 @@
 # Changelog
 
+## 3.0.0 — Música que funciona, registros configurables y panel nuevo
+
+### La música ya funciona
+- **Fuera Lavalink.** Era un servidor de Java aparte del bot. En un alojamiento
+  que solo ejecuta el bot —Render, Railway y parecidos— ese servidor no existe:
+  Vesper intentaba conectarse a `127.0.0.1:2333` contra nada, una y otra vez, y
+  la música no funcionó nunca.
+- **Reproductor nuevo dentro del propio proceso**: `yt-dlp` busca y extrae,
+  `ffmpeg` convierte a Opus y `@discordjs/voice` lo manda al canal de voz. Las
+  tres piezas llegan con `npm install`. No hay nada que levantar ni que pagar.
+- Acepta búsquedas por texto, enlaces de YouTube y SoundCloud, archivos de audio
+  sueltos y emisoras de radio. Si una pista falla —enlace caducado, vídeo
+  borrado— se salta, se avisa en el canal y la sesión sigue viva.
+- El volumen se aplica dentro de ffmpeg y al cambiarlo se retoma la canción en
+  el segundo exacto en el que iba.
+- Los errores de `yt-dlp` se traducen: «ese vídeo es privado», «pide iniciar
+  sesión», «el alojamiento no pudo conectarse a internet».
+- La música **ya no bloquea el arranque**. Antes se esperaban 15 segundos a un
+  servidor inexistente y el fallo se escribía como si algo se hubiera roto.
+- El `Dockerfile` ya no instala Java ni copia el `.jar`; desaparecen
+  `docker-compose.music.yml`, `lavalink/` y `scripts/start-production.sh`.
+- **La instalación nunca se cae por la música.** La librería que descargaba
+  yt-dlp lo hacía dentro de su propio `postinstall`: si GitHub no respondía,
+  `npm install` terminaba con error y **el despliegue entero se caía por no
+  poder poner música**. Ahora lo descarga `scripts/ensure-ytdlp.js`, que avisa
+  y sigue; se reintenta con `npm run music:setup`.
+
+### Corregido · 20 fallos reales encontrados auditando el bot entero
+- **`monitorError` lanzaba en cada fallo de monitor.** Su parámetro se llamaba
+  `error` y tapaba a la función `error()` del mismo módulo, así que la última
+  línea lanzaba «error is not a function», la excepción salía del `catch` de
+  quien llamaba y **el fallo original se perdía**. Por eso, cuando el bot no
+  podía crear un webhook, el envío de respaldo nunca se ejecutaba y el aviso no
+  se publicaba en ningún sitio.
+- **El agradecimiento por el boost se repetía.** Se comparaba `premiumSince`,
+  un getter que fabrica un `Date` nuevo en cada acceso: dos fechas iguales nunca
+  son `===`, así que cada cambio de rol o de apodo de un booster disparaba otra
+  vez «💜 ¡Gracias por el boost!». Ahora se comparan las marcas de tiempo.
+- **Ediciones de mensaje inventadas.** `messageUpdate` comparaba contra mensajes
+  parciales, cuyo contenido es `null`: al adjuntar Discord la vista previa de un
+  enlace se registraba una edición que nunca ocurrió, incluso de bots.
+- **Los registros de voz reventaban** cuando `newState.member` era null (alguien
+  desconectado al salir del servidor, o caché limpia).
+- **La mención en el título de un embed salía como número.** Discord solo
+  convierte `<@123…>` en la descripción; en títulos, pies y nombres de autor lo
+  deja crudo. Era el «Hasta pronto \<@292953664492929025\>» de la despedida de
+  Ankerie Dimension. Ahora en esos huecos sale el nombre, y en el contenedor V2
+  —donde sí funcionan— se mantiene la mención.
+- **Errores 50035 por pasarse de los límites de Discord**: la lista de autorroles
+  como `content`, la de canales de YouTube en un campo, y tres listas de
+  menciones de 1000 caracteres dentro de un campo de 1024. Nuevo módulo
+  `discordLimits` con recorte por palabras, y una red de seguridad en
+  `sendBrandedMessage` que recorta cualquier mensaje antes de publicarlo.
+- **El refresco del panel era código muerto** en `tiktok-setchannel` y
+  `youtube-setchannel`: estaba escrito después de los `return`.
+- **Los botones de confirmación caducados** daban «La interacción falló» sin
+  explicar nada; ahora el mensaje se edita al caducar.
+- **`!testwelcome` y `!testgoodbye` ignoraban la configuración** y enseñaban
+  siempre el diseño de fábrica.
+- **`/testbranding` tenía una copia a mano del diseño**, en inglés y sin leer la
+  configuración; ahora usa las mismas funciones que publican de verdad. Y decía
+  «enviada correctamente» sin comprobar que se hubiera enviado.
+- **Los botones de rol fallaban en silencio**: tras el `deferUpdate` el catch
+  general ya no podía responder, así que a quien le faltaba el permiso le
+  pasaba, simplemente, nada.
+- **`members.me` sin comprobar** en `/vesper-setup`, que además confundía «no
+  tengo permiso» con «no pude comprobarlo» y rechazaba canales válidos.
+- **`/cleandb` se quedaba colgado** en «⏳ Eliminando…» si MongoDB fallaba a
+  mitad; ahora dice cuántos se borraron.
+- **`editBrandedMessage` sin respaldo**: al terminar un directo, si el aviso se
+  había enviado sin webhook, lanzaba «Unknown Message» y nunca se marcaba.
+- **El pie de `/caso` mostraba el ID del moderador**; pasa a un campo, donde la
+  mención sí se convierte en nombre.
+- **21 títulos de registro estaban en inglés** («Member Joined», «Role Added»,
+  «User Banned»…) en un bot en castellano. Los diseños decorativos de Embers
+  Void no se han tocado: las pruebas de paridad lo comprueban.
+
+### Añadido · Cada registro se enciende, se apaga y se redirige por separado
+- Nueva pantalla **«Registros»** con los 27 avisos que Vesper puede anotar.
+  Cada uno tiene **su interruptor, su canal y su mención**, independientes.
+- Antes solo se podía encender o apagar el módulo entero y todo caía en el
+  mismo canal. Ahora puedes mandar los baneos a #moderación, las entradas a
+  #general y apagar los registros de voz sin tocar nada más.
+- Un aviso sin canal propio usa el de su grupo, y si no, el general: nunca se
+  pierde por no haber elegido uno.
+- Si el módulo está apagado, el interruptor propio no puede encenderlo, y el
+  panel **lo dice** en vez de aparentar que está activo.
+- Botones para encender todo, apagar todo o volver a lo de fábrica.
+- «Bot añadido» y «Miembro entró/salió» construían su embed a mano, saltándose
+  el catálogo: eran los únicos que no se podían editar. Ya no.
+
+### Cambiado · Panel rehecho
+- **Navegación por lo que quieres hacer**, no por cómo está hecho el bot:
+  «Tu servidor», «Cuando pasa algo», «Lo que dice», «Comunidad», «Ajustes».
+- **El inicio ya no es una vitrina de cifras**: es una lista de cosas que
+  arreglar, ordenada por gravedad, y cada una lleva de un clic a su pantalla.
+  Detecta módulos encendidos sin canal, avisos que no se publican en ninguna
+  parte, cuentas vigiladas sin destino, monitores en pausa y casos abiertos.
+- **Buscador con Ctrl+K** (o `/`): busca entre pantallas, mensajes y registros,
+  sin tildes y por palabras sueltas, y al llegar resalta el ajuste.
+- **Barra de guardado** abajo, que no se puede pasar por alto, en lugar de las
+  etiquetas diminutas de «cambios sin guardar» dentro de cada tarjeta.
+- Paleta nueva: neutros fríos en vez del morado teñido, radios más contenidos y
+  más contraste. El color del servidor destaca mucho más.
+- Los interruptores de registro guardan solos y repintan solo su fila, sin
+  mandarte el scroll al principio de la lista.
+
+
 ## 2.9.0 — Todos los mensajes editables, boosts y ofertas de juegos
 
 ### Corregido

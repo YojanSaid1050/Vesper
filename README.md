@@ -1,4 +1,4 @@
-# Vesper Bot 2.9.0
+# Vesper Bot 3.0.0
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión 2.8 conserva la presentación visual original con
@@ -211,13 +211,12 @@ bot continúa funcionando.
 
 ## Despliegue
 
-El proyecto incluye un `Dockerfile` reproducible con Chromium y Lavalink, y
+El proyecto incluye un `Dockerfile` reproducible con Chromium, y
 expone `/live`, `/ready` y `/health`. La disponibilidad exige Discord, MongoDB
-y monitores sanos. Lavalink solo bloquea `/ready` si `MUSIC_REQUIRED=true`.
+y monitores sanos. La música solo bloquea `/ready` si `MUSIC_REQUIRED=true`.
 
 El alojamiento queda a elección del propietario. Vesper requiere un proceso
-persistente y acceso a MongoDB. En Docker y Render, el proceso Lavalink puede
-iniciarse dentro del mismo contenedor con `LAVALINK_EMBEDDED=true`.
+persistente y acceso a MongoDB. La música no necesita ningún servicio extra.
 
 ## Seguridad
 
@@ -280,43 +279,32 @@ para la configuración y los permisos necesarios.
 
 ## Música gratuita
 
-La música usa Lavalink 4.2.2 y el complemento de YouTube 1.18.2. No requiere
-una API de pago, pero consume CPU y memoria del alojamiento propio.
+La música **no necesita ningún servidor aparte**. El reproductor vive dentro
+del propio bot:
 
-### Docker o Render: modo integrado
+| Pieza | Qué hace | De dónde sale |
+| --- | --- | --- |
+| `yt-dlp` | Busca la canción y da la dirección del audio | Se descarga en `bin/` al instalar |
+| `ffmpeg` | Convierte ese audio a Opus, que es lo que Discord quiere | Paquete `ffmpeg-static` |
+| `@discordjs/voice` | Lo manda al canal de voz | Dependencia de npm |
 
-El `Dockerfile` de Vesper inicia Node.js y Lavalink juntos. Define una contraseña
-larga en `LAVALINK_PASSWORD`, conserva `LAVALINK_EMBEDDED=true` y deja
-`MUSIC_REQUIRED=false` para que una avería musical no detenga las demás funciones.
-No es necesario desplegar `docker-compose.music.yml` en este modo.
+Esto sustituye a Lavalink, que era un servidor de Java independiente. En un
+alojamiento que solo ejecuta el bot —Render, Railway y parecidos— ese servidor
+nunca llegaba a existir: Vesper intentaba conectarse a `127.0.0.1:2333` contra
+nada y la música no funcionaba jamás. Ahora no hay nada que levantar ni que
+configurar.
 
-### Desarrollo local o Lavalink externo
+Acepta búsquedas por texto, enlaces de YouTube y SoundCloud, archivos de audio
+sueltos y emisoras de radio. Si una pista falla, se salta y la sesión sigue.
+
+Si la descarga de `yt-dlp` falla durante el despliegue (una red restringida, un
+corte), **la instalación no se rompe**: el bot arranca, la música queda
+desactivada y lo dice con todas las letras. Se reintenta con:
 
 ```bash
-docker compose -f docker-compose.music.yml up -d
+npm run music:setup
 ```
 
-Usa la misma contraseña en Vesper y Lavalink. Para un servidor externo define
-`LAVALINK_EMBEDDED=false` y su URL HTTP(S) en `LAVALINK_URL`.
-
-Activa el módulo con `/vesper-setup modulos` o desde el panel web. El canal se
-asigna con `/vesper-setup canales`; los límites avanzados se ajustan desde el
-panel o con `/vesper-musica-config` en el Main. El rol de Vesper necesita los
-permisos **Ver canal**, **Conectar** y **Hablar** en el canal de voz.
-
-Reglas incorporadas:
-
-- Una conexión y una cola por servidor.
-- Un solo canal de voz simultáneo por servidor.
-- El solicitante debe estar en ese canal.
-- Tres canciones pendientes por usuario y 100 en total por defecto.
-- Canciones repetidas y transmisiones en directo bloqueadas.
-- Duración máxima de 15 minutos por defecto.
-- Salto por voto del 50 % o inmediato para DJ.
-- Desconexión automática después de 180 segundos sin audiencia o sin canciones.
-
-Comandos: `/musica diagnostico`, `reproducir`, `pausar`, `continuar`, `saltar`,
-`cola`, `actual`, `bucle`, `volumen` y `detener`.
 
 ## Pruebas
 

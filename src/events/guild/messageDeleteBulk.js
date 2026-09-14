@@ -1,8 +1,7 @@
 // messageDeleteBulk.js — purgas de mensajes
 const { Events } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager');
-const { sendBrandedMessage } = require('../../utils/webhookSender');
-const { buildMessage } = require('../../core/EmbedCatalog');
+const { publishAlert } = require('../../core/AlertRouter');
 
 module.exports = {
   name: Events.MessageBulkDelete,
@@ -12,15 +11,9 @@ module.exports = {
     if (!guild) return;
 
     const guildConfig = await getGuildConfig(guild.id);
-    const logChannelId = guildConfig.general?.logChannel;
-    if (!logChannelId) return;
-
-    const logChannel = guild.channels.cache.get(logChannelId);
-    if (!logChannel) return;
 
     const channel = first.channel;
-    await sendBrandedMessage(logChannel, buildMessage('log_messages_purged', {
-      config: guildConfig,
+    await publishAlert(guild, guildConfig, 'log_messages_purged', {
       vars: {
         server: guild.name,
         memberCount: guild.memberCount,
@@ -33,6 +26,6 @@ module.exports = {
         { name: '📍 Canal', value: `${channel}`, inline: true },
         { name: '🔢 Cantidad', value: String(messages.size), inline: true }
       ]
-    }));
+    });
   }
 };

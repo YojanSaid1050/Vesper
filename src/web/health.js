@@ -18,10 +18,10 @@ function buildRuntimeHealth({ getClient, getMongoStatus, getMonitorStats, isShut
     const botReady = client?.isReady?.() || false;
     const database = getMongoStatus();
     const monitors = getMonitorStats();
-    const music = client?.music?.status?.() || { configured: false, connected: false, players: 0 };
+    const music = client?.music?.status?.() || { configured: false, connected: false, available: false, players: 0 };
     const monitorsHealthy = monitors.every(item => !item.disabledUntil);
     const musicRequired = String(process.env.MUSIC_REQUIRED || 'false').toLowerCase() === 'true';
-    const musicHealthy = !musicRequired || !music.configured || music.connected;
+    const musicHealthy = !musicRequired || music.available !== false;
     const stopping = isShuttingDown();
 
     const healthy = botReady && !stopping;

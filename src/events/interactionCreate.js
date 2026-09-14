@@ -50,43 +50,55 @@ async function handleColorRoles(interaction) {
     }
   } catch { return true; }
 
-  if (interaction.isStringSelectMenu() && interaction.customId === 'select_color') {
-    const selected = interaction.values[0];
-    await interaction.member.roles.remove(Object.values(colorRoles));
-    if (selected !== 'color_remove') {
-      const roleId = colorRoles[selected];
-      if (roleId) await interaction.member.roles.add(roleId);
+  // Tras el deferUpdate ya se ha respondido a Discord, así que el catch general
+  // del final del archivo no puede avisar de nada: si a Vesper le falta
+  // «Gestionar roles» o el rol está por encima del suyo, la persona pulsaba el
+  // botón y no pasaba absolutamente nada, sin explicación. Por eso cada
+  // asignación se hace aquí dentro, con su propio aviso.
+  const explainFailure = async error => {
+    const reason = /Missing Permissions|50013/.test(String(error?.message))
+      ? 'No puedo darte ese rol: me falta el permiso «Gestionar roles», o el rol está por encima del mío en la lista.'
+      : `No pude cambiar tus roles: ${String(error?.message || error).slice(0, 150)}`;
+    await interaction.followUp({ content: reason, flags: MessageFlags.Ephemeral }).catch(() => null);
+  };
+
+  const applyRoles = async action => {
+    try {
+      await action();
+    } catch (error) {
+      await explainFailure(error);
     }
     return true;
+  };
+
+  if (interaction.isStringSelectMenu() && interaction.customId === 'select_color') {
+    const selected = interaction.values[0];
+    return applyRoles(async () => {
+      await interaction.member.roles.remove(Object.values(colorRoles));
+      if (selected !== 'color_remove') {
+        const roleId = colorRoles[selected];
+        if (roleId) await interaction.member.roles.add(roleId);
+      }
+    });
   }
 
   if (interaction.isStringSelectMenu() && interaction.customId === 'select_country') {
     const selected = interaction.values[0];
-    await interaction.member.roles.remove(Object.values(countryRoles));
-    const roleId = countryRoles[selected];
-    if (roleId) await interaction.member.roles.add(roleId);
-    return true;
+    return applyRoles(async () => {
+      await interaction.member.roles.remove(Object.values(countryRoles));
+      const roleId = countryRoles[selected];
+      if (roleId) await interaction.member.roles.add(roleId);
+    });
   }
 
-  if (interaction.isButton() && inMap(gameRoles)) {
-    const roleId = gameRoles[customId];
-    if (interaction.member.roles.cache.has(roleId)) {
-      await interaction.member.roles.remove(roleId);
-    } else {
-      await interaction.member.roles.add(roleId);
-    }
-    return true;
-  }
+  const toggleFrom = map => applyRoles(async () => {
+    const roleId = map[customId];
+    if (interaction.member.roles.cache.has(roleId)) await interaction.member.roles.remove(roleId);
+    else await interaction.member.roles.add(roleId);
+  });
 
-  if (interaction.isButton() && inMap(platformRoles)) {
-    const roleId = platformRoles[customId];
-    if (interaction.member.roles.cache.has(roleId)) {
-      await interaction.member.roles.remove(roleId);
-    } else {
-      await interaction.member.roles.add(roleId);
-    }
-    return true;
-  }
+  if (interaction.isButton() && inMap(gameRoles)) return toggleFrom(gameRoles);
+  if (interaction.isButton() && inMap(platformRoles)) return toggleFrom(platformRoles);
 
   return true;
 }

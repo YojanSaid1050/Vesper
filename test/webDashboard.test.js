@@ -366,3 +366,72 @@ test('los mensajes de texto normal no admiten formato de embed', () => {
     /texto normal/
   );
 });
+
+/* ------------------------------------------------------------------ */
+/* Alertas y registros configurables uno a uno                         */
+/* ------------------------------------------------------------------ */
+
+const { alertSettings, resolveChannelId, alertOverview, ROUTABLE } = require('../src/core/AlertRouter');
+
+test('el saneador acepta apagar un aviso suelto, cambiarle el canal y la mención', () => {
+  const guild = mockGuild();
+  const result = sanitizeGuildPatch({
+    alerts: {
+      log_voice_join: { enabled: false },
+      log_ban_added: { channel: '123456789012345678', ping: '223456789012345678' }
+    }
+  }, guild);
+  assert.equal(result.alerts.log_voice_join.enabled, false);
+  assert.equal(result.alerts.log_ban_added.channel, '123456789012345678');
+  assert.equal(result.alerts.log_ban_added.ping, '223456789012345678');
+});
+
+test('vaciar un ajuste lo devuelve a «lo que diga el módulo»', () => {
+  const result = sanitizeGuildPatch({ alerts: { log_voice_join: { enabled: null, channel: null, ping: null } } }, mockGuild());
+  assert.deepEqual(result.alerts.log_voice_join, { enabled: null, channel: null, ping: null });
+});
+
+test('un aviso que no existe se rechaza', () => {
+  assert.throws(() => sanitizeGuildPatch({ alerts: { inventado: { enabled: true } } }, mockGuild()), /desconocido/);
+});
+
+test('sin tocar nada, cada aviso se comporta como su módulo', () => {
+  const encendido = { features: { logs: true }, general: { logChannel: 'L1' } };
+  assert.equal(alertSettings(encendido, 'log_member_join').enabled, true);
+
+  const apagado = { features: { logs: false }, general: { logChannel: 'L1' } };
+  assert.equal(alertSettings(apagado, 'log_member_join').enabled, false);
+});
+
+test('un aviso se puede apagar sin apagar el módulo entero', () => {
+  const config = { features: { logs: true }, general: { logChannel: 'L1' }, alerts: { log_voice_join: { enabled: false } } };
+  assert.equal(alertSettings(config, 'log_voice_join').enabled, false);
+  assert.equal(alertSettings(config, 'log_member_join').enabled, true, 'los demás siguen activos');
+});
+
+test('encender un aviso con su módulo apagado se avisa en vez de mentir', () => {
+  const config = { features: { logs: false }, alerts: { log_voice_join: { enabled: true } } };
+  const settings = alertSettings(config, 'log_voice_join');
+  assert.equal(settings.enabled, false);
+  assert.equal(settings.blockedByModule, true);
+});
+
+test('cada aviso puede ir a su propio canal, con respaldo en el general', () => {
+  const config = {
+    features: { logs: true, boosts: true },
+    general: { logChannel: 'GENERAL', botLogChannel: 'BOTS' },
+    alerts: { log_ban_added: { channel: 'MODERACION' } }
+  };
+  assert.equal(resolveChannelId(config, 'log_ban_added'), 'MODERACION', 'el suyo propio manda');
+  assert.equal(resolveChannelId(config, 'log_bot_join'), 'BOTS', 'si no, el de su grupo');
+  assert.equal(resolveChannelId(config, 'log_member_join'), 'GENERAL', 'y si no, el general');
+  assert.equal(resolveChannelId(config, 'boost_started'), 'GENERAL', 'los boosts caen al de bienvenida o al general');
+});
+
+test('el panel recibe todos los avisos agrupados', () => {
+  const overview = alertOverview({ features: { logs: true }, general: { logChannel: 'L1' } });
+  const total = overview.reduce((sum, group) => sum + group.items.length, 0);
+  assert.equal(total, ROUTABLE.length);
+  assert.ok(overview.length >= 4, 'deben venir repartidos por tema');
+  assert.ok(overview.every(group => group.items.every(item => item.label && item.kind)));
+});

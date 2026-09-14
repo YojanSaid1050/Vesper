@@ -54,3 +54,6 @@ desktop.ini
 playwright-report/
 test-results/
 .cache/ms-playwright
+
+# yt-dlp se descarga en el despliegue (39 MB); no va al repositorio.
+bin/

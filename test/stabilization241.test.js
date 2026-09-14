@@ -4,7 +4,7 @@ const { Events } = require('discord.js');
 const { requiredModuleForEvent } = require('../src/core/EventPolicy');
 const { CAPABILITIES, canWithGuildConfig } = require('../src/core/PermissionService');
 const { inferredCapability, COLLECTOR_ONLY_COMPONENT_IDS } = require('../src/events/interactionCreate');
-const { reconnectDelay } = require('../src/core/MusicService');
+const { MusicService } = require('../src/core/MusicService');
 const { findRecentAuditEntry } = require('../src/utils/auditLog');
 const { createDefaultGuildConfig, CURRENT_SCHEMA_VERSION } = require('../src/config/defaultGuild');
 
@@ -48,10 +48,12 @@ test('los botones de collectors no pasan al router del dashboard', () => {
   assert.equal(COLLECTOR_ONLY_COMPONENT_IDS.has('dashboard_home'), false);
 });
 
-test('la reconexión Lavalink usa backoff acotado', () => {
-  assert.ok(reconnectDelay(0) >= 2_000);
-  assert.ok(reconnectDelay(8) >= 60_000);
-  assert.ok(reconnectDelay(8) < 72_000);
+test('la música ya no depende de ningún servidor externo', () => {
+  // Antes esto comprobaba el backoff de reconexión con Lavalink. Ya no hay
+  // nada a lo que reconectarse: el reproductor vive dentro del propio bot.
+  const status = new MusicService({}).status();
+  assert.equal(status.engine, 'integrado');
+  assert.equal(status.available, true);
 });
 
 test('el audit log exige objetivo y ventana temporal', async () => {

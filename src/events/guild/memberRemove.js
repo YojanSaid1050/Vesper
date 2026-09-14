@@ -1,8 +1,10 @@
-const { Events, EmbedBuilder } = require('discord.js');
+const { Events } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { sendBrandedMessage } = require('../../utils/webhookSender');
 const { resolveEmbedTemplate } = require('../../core/EmbedTemplateService');
 const { classicFromTemplate } = require('../../core/EmbedLayouts');
+const { memberVars } = require('../../core/EmbedCatalog');
+const { publishAlert, resolveChannel, alertSettings } = require('../../core/AlertRouter');
 
 // Mismo criterio que en memberAdd: la estructura del diseño es intocable y
 // solo los textos, el color de acento y la imagen salen a la configuración.
@@ -62,28 +64,25 @@ module.exports = {
     const guildConfig = await getGuildConfig(member.guild.id); // Añadir await
     const general = guildConfig.general || {};
 
-    const goodbyeChannelId = general.goodbyeChannel;
-    if (goodbyeChannelId) {
-      const goodbyeChannel = member.guild.channels.cache.get(goodbyeChannelId);
-      if (goodbyeChannel) await sendGoodbye(member, goodbyeChannel, guildConfig);
+    const goodbyeChannel = resolveChannel(member.guild, guildConfig, 'goodbye');
+    if (goodbyeChannel && alertSettings(guildConfig, 'goodbye').enabled) {
+      await sendGoodbye(member, goodbyeChannel, guildConfig);
     }
 
-    const logChannelId = general.logChannel;
-    if (logChannelId) {
-      const logChannel = member.guild.channels.cache.get(logChannelId);
-      if (logChannel) {
-        const embed = new EmbedBuilder()
-          .setTitle(member.user.bot ? '🤖 Bot Left' : '📤 Member Left')
-          .setColor('#ED4245')
-          .addFields(
-            { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
-            { name: '🆔 ID', value: member.id }
-          )
-          .setThumbnail(member.user.displayAvatarURL())
-          .setTimestamp();
-        await sendBrandedMessage(logChannel, { embeds: [embed] });
-      }
-    }
+    // Igual que en la entrada: este registro se construía a mano y era el
+    // único que no se podía editar ni apagar desde el panel.
+    await publishAlert(member.guild, guildConfig, member.user.bot ? 'log_bot_leave' : 'log_member_leave', {
+      vars: memberVars(member),
+      defaults: {
+        title: member.user.bot ? '🤖 Bot retirado' : '📤 Miembro salió',
+        color: '#ED4245',
+        thumbnailUrl: member.user.displayAvatarURL()
+      },
+      fields: [
+        { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
+        { name: '🆔 ID', value: member.id }
+      ]
+    });
   },
   sendGoodbye,
   buildGoodbyePayload,

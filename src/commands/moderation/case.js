@@ -26,9 +26,13 @@ function caseEmbed(record) {
       { name: 'Expira', value: record.expiresAt ? `<t:${Math.floor(new Date(record.expiresAt).getTime() / 1000)}:R>` : 'No aplica', inline: true },
       { name: 'Motivo', value: String(record.reason || 'Sin motivo').slice(0, 1024) },
       ...(record.evidence ? [{ name: 'Evidencia', value: String(record.evidence).slice(0, 1024) }] : []),
-      { name: 'Notas recientes', value: notes.slice(0, 1024) || 'Sin notas.' }
+      { name: 'Notas recientes', value: notes.slice(0, 1024) || 'Sin notas.' },
+      // En un campo la mención sí se convierte en el nombre del moderador.
+      ...(record.resolvedBy ? [{ name: 'Último cierre por', value: `<@${record.resolvedBy}>`, inline: true }] : [])
     )
-    .setFooter({ text: record.resolvedBy ? `Último cierre por ${record.resolvedBy}` : 'Registro interno de moderación' })
+    // El pie de un embed no convierte menciones, así que aquí solo cabe un
+    // nombre. Antes salía el ID en bruto («Último cierre por 431897…»).
+    .setFooter({ text: 'Registro interno de moderación' })
     .setTimestamp(record.updatedAt || record.createdAt);
 }
 

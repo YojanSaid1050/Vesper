@@ -1,8 +1,7 @@
 const { Events, AuditLogEvent } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
-const { sendBrandedMessage } = require('../../utils/webhookSender');
-const { buildMessage, memberVars } = require('../../core/EmbedCatalog');
-const { isModuleEnabledConfig } = require('../../config/guildPolicy');
+const { memberVars } = require('../../core/EmbedCatalog');
+const { publishAlert } = require('../../core/AlertRouter');
 const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
 
 module.exports = {
@@ -16,44 +15,33 @@ module.exports = {
     // retirarlo. Se trata antes que los registros porque tiene su propio
     // canal y su propio módulo.
     // ------------------------------------------------------------------
-    if (!oldMember.partial && oldMember.premiumSince !== newMember.premiumSince) {
+    // Se comparan las MARCAS DE TIEMPO, no `premiumSince`: ese getter fabrica
+    // un Date nuevo en cada acceso, así que dos fechas iguales nunca son
+    // `===` y el bot daba las gracias por el boost cada vez que el booster
+    // cambiaba de rol o de apodo.
+    if (!oldMember.partial && oldMember.premiumSinceTimestamp !== newMember.premiumSinceTimestamp) {
       const started = Boolean(newMember.premiumSince);
-      if (isModuleEnabledConfig(guildConfig, 'boosts')) {
-        const boostChannelId = guildConfig.general?.boostChannel
-          || (started ? guildConfig.general?.welcomeChannel : null)
-          || guildConfig.general?.logChannel;
-        const boostChannel = boostChannelId && newMember.guild.channels.cache.get(boostChannelId);
-        if (boostChannel) {
-          const vars = memberVars(newMember, {
-            boostCount: newMember.guild.premiumSubscriptionCount ?? 0,
-            boostLevel: newMember.guild.premiumTier ?? 0
-          });
-          await sendBrandedMessage(boostChannel, buildMessage(started ? 'boost_started' : 'boost_stopped', {
-            config: guildConfig,
-            vars,
-            defaults: started
-              ? {
-                  title: '💜 ¡Gracias por el boost!',
-                  message: '{user} acaba de mejorar **{server}**. Ya vamos por {boostCount} boosts (nivel {boostLevel}).',
-                  color: '#F47FFF',
-                  thumbnailUrl: newMember.user.displayAvatarURL()
-                }
-              : {
-                  title: '💔 Boost retirado',
-                  description: `${newMember.user.tag} dejó de mejorar el servidor. Quedan ${newMember.guild.premiumSubscriptionCount ?? 0} boosts.`,
-                  color: '#747F8D',
-                  thumbnailUrl: newMember.user.displayAvatarURL()
-                }
-          }));
-        }
-      }
+      const vars = memberVars(newMember, {
+        boostCount: newMember.guild.premiumSubscriptionCount ?? 0,
+        boostLevel: newMember.guild.premiumTier ?? 0
+      });
+      await publishAlert(newMember.guild, guildConfig, started ? 'boost_started' : 'boost_stopped', {
+        vars,
+        defaults: started
+          ? {
+            title: '💜 ¡Gracias por el boost!',
+            message: '{user} acaba de mejorar **{server}**. Ya vamos por {boostCount} boosts (nivel {boostLevel}).',
+            color: '#F47FFF',
+            thumbnailUrl: newMember.user.displayAvatarURL()
+          }
+          : {
+            title: '💔 Boost retirado',
+            description: `${newMember.user.tag} dejó de mejorar el servidor. Quedan ${newMember.guild.premiumSubscriptionCount ?? 0} boosts.`,
+            color: '#747F8D',
+            thumbnailUrl: newMember.user.displayAvatarURL()
+          }
+      });
     }
-
-    const logChannelId = guildConfig.general?.logChannel;
-    if (!logChannelId) return;
-
-    const logChannel = newMember.guild.channels.cache.get(logChannelId);
-    if (!logChannel) return;
 
     // Vesper usa Partials.GuildMember: `oldMember` puede llegar incompleto, con
     // la caché de roles vacía y el apodo a null aunque el miembro tuviera
@@ -67,16 +55,15 @@ module.exports = {
     if (oldMember.nickname !== newMember.nickname) {
       const before = oldMember.nickname || 'Sin nickname';
       const after = newMember.nickname || 'Sin nickname';
-      await sendBrandedMessage(logChannel, buildMessage('log_nickname', {
-        config: guildConfig,
+      await publishAlert(newMember.guild, guildConfig, 'log_nickname', {
         vars: memberVars(newMember, { before, after }),
-        defaults: { title: '📝 Nickname Updated', color: '#00b0f4', thumbnailUrl: newMember.user.displayAvatarURL() },
+        defaults: { title: '📝 Apodo cambiado', color: '#00b0f4', thumbnailUrl: newMember.user.displayAvatarURL() },
         fields: [
           { name: '👤 Usuario', value: newMember.user.tag },
           { name: '📌 Antes', value: before, inline: true },
           { name: '📌 Después', value: after, inline: true }
         ]
-      }));
+      });
     }
 
     // Timeout changes
@@ -94,27 +81,25 @@ module.exports = {
       if (newMember.communicationDisabledUntilTimestamp) {
         const timeoutDate = new Date(newMember.communicationDisabledUntilTimestamp);
         const until = `<t:${Math.floor(timeoutDate.getTime() / 1000)}:F>`;
-        await sendBrandedMessage(logChannel, buildMessage('log_timeout_on', {
-          config: guildConfig,
+        await publishAlert(newMember.guild, guildConfig, 'log_timeout_on', {
           vars: memberVars(newMember, { executor, until, reason }),
-          defaults: { title: '🔇 User Timed Out', color: '#ED4245', thumbnailUrl: newMember.user.displayAvatarURL() },
+          defaults: { title: '🔇 Miembro aislado', color: '#ED4245', thumbnailUrl: newMember.user.displayAvatarURL() },
           fields: [
             { name: '👤 Usuario', value: newMember.user.tag },
             { name: '🛠️ Timeout por', value: executor },
             { name: '📅 Hasta', value: until },
             { name: '📝 Razón', value: reason }
           ]
-        }));
+        });
       } else {
-        await sendBrandedMessage(logChannel, buildMessage('log_timeout_off', {
-          config: guildConfig,
+        await publishAlert(newMember.guild, guildConfig, 'log_timeout_off', {
           vars: memberVars(newMember, { executor }),
-          defaults: { title: '🔊 Timeout Removed', color: '#57F287', thumbnailUrl: newMember.user.displayAvatarURL() },
+          defaults: { title: '🔊 Aislamiento retirado', color: '#57F287', thumbnailUrl: newMember.user.displayAvatarURL() },
           fields: [
             { name: '👤 Usuario', value: newMember.user.tag },
             { name: '🛠️ Removido por', value: executor }
           ]
-        }));
+        });
       }
     }
 
@@ -129,28 +114,26 @@ module.exports = {
     // la vez, los otros dos no aparecían en el registro.
     if (addedRoles.length) {
       const roles = addedRoles.map(role => `${role}`).join(', ').slice(0, 1024);
-      await sendBrandedMessage(logChannel, buildMessage('log_roles_added', {
-        config: guildConfig,
+      await publishAlert(newMember.guild, guildConfig, 'log_roles_added', {
         vars: memberVars(newMember, { roles }),
-        defaults: { title: addedRoles.length === 1 ? '🎭 Role Added' : '🎭 Roles Added', color: '#57F287' },
+        defaults: { title: addedRoles.length === 1 ? '🎭 Roles añadidos' : '🎭 Roles Added', color: '#57F287' },
         fields: [
           { name: '👤 Usuario', value: newMember.user.tag },
           { name: addedRoles.length === 1 ? '🎭 Rol' : '🎭 Roles', value: roles }
         ]
-      }));
+      });
     }
 
     if (removedRoles.length) {
       const roles = removedRoles.map(role => `${role}`).join(', ').slice(0, 1024);
-      await sendBrandedMessage(logChannel, buildMessage('log_roles_removed', {
-        config: guildConfig,
+      await publishAlert(newMember.guild, guildConfig, 'log_roles_removed', {
         vars: memberVars(newMember, { roles }),
-        defaults: { title: removedRoles.length === 1 ? '❌ Role Removed' : '❌ Roles Removed', color: '#ED4245' },
+        defaults: { title: removedRoles.length === 1 ? '❌ Roles retirados' : '❌ Roles Removed', color: '#ED4245' },
         fields: [
           { name: '👤 Usuario', value: newMember.user.tag },
           { name: removedRoles.length === 1 ? '🎭 Rol' : '🎭 Roles', value: roles }
         ]
-      }));
+      });
     }
   }
 };

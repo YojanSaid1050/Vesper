@@ -1,8 +1,10 @@
-const { Events, EmbedBuilder } = require('discord.js');
+const { Events } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
-const { sendBrandedMessage } = require('../../utils/webhookSender');
 const { resolveEmbedTemplate } = require('../../core/EmbedTemplateService');
 const { classicFromTemplate } = require('../../core/EmbedLayouts');
+const { memberVars } = require('../../core/EmbedCatalog');
+const { sendBrandedMessage } = require('../../utils/webhookSender');
+const { publishAlert, resolveChannel, alertSettings } = require('../../core/AlertRouter');
 
 // Diseño original de Embers Void. La ESTRUCTURA (contenedor V2, separador,
 // tipografía y GIF) no cambia nunca: solo se pueden sustituir los textos, el
@@ -65,51 +67,41 @@ module.exports = {
     const guildConfig = await getGuildConfig(member.guild.id); // Añadir await
     const general = guildConfig.general || {};
 
+    // Estos dos registros construían su embed a mano, saltándose el catálogo:
+    // por eso eran los únicos que no se podían editar desde el panel. Ahora
+    // pasan por el enrutador, como todos los demás.
     if (member.user.bot) {
       const botRole = member.guild.roles.cache.get(general.botRole);
       if (botRole) await member.roles.add(botRole).catch(() => null);
 
-      const botLogChannelId = general.botLogChannel;
-      if (botLogChannelId) {
-        const botLogChannel = member.guild.channels.cache.get(botLogChannelId);
-        if (botLogChannel) {
-          const embed = new EmbedBuilder()
-            .setTitle('🤖 Bot Added')
-            .setColor('#5865F2')
-            .addFields(
-              { name: '🤖 Bot', value: member.user.tag },
-              { name: '🆔 ID', value: member.id },
-              { name: '🎭 Rol añadido', value: botRole ? `<@&${general.botRole}>` : 'No configurado' }
-            )
-            .setThumbnail(member.user.displayAvatarURL())
-            .setTimestamp();
-          await sendBrandedMessage(botLogChannel, { embeds: [embed] });
-        }
-      }
+      await publishAlert(member.guild, guildConfig, 'log_bot_join', {
+        vars: memberVars(member, { role: botRole ? `${botRole}` : 'ninguno', roleName: botRole?.name || 'ninguno' }),
+        defaults: { title: '🤖 Bot añadido', color: '#5865F2', thumbnailUrl: member.user.displayAvatarURL() },
+        fields: [
+          { name: '🤖 Bot', value: member.user.tag },
+          { name: '🆔 ID', value: member.id },
+          { name: '🎭 Rol añadido', value: botRole ? `<@&${general.botRole}>` : 'No configurado' }
+        ]
+      });
     }
 
-    const welcomeChannelId = general.welcomeChannel;
-    if (welcomeChannelId) {
-      const welcomeChannel = member.guild.channels.cache.get(welcomeChannelId);
-      if (welcomeChannel) await sendWelcome(member, welcomeChannel, guildConfig);
+    const welcomeChannel = resolveChannel(member.guild, guildConfig, 'welcome');
+    if (welcomeChannel && alertSettings(guildConfig, 'welcome').enabled) {
+      await sendWelcome(member, welcomeChannel, guildConfig);
     }
 
-    const logChannelId = general.logChannel;
-    if (logChannelId) {
-      const logChannel = member.guild.channels.cache.get(logChannelId);
-      if (logChannel) {
-        const embed = new EmbedBuilder()
-          .setTitle(member.user.bot ? '🤖 Bot Joined' : '📥 Member Joined')
-          .setColor(member.user.bot ? '#5865F2' : '#57F287')
-          .addFields(
-            { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
-            { name: '🆔 ID', value: member.id }
-          )
-          .setThumbnail(member.user.displayAvatarURL())
-          .setTimestamp();
-        await sendBrandedMessage(logChannel, { embeds: [embed] });
-      }
-    }
+    await publishAlert(member.guild, guildConfig, member.user.bot ? 'log_bot_join' : 'log_member_join', {
+      vars: memberVars(member),
+      defaults: {
+        title: member.user.bot ? '🤖 Bot añadido' : '📥 Miembro entró',
+        color: member.user.bot ? '#5865F2' : '#57F287',
+        thumbnailUrl: member.user.displayAvatarURL()
+      },
+      fields: [
+        { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
+        { name: '🆔 ID', value: member.id }
+      ]
+    });
   },
   sendWelcome,
   buildWelcomePayload,

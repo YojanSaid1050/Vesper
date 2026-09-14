@@ -8,7 +8,7 @@ const { escapeHtml, qualifyingStarCount, renderTranscript, safeChannelName, tick
 test('los módulos comunitarios son opt-in y la configuración nace completa', () => {
   const modules = moduleDefaults();
   const config = createDefaultGuildConfig('guild');
-  assert.equal(CURRENT_SCHEMA_VERSION, 6);
+  assert.equal(CURRENT_SCHEMA_VERSION, 7);
   // El catálogo de mensajes nace vacío: sin plantillas guardadas, cada aviso
   // conserva el formato con el que se escribió.
   assert.deepEqual(config.embeds, {});

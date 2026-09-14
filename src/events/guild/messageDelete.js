@@ -1,7 +1,7 @@
 const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
-const { sendBrandedMessage } = require('../../utils/webhookSender');
-const { buildMessage, memberVars } = require('../../core/EmbedCatalog');
+const {memberVars } = require('../../core/EmbedCatalog');
+const { publishAlert } = require('../../core/AlertRouter');
 const { createLog } = require('../../utils/logCache');
 const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
 
@@ -15,11 +15,6 @@ module.exports = {
     const authorTag = message.author?.tag || 'Usuario desconocido';
 
     const guildConfig = await getGuildConfig(message.guild.id); // Añadir await
-    const logChannelId = guildConfig.general?.logChannel;
-    if (!logChannelId) return;
-
-    const logChannel = message.guild.channels.cache.get(logChannelId);
-    if (!logChannel) return;
 
     if (!createLog(`delete-${message.id}`)) return;
 
@@ -32,19 +27,18 @@ module.exports = {
     } catch {}
 
     const content = message.content?.substring(0, 1000) || '*Sin texto*';
-    await sendBrandedMessage(logChannel, buildMessage('log_message_deleted', {
-      config: guildConfig,
+    await publishAlert(message.guild, guildConfig, 'log_message_deleted', {
       vars: memberVars(message.member || { user: message.author, guild: message.guild }, {
         userTag: authorTag, executor: deleter,
         channel: `${message.channel}`, channelName: message.channel?.name || '', content
       }),
-      defaults: { title: '🗑️ Message Deleted', color: '#ED4245' },
+      defaults: { title: '🗑️ Mensaje borrado', color: '#ED4245' },
       fields: [
         { name: '👤 Usuario', value: authorTag },
         { name: '🛠️ Eliminado por', value: deleter },
         { name: '📍 Canal', value: `${message.channel}` },
         { name: '💬 Contenido', value: content }
       ]
-    }));
+    });
   }
 };

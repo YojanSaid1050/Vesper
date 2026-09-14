@@ -1,8 +1,7 @@
 // threadCreate.js — hilos nuevos
 const { Events } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager');
-const { sendBrandedMessage } = require('../../utils/webhookSender');
-const { buildMessage } = require('../../core/EmbedCatalog');
+const { publishAlert } = require('../../core/AlertRouter');
 
 module.exports = {
   name: Events.ThreadCreate,
@@ -13,15 +12,9 @@ module.exports = {
     if (!thread.guild) return;
 
     const guildConfig = await getGuildConfig(thread.guild.id);
-    const logChannelId = guildConfig.general?.logChannel;
-    if (!logChannelId) return;
-
-    const logChannel = thread.guild.channels.cache.get(logChannelId);
-    if (!logChannel) return;
 
     const owner = thread.ownerId ? `<@${thread.ownerId}>` : 'Desconocido';
-    await sendBrandedMessage(logChannel, buildMessage('log_thread_created', {
-      config: guildConfig,
+    await publishAlert(thread.guild, guildConfig, 'log_thread_created', {
       vars: {
         server: thread.guild.name,
         memberCount: thread.guild.memberCount,
@@ -36,6 +29,6 @@ module.exports = {
         { name: '📍 En', value: thread.parent ? `${thread.parent}` : 'Desconocido', inline: true },
         { name: '👤 Creado por', value: owner, inline: true }
       ]
-    }));
+    });
   }
 };

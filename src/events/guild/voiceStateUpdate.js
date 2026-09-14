@@ -1,7 +1,7 @@
-const { Events, EmbedBuilder } = require('discord.js');
+const { Events } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado
-const { sendBrandedMessage } = require('../../utils/webhookSender');
-const { buildMessage, memberVars } = require('../../core/EmbedCatalog');
+const {memberVars } = require('../../core/EmbedCatalog');
+const { publishAlert } = require('../../core/AlertRouter');
 
 const recentLogs = new Set();
 
@@ -16,58 +16,56 @@ module.exports = {
   name: Events.VoiceStateUpdate,
   async execute(oldState, newState) {
     if (oldState.channelId === newState.channelId) return;
-    if (newState.member?.user.bot) return;
+
+    // `newState.member` lee de la caché de miembros y devuelve null si no
+    // está: pasaba al desconectar a alguien que acababa de salir del servidor
+    // o tras limpiar la caché, y el registro de voz reventaba con un
+    // TypeError en vez de publicarse.
+    const member = newState.member ?? oldState.member;
+    if (!member || member.user?.bot) return;
 
     const guildConfig = await getGuildConfig(newState.guild.id); // Añadir await
-    const logChannelId = guildConfig.general?.logChannel;
-    if (!logChannelId) return;
-
-    const logChannel = newState.guild.channels.cache.get(logChannelId);
-    if (!logChannel) return;
 
     // Joined voice channel
     if (!oldState.channelId && newState.channelId) {
-      if (!createVoiceLog(`join-${newState.member.id}-${newState.channelId}`)) return;
-      await sendBrandedMessage(logChannel, buildMessage('log_voice_join', {
-        config: guildConfig,
-        vars: memberVars(newState.member, { channel: `${newState.channel}`, channelName: newState.channel?.name || '' }),
-        defaults: { title: '🔊 Voice Joined', color: '#57F287' },
+      if (!createVoiceLog(`join-${member.id}-${newState.channelId}`)) return;
+      await publishAlert(newState.guild, guildConfig, 'log_voice_join', {
+        vars: memberVars(member, { channel: `${newState.channel}`, channelName: newState.channel?.name || '' }),
+        defaults: { title: '🔊 Entró a voz', color: '#57F287' },
         fields: [
-          { name: '👤 Usuario', value: newState.member.user.tag, inline: true },
+          { name: '👤 Usuario', value: member.user.tag, inline: true },
           { name: '🎤 Canal', value: `${newState.channel}`, inline: true }
         ]
-      }));
+      });
       return;
     }
 
     // Left voice channel
     if (oldState.channelId && !newState.channelId) {
-      if (!createVoiceLog(`leave-${newState.member.id}-${oldState.channelId}`)) return;
-      await sendBrandedMessage(logChannel, buildMessage('log_voice_leave', {
-        config: guildConfig,
-        vars: memberVars(newState.member, { channel: `${oldState.channel}`, channelName: oldState.channel?.name || '' }),
-        defaults: { title: '📴 Voice Left', color: '#ED4245' },
+      if (!createVoiceLog(`leave-${member.id}-${oldState.channelId}`)) return;
+      await publishAlert(newState.guild, guildConfig, 'log_voice_leave', {
+        vars: memberVars(member, { channel: `${oldState.channel}`, channelName: oldState.channel?.name || '' }),
+        defaults: { title: '📴 Salió de voz', color: '#ED4245' },
         fields: [
-          { name: '👤 Usuario', value: newState.member.user.tag, inline: true },
+          { name: '👤 Usuario', value: member.user.tag, inline: true },
           { name: '🎤 Canal', value: `${oldState.channel}`, inline: true }
         ]
-      }));
+      });
       return;
     }
 
     // Moved between voice channels
     if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
-      if (!createVoiceLog(`move-${newState.member.id}-${oldState.channelId}-${newState.channelId}`)) return;
-      await sendBrandedMessage(logChannel, buildMessage('log_voice_move', {
-        config: guildConfig,
-        vars: memberVars(newState.member, { from: `${oldState.channel}`, to: `${newState.channel}` }),
-        defaults: { title: '🔄 Voice Moved', color: '#5865F2' },
+      if (!createVoiceLog(`move-${member.id}-${oldState.channelId}-${newState.channelId}`)) return;
+      await publishAlert(newState.guild, guildConfig, 'log_voice_move', {
+        vars: memberVars(member, { from: `${oldState.channel}`, to: `${newState.channel}` }),
+        defaults: { title: '🔄 Cambió de canal de voz', color: '#5865F2' },
         fields: [
-          { name: '👤 Usuario', value: newState.member.user.tag },
+          { name: '👤 Usuario', value: member.user.tag },
           { name: '⬅️ De', value: `${oldState.channel}`, inline: true },
           { name: '➡️ A', value: `${newState.channel}`, inline: true }
         ]
-      }));
+      });
     }
   }
 };

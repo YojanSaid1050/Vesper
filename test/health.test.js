@@ -61,12 +61,19 @@ test('el bot desconectado o el apagado sí marcan el proceso como enfermo', () =
 });
 
 test('la música solo afecta al estado si MUSIC_REQUIRED está activo', () => {
-  const opcional = scenario({ music: { configured: true, connected: false, players: 0 } });
+  // El motor vive dentro del bot: «no disponible» significa que faltan las
+  // herramientas de audio, no que un servidor externo esté caído.
+  const averiada = { configured: false, connected: false, available: false, players: 0 };
+
+  const opcional = scenario({ music: averiada });
   assert.equal(opcional.ready, true, 'una avería musical no debe degradar el bot entero');
 
-  const obligatoria = scenario({ musicRequired: true, music: { configured: true, connected: false, players: 0 } });
+  const obligatoria = scenario({ musicRequired: true, music: averiada });
   assert.equal(obligatoria.healthy, true, 'ni siquiera así se debe reiniciar el contenedor');
   assert.equal(obligatoria.ready, false);
+
+  const sana = scenario({ musicRequired: true, music: { configured: true, connected: true, available: true, players: 0 } });
+  assert.equal(sana.ready, true);
 });
 
 test('los endpoints devuelven los códigos correctos', async () => {
