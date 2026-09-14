@@ -199,3 +199,46 @@ test('un formato desconocido no rompe nada: se usa el de fábrica', () => {
   const payload = memberAdd.buildWelcomePayload(fakeMember(), { embeds: { welcome: { layout: 'inventado' } } });
   assert.equal(payload.flags, 32768);
 });
+
+/* ------------------------------------------------------------------ */
+/* Menciones donde Discord no las convierte                            */
+/* ------------------------------------------------------------------ */
+
+test('una mención en el título de un embed clásico sale como nombre, no como número', () => {
+  // Era el fallo de la despedida de Ankerie Dimension: el título mostraba
+  // «Hasta pronto <@292953664492929025>» porque Discord no convierte
+  // menciones fuera de la descripción.
+  const { resolveEmbedTemplate } = require('../src/core/EmbedTemplateService');
+  const member = fakeMember({ guild: { name: 'Ankerie Dimension', memberCount: 12 } });
+  const config = { embeds: { goodbye: { title: 'Hasta pronto {user}', message: 'Adiós {user}.' } } };
+
+  const template = resolveEmbedTemplate(config, 'goodbye', member, { layout: 'classic' });
+  assert.equal(template.title, 'Hasta pronto @Yojan');
+  assert.match(template.message, /<@123456789012345678>/, 'en la descripción sí debe ser una mención real');
+});
+
+test('en el contenedor V2 la mención funciona también en el título', () => {
+  const { resolveEmbedTemplate } = require('../src/core/EmbedTemplateService');
+  const config = { embeds: { goodbye: { title: 'Hasta pronto {user}', layout: 'components_v2' } } };
+  const template = resolveEmbedTemplate(config, 'goodbye', fakeMember(), {});
+  assert.match(template.title, /<@123456789012345678>/);
+});
+
+test('el pie tampoco convierte menciones', () => {
+  const { resolveEmbedTemplate } = require('../src/core/EmbedTemplateService');
+  const config = { embeds: { welcome: { footer: 'Añadido por {user}' } } };
+  const template = resolveEmbedTemplate(config, 'welcome', fakeMember(), { layout: 'classic' });
+  assert.equal(template.footer, 'Añadido por @Yojan');
+});
+
+test('lo mismo vale para roles y canales en el catálogo', () => {
+  const { buildMessage } = require('../src/core/EmbedCatalog');
+  const vars = {
+    user: '<@1>', displayName: 'Yojan', username: 'yojan', userId: '1',
+    role: '<@&2>', roleName: 'Miembro', channel: '<#3>', channelName: 'general'
+  };
+  const config = { embeds: { log_roles_added: { title: '{user} · {role} · {channel}', message: '{user} en {channel}' } } };
+  const payload = buildMessage('log_roles_added', { config, vars, defaults: {} });
+  assert.equal(payload.embeds[0].title, '@Yojan · @Miembro · #general');
+  assert.equal(payload.embeds[0].description, '<@1> en <#3>');
+});

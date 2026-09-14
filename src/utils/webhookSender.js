@@ -1,5 +1,6 @@
 const { getGuildConfig } = require('../database/mongoManager');
 const { monitorError } = require('./logger');
+const { clampPayload } = require('./discordLimits');
 
 const webhookCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000;
@@ -106,7 +107,10 @@ function enqueueChannel(channelId, operation) {
 }
 
 async function sendBrandedMessage(channel, payload, options = {}) {
-  return enqueueChannel(channel.id, () => sendBrandedMessageNow(channel, payload, options));
+  // Red de seguridad: si algo se pasa de los límites de Discord —un registro
+  // con 40 campos, una lista de canales larguísima— se recorta aquí en vez de
+  // que Discord rechace el mensaje entero y el aviso no llegue a publicarse.
+  return enqueueChannel(channel.id, () => sendBrandedMessageNow(channel, clampPayload(payload), options));
 }
 
 async function editBrandedMessage(channel, messageId, payload) {
@@ -116,7 +120,17 @@ async function editBrandedMessage(channel, messageId, payload) {
       ...payload,
       allowedMentions: { parse: [], roles: [], users: [] }
     };
-    if (webhook) return webhook.editMessage(messageId, safePayload);
+    // El mensaje puede haberse publicado por el camino de respaldo (sin
+    // webhook) o el webhook puede haberse borrado y recreado desde entonces.
+    // En esos casos `editMessage` lanza «Unknown Message» y el aviso de
+    // directo se quedaba para siempre sin marcar como terminado.
+    if (webhook) {
+      try {
+        return await webhook.editMessage(messageId, safePayload);
+      } catch {
+        // se intenta por el canal, más abajo
+      }
+    }
     const message = await channel.messages.fetch(messageId);
     return message.edit(safePayload);
   });

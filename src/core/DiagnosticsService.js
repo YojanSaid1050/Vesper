@@ -52,7 +52,7 @@ async function buildDiagnosticsEmbed(client) {
       { name: 'MongoDB', value: `${mark(data.mongo.connected)} Conexión\nLatencia: ${data.mongo.latency ?? 'N/D'} ms`, inline: true },
       { name: 'APIs y cuota desde el arranque', value: `${mark(data.twitch.configured)} Twitch · ${data.providerMetrics.twitch.calls} llamadas${data.providerMetrics.twitch.remaining !== null ? ` · ${data.providerMetrics.twitch.remaining}/${data.providerMetrics.twitch.limit} restantes` : ''}\n${mark(data.youtube.configured)} YouTube · ${data.providerMetrics.youtube.units}/10000 unidades estimadas\n${mark(data.tiktok.provider === 'self_hosted' || data.tiktok.mode === 'integrated')} TikTok · US$0.00`, inline: true },
       { name: 'TikTok gratuito', value: `Navegador: ${data.tiktok.browser?.ready ? 'listo' : data.tiktok.browser?.installed ? 'instalado/en espera' : 'no detectado'}\nÚltimo éxito: ${data.tiktok.lastSuccess || 'sin datos'}\nÚltimo error: ${data.tiktok.lastError?.message || 'ninguno'}`.slice(0, 1024) },
-      { name: 'Música', value: `${mark(data.music.configured)} Configuración\n${mark(data.music.connected)} Lavalink\nReproductores: ${data.music.players || 0}`, inline: true },
+      { name: 'Música', value: `${mark(data.music.available)} Motor de audio\nSesiones: ${data.music.players || 0}\nSonando: ${data.music.playing || 0}`, inline: true },
       { name: 'Monitores', value: monitorLines.slice(0, 1024) }
     )
     .setFooter({ text: 'No se muestran credenciales ni secretos' })

@@ -70,14 +70,31 @@
           <p class="view-hint" id="view-hint"></p>
         </div>
         <div class="topbar-actions">
+          <button id="search-open" class="search-trigger" type="button">
+            <span aria-hidden="true">⌕</span>
+            <span class="search-trigger-text">Buscar un ajuste…</span>
+            <kbd>Ctrl</kbd><kbd>K</kbd>
+          </button>
           <span id="status-pill" class="pill" aria-live="polite">Comprobando…</span>
           <button id="refresh-button" class="button quiet" type="button">
-            <span aria-hidden="true">⟳</span> Actualizar
+            <span aria-hidden="true">⟳</span> <span class="button-text">Actualizar</span>
           </button>
         </div>
       </header>
 
       <main id="view" class="view" tabindex="-1"></main>
+
+      <!-- Barra de guardado. Sustituye a las etiquetas diminutas de «cambios
+           sin guardar» que había dentro de cada tarjeta y que era muy fácil
+           no ver hasta perder el trabajo. -->
+      <div id="save-bar" class="save-bar" role="status" hidden>
+        <span class="save-bar-dot" aria-hidden="true"></span>
+        <span id="save-bar-text">Tienes cambios sin guardar.</span>
+        <div class="save-bar-actions">
+          <button id="save-bar-discard" class="button quiet sm" type="button">Descartar</button>
+          <button id="save-bar-save" class="button sm" type="button">Guardar cambios</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -118,6 +135,19 @@
       <form method="dialog" class="modal-actions">
         <button value="close" class="button" type="submit">Listo</button>
       </form>
+    </div>
+  </dialog>
+
+  <!-- Buscador. Con cientos de ajustes, recordar en qué pantalla está cada
+       cosa es imposible: se escribe y se va. -->
+  <dialog id="search-dialog" class="modal search" aria-label="Buscar un ajuste">
+    <div class="modal-card search-card">
+      <div class="search-field">
+        <span aria-hidden="true">⌕</span>
+        <input id="search-input" type="search" placeholder="Bienvenida, baneos, color, twitch…" autocomplete="off" spellcheck="false">
+      </div>
+      <ul id="search-results" class="search-results"></ul>
+      <p class="search-help"><kbd>↑</kbd><kbd>↓</kbd> para moverte · <kbd>Enter</kbd> para abrir · <kbd>Esc</kbd> para cerrar</p>
     </div>
   </dialog>
 

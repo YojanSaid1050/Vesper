@@ -48,16 +48,22 @@ module.exports = {
       console.error('❌ Error iniciando monitores:', error);
     }
 
+    // La música no bloquea el arranque. Antes se esperaban 15 segundos a que
+    // respondiera un servidor que en muchos alojamientos no existe, y el fallo
+    // se escribía como si algo se hubiera roto. Ahora se arranca la conexión
+    // en segundo plano y se dice en una línea en qué estado quedó.
     try {
       await client.music.start();
-      if (client.music.status().configured) {
-        await client.music.waitUntilReady(15_000);
-        console.log('🎵 Servicio de música conectado y listo');
+      const music = client.music.status();
+      if (!music.configured) {
+        console.log(`🎵 Música desactivada — ${music.reason}`);
+      } else if (music.connected) {
+        console.log('🎵 Música conectada y lista');
       } else {
-        console.log('ℹ️ Música disponible pero Lavalink no está configurado');
+        console.log(`🎵 Música: conectando con ${music.url} en segundo plano…`);
       }
     } catch (error) {
-      console.error('⚠️ Música no disponible por ahora; el resto de Vesper seguirá activo:', error.message);
+      console.log('🎵 Música no disponible; el resto de Vesper sigue activo:', error.message);
     }
 
     for (const guild of client.guilds.cache.values()) {

@@ -15,7 +15,6 @@ rotarse antes del próximo despliegue. No están incluidas en este paquete.
 | `TWITCH_CLIENT_SECRET` | Twitch Developer Console | Uso de la cuota de la aplicación |
 | `GOOGLE_CLIENT_SECRET` | Google Cloud Console → Credenciales | Suplantación del acceso por Google |
 | `YOUTUBE_API_KEY` | Google Cloud → revocar y crear una nueva | Agotamiento de la cuota diaria |
-| `LAVALINK_PASSWORD` | Elegir una aleatoria nueva | Acceso al servidor de audio |
 
 Guarda cada valor nuevo **solo** como variable secreta de Render. Nunca en
 `.env.example`, `render.yaml`, GitHub, capturas de pantalla ni mensajes de chat.

@@ -130,44 +130,38 @@ function monitor(platform, action, guildId, details = {}) {
 // ==================================================
 // CORREGIDA: Manejo seguro de errores para monitorError
 // ==================================================
-function monitorError(platform, action, guildId, error, details = {}) {
-    let errorMessage = 'Error desconocido';
-    
-    // SANEAMIENTO COMPLETO DEL ERROR
-    if (typeof error === 'function') {
-        errorMessage = `Se recibió una función (${error.name || 'anonymous'}) como error. Verifica el código.`;
-    } else if (!error) {
-        errorMessage = 'Error vacío o indefinido';
-    } else if (error instanceof Error) {
-        errorMessage = error.message;
-    } else if (typeof error === 'string') {
-        errorMessage = error;
-    } else if (typeof error === 'object') {
+// OJO: el parámetro NO puede llamarse `error`. Se llamaba así y tapaba a la
+// función `error()` de este mismo módulo, así que la última línea lanzaba
+// "error is not a function" en CADA fallo de monitor: la excepción salía del
+// catch de quien llamaba y el error original se perdía. Por eso, cuando el
+// bot no podía crear un webhook, el envío de respaldo nunca llegaba a
+// ejecutarse y el aviso no se publicaba en ningún sitio.
+function describeFailure(failure) {
+    if (failure === null || failure === undefined) return 'Error vacío o indefinido';
+    if (failure instanceof Error) return failure.message || failure.name || 'Error sin mensaje';
+    if (typeof failure === 'string') return failure;
+    if (typeof failure === 'function') return `Se recibió una función (${failure.name || 'anónima'}) como error`;
+    if (typeof failure === 'object') {
+        if (typeof failure.message === 'string' && failure.message) return failure.message;
+        if (typeof failure.error === 'string' && failure.error) return failure.error;
         try {
-            // Intentar obtener message si existe
-            if (error.message && typeof error.message === 'string') {
-                errorMessage = error.message;
-            } else if (error.error && typeof error.error === 'string') {
-                errorMessage = error.error;
-            } else {
-                errorMessage = JSON.stringify(error);
-            }
-        } catch (e) {
-            errorMessage = String(error);
+            return JSON.stringify(failure);
+        } catch {
+            return String(failure);
         }
-    } else {
-        errorMessage = String(error);
     }
-    
-    // Limitar longitud del mensaje para la cache key
+    return String(failure);
+}
+
+function monitorError(platform, action, guildId, failure, details = {}) {
+    const errorMessage = describeFailure(failure);
     const cacheKey = `${platform}_${action}_${guildId || 'global'}_${errorMessage.substring(0, 30)}`;
-    
+
     if (createLog(cacheKey, 10000)) {
         const detailsStr = Object.entries(details)
-            .map(([k, v]) => `${k}: ${v}`)
+            .map(([key, value]) => `${key}: ${value}`)
             .join(' | ');
-        const logMessage = `[${platform}] ${action} | Guild: ${guildId || 'global'} | Error: ${errorMessage}${detailsStr ? ` | ${detailsStr}` : ''}`;
-        error(logMessage);
+        error(`[${platform}] ${action} | Guild: ${guildId || 'global'} | Error: ${errorMessage}${detailsStr ? ` | ${detailsStr}` : ''}`);
     }
 }
 
@@ -216,6 +210,7 @@ module.exports = {
     debug,
     monitor,
     monitorError,
+    describeFailure,
     log,
     cleanOldLogs
 };

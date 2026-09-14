@@ -26,7 +26,9 @@ const state = {
   section: 'inicio',
   health: null,
   loading: false,
-  dirty: new Set()
+  dirty: new Set(),
+  searchResults: [],
+  searchIndex: 0
 };
 
 const $ = selector => document.querySelector(selector);
@@ -429,31 +431,102 @@ function wireImageFallbacks(root) {
 /* Secciones                                                         */
 /* ---------------------------------------------------------------- */
 
+// La navegación está ordenada por LO QUE QUIERES HACER, no por cómo está
+// hecho el bot por dentro. Nadie entra al panel pensando «voy a configurar el
+// módulo de logs»: entra pensando «quiero saber quién borra mensajes».
 const SECTIONS = [
-  { id: 'inicio', group: 'Servidor', icon: '◈', label: 'Inicio', title: 'Resumen del servidor',
-    hint: 'Estado de Vesper y qué falta por configurar.' },
-  { id: 'identidad', group: 'Servidor', icon: '✦', label: 'Identidad', title: 'Identidad del bot',
-    hint: 'Cómo se llama y qué cara pone Vesper en este servidor.', needs: 'configure' },
-  { id: 'bienvenidas', group: 'Mensajes', icon: '✉', label: 'Bienvenidas', title: 'Bienvenida y despedida',
-    hint: 'Edita los embeds que se publican cuando alguien entra o sale.', needs: 'configure' },
-  { id: 'avisos', group: 'Mensajes', icon: '◎', label: 'Avisos de redes', title: 'TikTok, Twitch y YouTube',
-    hint: 'Cuentas vigiladas, canales de destino y rol al que avisar.', needs: 'social' },
-  { id: 'mensajes', group: 'Mensajes', icon: '✎', label: 'Todos los mensajes', title: 'Todos los mensajes del bot',
-    hint: 'Cada aviso que Vesper publica, editable: título, texto, color, imagen y pie.', needs: 'configure' },
-  { id: 'ofertas', group: 'Mensajes', icon: '◈', label: 'Ofertas de juegos', title: 'Ofertas y juegos gratis',
-    hint: 'Avisa en un canal cuando Epic regale un juego, Steam rebaje algo o aparezca un sorteo.', needs: 'configure' },
-  { id: 'moderacion', group: 'Comunidad', icon: '⚖', label: 'Moderación', title: 'Moderación',
-    hint: 'Filtros automáticos, casos abiertos y sanciones.' },
-  { id: 'comunidad', group: 'Comunidad', icon: '☰', label: 'Comunidad', title: 'Tickets, sugerencias y roles',
-    hint: 'Paneles de soporte, buzón de sugerencias, autorroles y destacados.', needs: 'configure' },
-  { id: 'musica', group: 'Comunidad', icon: '♪', label: 'Música', title: 'Reproductor de música',
-    hint: 'Canales permitidos y límites de la cola.', needs: 'configure' },
-  { id: 'modulos', group: 'Ajustes', icon: '⚙', label: 'Módulos y permisos', title: 'Módulos y permisos',
-    hint: 'Qué funciones están activas y qué roles pueden usarlas.', needs: 'configure' },
-  { id: 'resumen', group: 'Ajustes', icon: '≡', label: 'Configuración', title: 'Configuración completa',
-    hint: 'Todo lo que Vesper tiene guardado de este servidor.', needs: 'configure' },
-  { id: 'auditoria', group: 'Ajustes', icon: '⏱', label: 'Auditoría', title: 'Auditoría del panel',
-    hint: 'Quién cambió qué desde la web.', needs: 'configure' }
+  {
+    id: 'inicio', group: 'Tu servidor', icon: '◉', label: 'Estado',
+    title: 'Estado del servidor',
+    hint: 'Qué está funcionando, qué falta y qué hay que arreglar.'
+  },
+  {
+    id: 'apariencia', group: 'Tu servidor', icon: '✦', label: 'Apariencia',
+    title: 'Cómo se ve Vesper',
+    hint: 'Nombre, avatar y color con los que publica en este servidor.',
+    needs: 'configure',
+    keywords: ['identidad', 'nombre', 'avatar', 'color', 'marca', 'branding', 'apodo', 'tema']
+  },
+
+  {
+    id: 'bienvenidas', group: 'Cuando pasa algo', icon: '✉', label: 'Entradas y salidas',
+    title: 'Cuando alguien entra o sale',
+    hint: 'Bienvenida, despedida y agradecimiento por los boosts.',
+    needs: 'configure',
+    keywords: ['bienvenida', 'despedida', 'boost', 'nitro', 'entrar', 'salir', 'saludo']
+  },
+  {
+    id: 'registros', group: 'Cuando pasa algo', icon: '☰', label: 'Registros',
+    title: 'Qué se anota y dónde',
+    hint: 'Cada aviso por separado: se enciende, se apaga, se le cambia el canal y a quién menciona.',
+    needs: 'configure',
+    keywords: ['logs', 'registro', 'auditoría', 'canal', 'avisos', 'apagar', 'encender', 'mención', 'ping']
+  },
+  {
+    id: 'avisos', group: 'Cuando pasa algo', icon: '◎', label: 'Avisos de redes',
+    title: 'TikTok, Twitch y YouTube',
+    hint: 'Cuentas vigiladas, canales de destino y rol al que avisar.',
+    needs: 'social',
+    keywords: ['twitch', 'youtube', 'tiktok', 'directo', 'stream', 'video', 'short', 'notificación']
+  },
+  {
+    id: 'ofertas', group: 'Cuando pasa algo', icon: '◈', label: 'Ofertas y juegos',
+    title: 'Ofertas y juegos gratis',
+    hint: 'Avisa cuando Epic regale un juego, Steam rebaje algo o aparezca un sorteo.',
+    needs: 'configure',
+    keywords: ['epic', 'steam', 'gratis', 'oferta', 'rebaja', 'sorteo', 'giveaway', 'juego']
+  },
+
+  {
+    id: 'mensajes', group: 'Lo que dice', icon: '✎', label: 'Todos los mensajes',
+    title: 'Todos los mensajes del bot',
+    hint: 'Cada aviso, editable: texto, color, imagen, formato y tamaño de letra.',
+    needs: 'configure',
+    keywords: ['embed', 'texto', 'editar', 'plantilla', 'formato', 'letra', 'símbolos', 'markdown', 'título']
+  },
+
+  {
+    id: 'moderacion', group: 'Comunidad', icon: '⚖', label: 'Moderación',
+    title: 'Moderación',
+    hint: 'Filtros automáticos, casos abiertos y sanciones.',
+    keywords: ['filtro', 'baneo', 'aislar', 'sanción', 'caso', 'automod', 'enlaces', 'palabras']
+  },
+  {
+    id: 'comunidad', group: 'Comunidad', icon: '☺', label: 'Comunidad',
+    title: 'Tickets, sugerencias y roles',
+    hint: 'Soporte, buzón de sugerencias, autorroles y mensajes destacados.',
+    needs: 'configure',
+    keywords: ['ticket', 'soporte', 'sugerencia', 'autorrol', 'selfrole', 'destacado', 'starboard']
+  },
+  {
+    id: 'musica', group: 'Comunidad', icon: '♪', label: 'Música',
+    title: 'Reproductor de música',
+    hint: 'Canales permitidos, límites de la cola y estado del motor de audio.',
+    needs: 'configure',
+    keywords: ['música', 'canción', 'voz', 'cola', 'volumen', 'dj', 'reproducir']
+  },
+
+  {
+    id: 'modulos', group: 'Ajustes', icon: '⚙', label: 'Módulos y permisos',
+    title: 'Módulos y permisos',
+    hint: 'Qué funciones están activas y qué roles pueden usarlas.',
+    needs: 'configure',
+    keywords: ['módulo', 'activar', 'desactivar', 'permiso', 'rol', 'moderador', 'dj']
+  },
+  {
+    id: 'resumen', group: 'Ajustes', icon: '≡', label: 'Configuración',
+    title: 'Configuración completa',
+    hint: 'Todo lo que Vesper tiene guardado de este servidor.',
+    needs: 'configure',
+    keywords: ['todo', 'exportar', 'copia', 'json', 'resumen']
+  },
+  {
+    id: 'auditoria', group: 'Ajustes', icon: '⏱', label: 'Historial',
+    title: 'Historial de cambios',
+    hint: 'Quién cambió qué desde la web.',
+    needs: 'configure',
+    keywords: ['auditoría', 'historial', 'quién', 'cambio']
+  }
 ];
 
 function sectionAllowed(section) {
@@ -469,91 +542,206 @@ function currentSection() {
 /* Inicio                                                            */
 /* ---------------------------------------------------------------- */
 
+// El inicio ya no es una vitrina de cifras: es una lista de cosas que hacer.
+// Cada problema dice qué pasa, qué consecuencia tiene y lleva de un clic a la
+// pantalla donde se arregla.
+function healthIssues() {
+  const data = state.data;
+  const health = state.health || data.health || {};
+  const config = data.config || {};
+  const general = config.general || {};
+  const features = config.features || {};
+  const issues = [];
+
+  if (!state.session.user.discord) {
+    issues.push({
+      level: 'warn',
+      title: 'Tu cuenta de Discord no está vinculada',
+      detail: 'Con solo Google puedes configurar, pero no moderar ni gestionar cuentas de redes.',
+      action: null
+    });
+  }
+
+  if (health.database && !health.database.connected) {
+    issues.push({
+      level: 'bad',
+      title: 'La base de datos está desconectada',
+      detail: 'Vesper no puede guardar ni leer la configuración mientras siga así. Suele arreglarse solo en unos minutos.',
+      action: null
+    });
+  }
+
+  for (const monitor of health.monitors || []) {
+    if (!monitor.disabledUntil) continue;
+    issues.push({
+      level: 'warn',
+      title: `El monitor «${monitor.name}» está en pausa`,
+      detail: `Falló varias veces seguidas. Se reanuda solo${formatDate(monitor.disabledUntil) ? ` el ${formatDate(monitor.disabledUntil)}` : ' en unos minutos'}.`,
+      action: { section: 'avisos', label: 'Ver avisos de redes' }
+    });
+  }
+
+  if (features.music && health.music && health.music.available === false) {
+    issues.push({
+      level: 'warn',
+      title: 'El reproductor de música no está disponible',
+      detail: health.music.reason || 'Faltan las herramientas de audio en el alojamiento.',
+      action: { section: 'musica', label: 'Ver música' }
+    });
+  }
+
+  // Módulos encendidos que no llegan a ninguna parte: es el error de
+  // configuración más habitual y el más difícil de detectar desde Discord.
+  const sinCanal = [
+    [features.welcome, general.welcomeChannel, 'La bienvenida está activa pero no hay canal elegido', 'bienvenidas'],
+    [features.goodbye, general.goodbyeChannel, 'La despedida está activa pero no hay canal elegido', 'bienvenidas'],
+    [features.logs, general.logChannel, 'Los registros están activos pero no hay canal elegido', 'registros'],
+    [features.deals, config.deals?.channel, 'Las ofertas están activas pero no hay canal elegido', 'ofertas']
+  ];
+  for (const [enabled, channel, title, section] of sinCanal) {
+    if (enabled && !channel) {
+      issues.push({
+        level: 'warn',
+        title,
+        detail: 'Está encendido, pero no se publica en ningún sitio.',
+        action: { section, label: 'Elegir canal' }
+      });
+    }
+  }
+
+  const avisosSinCanal = (data.alerts || [])
+    .flatMap(group => group.items)
+    .filter(item => item.enabled && !item.effectiveChannelId).length;
+  if (avisosSinCanal) {
+    issues.push({
+      level: 'warn',
+      title: `${avisosSinCanal} ${avisosSinCanal === 1 ? 'aviso encendido no tiene' : 'avisos encendidos no tienen'} canal`,
+      detail: 'Están activos pero no se ven en ninguna parte.',
+      action: { section: 'registros', label: 'Revisar registros' }
+    });
+  }
+
+  for (const platform of ['tiktok', 'twitch', 'youtube']) {
+    const cuentas = config[platform]?.users?.length || 0;
+    const canales = [config[platform]?.liveChannel, config[platform]?.videoChannel, config[platform]?.shortChannel].filter(Boolean).length;
+    if (features[platform] && cuentas && !canales) {
+      issues.push({
+        level: 'warn',
+        title: `Vigilas ${cuentas} ${cuentas === 1 ? 'cuenta' : 'cuentas'} de ${platform} sin canal de destino`,
+        detail: 'Vesper comprueba si hay novedades, pero no tiene dónde anunciarlas.',
+        action: { section: 'avisos', label: 'Elegir canal' }
+      });
+    }
+  }
+
+  const activeCases = (data.cases || []).filter(item => item.status === 'active').length;
+  if (activeCases) {
+    issues.push({
+      level: 'info',
+      title: `${activeCases} ${activeCases === 1 ? 'caso de moderación abierto' : 'casos de moderación abiertos'}`,
+      detail: 'Sanciones que siguen activas y todavía nadie ha cerrado.',
+      action: { section: 'moderacion', label: 'Ver casos' }
+    });
+  }
+
+  for (const check of (data.setup?.checks || []).filter(item => !item.ready)) {
+    issues.push({
+      level: 'info',
+      title: `Falta configurar: ${check.label}`,
+      detail: 'Vesper funciona sin esto, pero le falta una pieza.',
+      action: null
+    });
+  }
+
+  return issues;
+}
+
+function issueMarkup(issue) {
+  const icon = { bad: '✕', warn: '!', info: '·' }[issue.level] || '·';
+  return `
+    <div class="issue ${escapeHtml(issue.level)}">
+      <span class="issue-icon" aria-hidden="true">${icon}</span>
+      <div class="issue-body">
+        <strong>${escapeHtml(issue.title)}</strong>
+        <small>${escapeHtml(issue.detail)}</small>
+      </div>
+      ${issue.action ? `<button class="button quiet sm" type="button" data-goto="${escapeHtml(issue.action.section)}">${escapeHtml(issue.action.label)}</button>` : ''}
+    </div>`;
+}
+
 function renderInicio() {
   const data = state.data;
   const health = state.health || data.health || {};
-  const ready = health.ready ?? health.healthy;
   const setup = data.setup || { checks: [], percentage: 0, ready: 0, total: 0 };
-  const activeCases = (data.cases || []).filter(item => item.status === 'active').length;
+  const issues = healthIssues();
+  const graves = issues.filter(issue => issue.level === 'bad').length;
+  const avisos = issues.filter(issue => issue.level === 'warn').length;
+
   const accounts = ['tiktok', 'twitch', 'youtube']
     .reduce((total, platform) => total + (data.config?.[platform]?.users?.length || 0), 0);
+  const registrosActivos = (data.alerts || []).flatMap(group => group.items).filter(item => item.enabled).length;
   const activeModules = Object.values(data.config?.features || {}).filter(Boolean).length;
 
-  const pending = setup.checks.filter(check => !check.ready);
-  const checks = setup.checks.map(check => `
-    <div class="check-row">
-      <span>${escapeHtml(check.label)}</span>
-      <span class="tag ${check.ready ? 'ok' : 'warn'}">${check.ready ? 'Listo' : 'Pendiente'}</span>
-    </div>`).join('');
-
-  const monitors = (health.monitors || []).map(monitor => `
-    <div class="check-row">
-      <span>${escapeHtml(monitor.name)}</span>
-      <span class="tag ${monitor.disabledUntil ? 'warn' : 'ok'}">${monitor.disabledUntil ? `En pausa hasta ${formatDate(monitor.disabledUntil)}` : 'Activo'}</span>
-    </div>`).join('');
-
-  const noDiscord = !state.session.user.discord
-    ? `<div class="callout warn"><strong>Falta vincular Discord.</strong><span>Con solo Google puedes configurar, pero no moderar ni gestionar cuentas de redes. Vincula Discord desde la tarjeta de tu cuenta.</span></div>`
-    : '';
-
-  const nextStep = pending.length
-    ? `<div class="callout info"><strong>Siguiente paso: ${escapeHtml(pending[0].label)}.</strong><span>${pending.length === 1 ? 'Queda 1 ajuste' : `Quedan ${pending.length} ajustes`} por completar.</span></div>`
-    : `<div class="callout ok"><strong>Configuración completa.</strong><span>No queda nada pendiente en este servidor.</span></div>`;
+  const titular = graves
+    ? { kind: 'bad', text: 'Hay algo roto', detail: 'Revisa lo primero de la lista.' }
+    : avisos
+      ? { kind: 'warn', text: 'Funciona, con reservas', detail: `${avisos} ${avisos === 1 ? 'cosa no está haciendo nada' : 'cosas no están haciendo nada'}.` }
+      : { kind: 'ok', text: 'Todo en orden', detail: 'No hay nada que requiera tu atención.' };
 
   return `
-    ${noDiscord}
-    <div class="grid-3">
-      <div class="stat">
-        <small>Estado de Vesper</small>
-        <strong class="${ready ? 'ok' : 'warn'}">${ready ? 'Operativo' : 'Requiere atención'}</strong>
-        <span class="stat-note">${escapeHtml(healthSummary(health))}</span>
+    <div class="headline ${titular.kind}">
+      <div class="headline-main">
+        <span class="headline-dot" aria-hidden="true"></span>
+        <div>
+          <strong>${escapeHtml(titular.text)}</strong>
+          <small>${escapeHtml(titular.detail)} ${escapeHtml(healthSummary(health))}</small>
+        </div>
       </div>
-      <div class="stat">
-        <small>Preparación</small>
-        <strong>${setup.percentage}%</strong>
-        <span class="stat-note">${setup.ready} de ${setup.total} ajustes listos</span>
+      <div class="headline-meter">
+        <div class="meter"><span data-meter="${setup.percentage}"></span></div>
+        <small>${setup.ready} de ${setup.total} ajustes listos</small>
       </div>
-      <div class="stat">
-        <small>Cuentas vigiladas</small>
-        <strong>${accounts}</strong>
-        <span class="stat-note">TikTok, Twitch y YouTube</span>
-      </div>
-      <div class="stat">
-        <small>Casos activos</small>
-        <strong class="${activeCases ? 'warn' : ''}">${activeCases}</strong>
-        <span class="stat-note">${data.cases?.length || 0} visibles en total</span>
-      </div>
-    </div>
-
-    ${nextStep}
-
-    <div class="grid-2">
-      ${card({
-        eyebrow: 'Preparación',
-        title: 'Qué falta por configurar',
-        description: 'Cada punto corresponde a un ajuste que Vesper necesita para trabajar.',
-        body: `<div class="meter"><span data-meter="${setup.percentage}"></span></div><div class="check-list">${checks || emptyBlock('Sin comprobaciones', 'El servidor todavía no tiene configuración.')}</div>`
-      })}
-      ${card({
-        eyebrow: 'Servicio',
-        title: 'Monitores y conexiones',
-        description: 'Si un monitor falla varias veces seguidas entra en pausa y se reanuda solo.',
-        body: `
-          <div class="check-list">
-            <div class="check-row"><span>Base de datos</span><span class="tag ${health.database?.connected ? 'ok' : 'bad'}">${health.database?.connected ? 'Conectada' : 'Desconectada'}</span></div>
-            <div class="check-row"><span>Música (Lavalink)</span><span class="tag ${health.music?.connected ? 'ok' : health.music?.configured ? 'warn' : ''}">${health.music?.connected ? 'Conectada' : health.music?.configured ? 'Sin conexión' : 'No configurada'}</span></div>
-            ${monitors}
-          </div>`
-      })}
     </div>
 
     ${card({
-      eyebrow: 'Módulos',
-      title: `${activeModules} de ${Object.keys(data.config?.features || {}).length} funciones activas`,
-      description: 'Un vistazo rápido. Se activan y desactivan en «Módulos y permisos».',
-      actions: data.permissions.configure ? '<button class="button quiet sm" type="button" data-goto="modulos">Gestionar módulos</button>' : '',
-      body: `<div class="chips">${Object.entries(data.config?.features || {}).map(([key, value]) =>
-        `<span class="tag ${value ? 'ok' : ''}">${escapeHtml(moduleLabel(key))}</span>`).join('') || emptyBlock('Sin módulos', 'No se pudo leer la configuración.')}</div>`
+      eyebrow: issues.length ? 'Qué hacer' : 'Nada pendiente',
+      title: issues.length ? `${issues.length} ${issues.length === 1 ? 'cosa por revisar' : 'cosas por revisar'}` : 'No hay nada por revisar',
+      description: issues.length
+        ? 'Ordenadas por gravedad. Cada una lleva a la pantalla donde se arregla.'
+        : 'Los módulos activos tienen su canal, los monitores funcionan y no quedan casos abiertos.',
+      body: issues.length
+        ? `<div class="issue-list">${issues.slice(0, 12).map(issueMarkup).join('')}</div>${issues.length > 12 ? `<p class="hint">…y ${issues.length - 12} más.</p>` : ''}`
+        : emptyBlock('Todo listo', 'Vuelve por aquí si cambias algo y quieres comprobar que sigue en pie.')
+    })}
+
+    <div class="stat-row">
+      <div class="stat"><span class="stat-value">${activeModules}</span><span class="stat-label">módulos activos</span></div>
+      <div class="stat"><span class="stat-value">${registrosActivos}</span><span class="stat-label">registros encendidos</span></div>
+      <div class="stat"><span class="stat-value">${accounts}</span><span class="stat-label">cuentas vigiladas</span></div>
+      <div class="stat"><span class="stat-value">${(data.cases || []).filter(item => item.status === 'active').length}</span><span class="stat-label">casos abiertos</span></div>
+    </div>
+
+    ${card({
+      eyebrow: 'Atajos',
+      title: '¿Qué quieres hacer?',
+      description: 'Lo que más se toca. También puedes buscar cualquier ajuste con Ctrl+K.',
+      body: `
+        <div class="shortcut-grid">
+          ${[
+            ['bienvenidas', '✉', 'Cambiar la bienvenida', 'El mensaje que ve alguien al entrar.'],
+            ['registros', '☰', 'Elegir qué se anota', 'Enciende o apaga cada registro por separado.'],
+            ['mensajes', '✎', 'Editar los textos', 'Todos los mensajes del bot, con vista previa.'],
+            ['avisos', '◎', 'Avisar de directos', 'TikTok, Twitch y YouTube.'],
+            ['apariencia', '✦', 'Cambiar su cara', 'Nombre, avatar y color.'],
+            ['modulos', '⚙', 'Encender funciones', 'Qué hace y qué no hace Vesper aquí.']
+          ].filter(([id]) => SECTIONS.some(section => section.id === id && sectionAllowed(section)))
+            .map(([id, icon, title, detail]) => `
+            <button class="shortcut" type="button" data-goto="${id}">
+              <span class="shortcut-icon" aria-hidden="true">${icon}</span>
+              <strong>${escapeHtml(title)}</strong>
+              <small>${escapeHtml(detail)}</small>
+            </button>`).join('')}
+        </div>`
     })}`;
 }
 
@@ -1985,7 +2173,9 @@ function renderMusica() {
 
   return `
     ${!config.features?.music ? '<div class="callout warn"><strong>El módulo de música está apagado.</strong><span>Actívalo en «Módulos y permisos» para que /musica funcione.</span></div>' : ''}
-    ${health.music?.configured === false ? '<div class="callout"><strong>Lavalink no está configurado en el alojamiento.</strong><span>Sin él, el reproductor no puede conectarse aunque el módulo esté activo.</span></div>' : ''}
+    ${health.music?.available === false
+      ? `<div class="callout warn"><strong>El reproductor no está disponible.</strong><span>${escapeHtml(health.music.reason || 'Faltan las herramientas de audio en el alojamiento.')}</span></div>`
+      : '<div class="callout ok"><strong>El reproductor está listo.</strong><span>Vesper busca y reproduce por su cuenta, dentro del mismo proceso. No hace falta ningún servidor de música aparte ni pagar nada.</span></div>'}
 
     ${card({
       eyebrow: 'Música',
@@ -2269,7 +2459,14 @@ async function loadAudit() {
 /* Guardado                                                          */
 /* ---------------------------------------------------------------- */
 
-async function saveConfig(body, successMessage, submitter = null) {
+/**
+ * Guarda y refresca. `options.rerender: false` deja la pantalla como está —
+ * lo usan los interruptores sueltos, porque volver a pintar la lista entera
+ * al marcar una casilla te manda el scroll al principio y pierdes de vista
+ * justo la fila que acabas de tocar.
+ */
+async function saveConfig(body, successMessage, submitter = null, options = {}) {
+  const { rerender = true } = options;
   const button = submitter?.tagName === 'BUTTON' ? submitter : null;
   const previousLabel = button?.textContent;
   if (button) { button.disabled = true; button.textContent = 'Guardando…'; }
@@ -2279,11 +2476,17 @@ async function saveConfig(body, successMessage, submitter = null) {
     state.data.config = result.config;
     state.data.setup = result.setup;
     state.dirty.clear();
+    updateSaveBar();
     if (result.warning) toast(result.warning, 'bad');
-    else toast(successMessage, 'ok');
-    // Se recarga el servidor para que la identidad efectiva, los avisos y el
-    // resumen reflejen lo recién guardado sin tener que refrescar a mano.
-    await selectGuild(state.guildId, { keepSection: true, silent: true });
+    else if (successMessage) toast(successMessage, 'ok');
+
+    if (rerender) {
+      // Se recarga el servidor para que la identidad efectiva, los avisos y el
+      // resumen reflejen lo recién guardado sin tener que refrescar a mano.
+      await selectGuild(state.guildId, { keepSection: true, silent: true });
+    } else {
+      await refreshGuildData();
+    }
     return result;
   } catch (error) {
     toast(error.message, 'bad');
@@ -2293,11 +2496,23 @@ async function saveConfig(body, successMessage, submitter = null) {
   }
 }
 
+// Trae los datos del servidor sin volver a pintar la pantalla.
+async function refreshGuildData() {
+  try {
+    const data = await api(`/guilds/${state.guildId}`);
+    state.data = data;
+    applyTheme();
+  } catch {
+    // Si falla, lo que hay en pantalla sigue siendo lo último confirmado.
+  }
+}
+
 function markDirty(form) {
-  if (!form) return;
+  if (!form || !form.id) return;
   state.dirty.add(form.id);
   const flag = form.querySelector('.dirty-flag');
   if (flag) flag.hidden = false;
+  updateSaveBar();
 }
 
 function watchDirty(root) {
@@ -2729,9 +2944,224 @@ function bindResumen(root) {
   });
 }
 
+/* ---------------------------------------------------------------- */
+/* Registros: qué se anota, dónde y a quién se avisa                 */
+/* ---------------------------------------------------------------- */
+
+// Cada aviso que Vesper puede publicar, con tres decisiones por separado:
+// si se publica, en qué canal y a quién se menciona. Antes esto solo se podía
+// encender o apagar por módulos enteros, y todo caía en el mismo canal.
+
+function alertGroups() {
+  return state.data.alerts || [];
+}
+
+function alertSaved(kind) {
+  return state.data.config.alerts?.[kind] || {};
+}
+
+function alertRowMarkup(item) {
+  const saved = alertSaved(item.kind);
+  const channelLabel = item.effectiveChannelId
+    ? nameOf(state.data.channels, item.effectiveChannelId, 'canal desconocido')
+    : null;
+
+  // Estado real, en una palabra, para poder escanear la lista de un vistazo.
+  const estado = item.blockedByModule
+    ? { tag: 'Bloqueado', kind: 'warn', why: `El módulo «${item.module}» está apagado, así que este aviso no sale aunque lo enciendas aquí.` }
+    : !item.enabled
+      ? { tag: 'Apagado', kind: '', why: 'No se publica en ningún sitio.' }
+      : !item.effectiveChannelId
+        ? { tag: 'Sin canal', kind: 'warn', why: 'Está encendido pero no hay ningún canal elegido, así que no se ve en ninguna parte.' }
+        : { tag: 'Activo', kind: 'ok', why: `Se publica en #${channelLabel}.` };
+
+  return `
+    <div class="alert-row${item.enabled ? ' on' : ''}" data-alert="${escapeHtml(item.kind)}">
+      <label class="switch" title="${item.enabled ? 'Apagar este aviso' : 'Encender este aviso'}">
+        <input type="checkbox" data-alert-toggle="${escapeHtml(item.kind)}" ${item.enabled ? 'checked' : ''}>
+        <span class="switch-track" aria-hidden="true"></span>
+        <span class="sr-only">${escapeHtml(item.label)}</span>
+      </label>
+
+      <div class="alert-main">
+        <strong>${escapeHtml(item.label)}</strong>
+        <small>${escapeHtml(estado.why)}</small>
+      </div>
+
+      <div class="alert-target">
+        <label class="sr-only" for="alert-${item.kind}-channel">Canal de ${escapeHtml(item.label)}</label>
+        <select id="alert-${item.kind}-channel" data-alert-channel="${escapeHtml(item.kind)}">
+          ${selectOptions(state.data.channels, saved.channel, channelLabel ? 'El de siempre' : 'Sin canal elegido')}
+        </select>
+        <label class="sr-only" for="alert-${item.kind}-ping">Mención de ${escapeHtml(item.label)}</label>
+        <select id="alert-${item.kind}-ping" data-alert-ping="${escapeHtml(item.kind)}">
+          ${selectOptions(state.data.roles, saved.ping, 'Sin mención')}
+        </select>
+      </div>
+
+      <span class="tag ${estado.kind}">${estado.tag}</span>
+    </div>`;
+}
+
+function renderRegistros() {
+  const groups = alertGroups();
+  if (!groups.length) {
+    return card({
+      eyebrow: 'Registros',
+      title: 'No hay avisos que configurar',
+      description: 'Actualiza la página para volver a cargarlos.',
+      body: ''
+    });
+  }
+
+  const general = state.data.config.general || {};
+  const todos = groups.flatMap(group => group.items);
+  const activos = todos.filter(item => item.enabled).length;
+  const sinCanal = todos.filter(item => item.enabled && !item.effectiveChannelId).length;
+  const bloqueados = todos.filter(item => item.blockedByModule).length;
+
+  const avisos = [];
+  if (!general.logChannel) {
+    avisos.push('No hay canal general de registros. Elígelo abajo: es donde caen todos los avisos que no tengan uno propio.');
+  }
+  if (sinCanal) avisos.push(`${sinCanal} ${sinCanal === 1 ? 'aviso está encendido' : 'avisos están encendidos'} pero sin canal, así que no se publican en ningún sitio.`);
+  if (bloqueados) avisos.push(`${bloqueados} ${bloqueados === 1 ? 'aviso tiene' : 'avisos tienen'} su módulo apagado y no salen aunque estén encendidos aquí.`);
+
+  const bloques = groups.map(group => card({
+    eyebrow: group.group,
+    title: `${group.items.filter(item => item.enabled).length} de ${group.items.length} activos`,
+    description: 'Cada fila se enciende o se apaga por su cuenta. El canal vacío significa «el de siempre».',
+    body: `<div class="alert-list">${group.items.map(alertRowMarkup).join('')}</div>`
+  })).join('');
+
+  return `
+    ${avisos.length ? `<div class="callout warn"><strong>Revisa esto.</strong><span>${escapeHtml(avisos.join(' '))}</span></div>` : ''}
+
+    <div class="stat-row">
+      <div class="stat"><span class="stat-value">${activos}</span><span class="stat-label">avisos activos</span></div>
+      <div class="stat"><span class="stat-value">${todos.length - activos}</span><span class="stat-label">apagados</span></div>
+      <div class="stat"><span class="stat-value">${new Set(todos.filter(i => i.enabled).map(i => i.effectiveChannelId).filter(Boolean)).size}</span><span class="stat-label">canales en uso</span></div>
+    </div>
+
+    ${card({
+      eyebrow: 'Dónde caen por defecto',
+      title: 'Canales generales',
+      description: 'Un aviso sin canal propio se publica aquí. Es lo más cómodo: eliges estos dos y te olvidas.',
+      body: `
+        <form id="form-log-channels" class="form">
+          <div class="form-row">
+            <div class="field">
+              <label for="channel-log">Canal de registros</label>
+              <select id="channel-log">${selectOptions(state.data.channels, general.logChannel)}</select>
+              <span class="hint">Entradas, salidas, moderación, cambios del servidor…</span>
+            </div>
+            <div class="field">
+              <label for="channel-botlog">Canal de registros de bots</label>
+              <select id="channel-botlog">${selectOptions(state.data.channels, general.botLogChannel, 'Usar el de registros')}</select>
+              <span class="hint">Cuando se añade o se retira un bot.</span>
+            </div>
+          </div>
+          ${formActions('Guardar canales')}
+        </form>`
+    })}
+
+    ${card({
+      eyebrow: 'De golpe',
+      title: 'Encender o apagar todo',
+      description: 'Útil para empezar de cero: apágalo todo y enciende solo lo que te interese.',
+      body: `
+        <div class="button-row">
+          <button class="button ghost" type="button" data-alerts-all="on">Encender todos</button>
+          <button class="button ghost" type="button" data-alerts-all="off">Apagar todos</button>
+          <button class="button ghost" type="button" data-alerts-all="reset">Volver a lo de fábrica</button>
+        </div>`
+    })}
+
+    ${bloques}`;
+}
+
+// Repinta una sola fila con el estado recién confirmado por el servidor.
+function refreshAlertRow(kind) {
+  const item = alertGroups().flatMap(group => group.items).find(entry => entry.kind === kind);
+  const row = document.querySelector(`[data-alert="${kind}"]`);
+  if (!item || !row) return;
+  const replacement = document.createElement('div');
+  replacement.innerHTML = alertRowMarkup(item);
+  const fresh = replacement.firstElementChild;
+  row.replaceWith(fresh);
+  bindAlertRow(fresh);
+  updateAlertCounters();
+}
+
+function updateAlertCounters() {
+  const todos = alertGroups().flatMap(group => group.items);
+  const values = [
+    todos.filter(item => item.enabled).length,
+    todos.filter(item => !item.enabled).length,
+    new Set(todos.filter(item => item.enabled).map(item => item.effectiveChannelId).filter(Boolean)).size
+  ];
+  document.querySelectorAll('.stat-row .stat-value').forEach((node, index) => {
+    if (values[index] !== undefined) node.textContent = values[index];
+  });
+}
+
+function bindAlertRow(row) {
+  row.querySelector('[data-alert-toggle]')?.addEventListener('change', event => {
+    const kind = event.target.dataset.alertToggle;
+    saveConfig({ alerts: { [kind]: { enabled: event.target.checked } } }, null, null, { rerender: false })
+      .then(() => refreshAlertRow(kind));
+  });
+  row.querySelector('[data-alert-channel]')?.addEventListener('change', event => {
+    const kind = event.target.dataset.alertChannel;
+    saveConfig({ alerts: { [kind]: { channel: event.target.value || null } } }, null, null, { rerender: false })
+      .then(() => refreshAlertRow(kind));
+  });
+  row.querySelector('[data-alert-ping]')?.addEventListener('change', event => {
+    const kind = event.target.dataset.alertPing;
+    saveConfig({ alerts: { [kind]: { ping: event.target.value || null } } }, null, null, { rerender: false })
+      .then(() => refreshAlertRow(kind));
+  });
+}
+
+function bindRegistros(root) {
+  root.querySelector('#form-log-channels')?.addEventListener('submit', event => {
+    event.preventDefault();
+    saveConfig({ general: {
+      logChannel: $('#channel-log').value || null,
+      botLogChannel: $('#channel-botlog').value || null
+    } }, 'Canales de registro actualizados.', event.submitter);
+  });
+
+  // Cada fila guarda sola, sin botón: es una sola casilla y obligar a pulsar
+  // «Guardar» después sobra.
+  root.querySelectorAll('.alert-row').forEach(bindAlertRow);
+
+  root.querySelectorAll('[data-alerts-all]').forEach(button => {
+    button.addEventListener('click', async event => {
+      const mode = button.dataset.alertsAll;
+      const labels = { on: 'Encender todos los avisos', off: 'Apagar todos los avisos', reset: 'Volver a lo de fábrica' };
+      const detail = {
+        on: 'Se encenderán los avisos de todos los módulos que estén activos.',
+        off: 'Vesper dejará de anotar nada en los canales de registro.',
+        reset: 'Cada aviso volverá a depender de su módulo, y se olvidarán los canales y menciones que hayas puesto uno a uno.'
+      };
+      if (!await confirmDialog({ title: labels[mode], message: detail[mode], confirmLabel: labels[mode], danger: mode !== 'on' })) return;
+
+      const alerts = {};
+      for (const item of alertGroups().flatMap(group => group.items)) {
+        alerts[item.kind] = mode === 'reset'
+          ? { enabled: null, channel: null, ping: null }
+          : { enabled: mode === 'on' };
+      }
+      saveConfig({ alerts }, `${labels[mode]}: hecho.`, event.currentTarget);
+    });
+  });
+}
+
 const RENDERERS = {
   inicio: { render: renderInicio, bind: () => {} },
-  identidad: { render: renderIdentidad, bind: bindIdentidad },
+  apariencia: { render: renderIdentidad, bind: bindIdentidad },
+  registros: { render: renderRegistros, bind: bindRegistros },
   bienvenidas: { render: renderBienvenidas, bind: bindBienvenidas },
   avisos: { render: renderAvisos, bind: bindAvisos },
   mensajes: { render: renderMensajes, bind: bindMensajes },
@@ -2743,6 +3173,212 @@ const RENDERERS = {
   resumen: { render: renderResumen, bind: bindResumen },
   auditoria: { render: renderAuditoria, bind: () => loadAudit() }
 };
+
+/* ---------------------------------------------------------------- */
+/* Barra de guardado y buscador                                      */
+/* ---------------------------------------------------------------- */
+
+// Antes cada tarjeta avisaba de sus cambios sin guardar con una etiqueta
+// diminuta que era fácil no ver, y se perdía trabajo al cambiar de pantalla.
+// Ahora aparece una barra abajo que no se puede pasar por alto y que guarda
+// todo lo pendiente de una vez.
+function dirtyForms() {
+  return [...state.dirty]
+    .map(id => document.getElementById(id))
+    .filter(form => form && document.body.contains(form));
+}
+
+function updateSaveBar() {
+  const bar = $('#save-bar');
+  if (!bar) return;
+  const forms = dirtyForms();
+  bar.hidden = forms.length === 0;
+  const label = $('#save-bar-text');
+  if (label) {
+    label.textContent = forms.length === 1
+      ? 'Tienes un cambio sin guardar.'
+      : `Tienes ${forms.length} cambios sin guardar.`;
+  }
+}
+
+function bindSaveBar() {
+  $('#save-bar-save')?.addEventListener('click', () => {
+    for (const form of dirtyForms()) {
+      const submit = form.querySelector('button[type="submit"]');
+      if (submit) submit.click();
+      else form.requestSubmit?.();
+    }
+  });
+
+  $('#save-bar-discard')?.addEventListener('click', async () => {
+    if (!await confirmDialog({
+      title: 'Descartar los cambios',
+      message: 'Se perderá lo que hayas escrito y no guardado en esta pantalla.',
+      confirmLabel: 'Descartar',
+      danger: true
+    })) return;
+    state.dirty.clear();
+    updateSaveBar();
+    renderView();
+  });
+}
+
+/* ---------------------------------------------------------------- */
+
+// El buscador es la respuesta a un panel con cientos de ajustes: en vez de
+// recordar en qué pantalla estaba cada cosa, se escribe y se va.
+function searchEntries() {
+  const entries = [];
+
+  for (const section of SECTIONS.filter(sectionAllowed)) {
+    entries.push({
+      kind: 'Pantalla',
+      label: section.title,
+      detail: section.hint,
+      terms: [section.label, section.title, section.hint, ...(section.keywords || [])].join(' '),
+      section: section.id
+    });
+  }
+
+  for (const group of state.data?.messageCatalog || []) {
+    for (const item of group.items) {
+      entries.push({
+        kind: 'Mensaje',
+        label: item.label,
+        detail: item.description,
+        terms: `${item.label} ${item.description} ${group.group} mensaje embed texto`,
+        section: 'mensajes',
+        focus: `[data-message="${item.id}"]`
+      });
+    }
+  }
+
+  for (const group of state.data?.alerts || []) {
+    for (const item of group.items) {
+      entries.push({
+        kind: 'Registro',
+        label: item.label,
+        detail: `${item.enabled ? 'Activo' : 'Apagado'} · ${group.group}`,
+        terms: `${item.label} ${group.group} registro log aviso canal mención`,
+        section: 'registros',
+        focus: `[data-alert="${item.kind}"]`
+      });
+    }
+  }
+
+  return entries;
+}
+
+// Coincidencia sencilla y tolerante: sin tildes, por palabras sueltas y en
+// cualquier orden, que es como escribe la gente cuando busca.
+function normalize(value) {
+  return String(value ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function searchMatches(query) {
+  const words = normalize(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return searchEntries().filter(entry => entry.kind === 'Pantalla');
+  return searchEntries()
+    .map(entry => {
+      const haystack = normalize(entry.terms);
+      if (!words.every(word => haystack.includes(word))) return null;
+      // Lo que empieza por lo escrito va primero: es casi siempre lo buscado.
+      const score = normalize(entry.label).startsWith(words[0]) ? 0 : 1;
+      return { entry, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 12)
+    .map(match => match.entry);
+}
+
+function renderSearchResults(query) {
+  const list = $('#search-results');
+  if (!list) return;
+  const results = searchMatches(query);
+  state.searchResults = results;
+  state.searchIndex = 0;
+
+  if (!results.length) {
+    list.innerHTML = '<li class="search-empty">No encontré nada con eso. Prueba con «bienvenida», «baneos», «twitch» o «color».</li>';
+    return;
+  }
+
+  list.innerHTML = results.map((entry, index) => `
+    <li>
+      <button type="button" class="search-hit${index === 0 ? ' active' : ''}" data-hit="${index}">
+        <span class="search-kind">${escapeHtml(entry.kind)}</span>
+        <span class="search-label">${escapeHtml(entry.label)}</span>
+        <span class="search-detail">${escapeHtml(entry.detail || '')}</span>
+      </button>
+    </li>`).join('');
+}
+
+function moveSearchSelection(delta) {
+  const hits = [...document.querySelectorAll('.search-hit')];
+  if (!hits.length) return;
+  state.searchIndex = (state.searchIndex + delta + hits.length) % hits.length;
+  hits.forEach((hit, index) => hit.classList.toggle('active', index === state.searchIndex));
+  hits[state.searchIndex].scrollIntoView({ block: 'nearest' });
+}
+
+async function runSearchHit(index) {
+  const entry = state.searchResults?.[index];
+  if (!entry) return;
+  closeSearch();
+  await showSection(entry.section);
+  if (!entry.focus) return;
+  // Se abre y se resalta lo que se buscó, para no tener que localizarlo a
+  // mano dentro de una lista larga.
+  const target = document.querySelector(entry.focus);
+  if (!target) return;
+  if (target.tagName === 'DETAILS') target.open = true;
+  target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  target.classList.add('flash');
+  setTimeout(() => target.classList.remove('flash'), 1600);
+}
+
+function openSearch() {
+  const dialog = $('#search-dialog');
+  if (!dialog || dialog.open) return;
+  const input = $('#search-input');
+  if (input) input.value = '';
+  renderSearchResults('');
+  dialog.showModal();
+  input?.focus();
+}
+
+function closeSearch() {
+  const dialog = $('#search-dialog');
+  if (dialog?.open) dialog.close();
+}
+
+function bindSearch() {
+  $('#search-open')?.addEventListener('click', openSearch);
+  $('#search-input')?.addEventListener('input', event => renderSearchResults(event.target.value));
+
+  $('#search-results')?.addEventListener('click', event => {
+    const hit = event.target.closest('[data-hit]');
+    if (hit) runSearchHit(Number(hit.dataset.hit));
+  });
+
+  $('#search-dialog')?.addEventListener('keydown', event => {
+    if (event.key === 'ArrowDown') { event.preventDefault(); moveSearchSelection(1); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); moveSearchSelection(-1); }
+    else if (event.key === 'Enter') { event.preventDefault(); runSearchHit(state.searchIndex); }
+  });
+
+  document.addEventListener('keydown', event => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      openSearch();
+    } else if (event.key === '/' && !typing && !$('#search-dialog')?.open) {
+      event.preventDefault();
+      openSearch();
+    }
+  });
+}
 
 /* ---------------------------------------------------------------- */
 /* Navegación y estructura                                           */
@@ -2893,6 +3529,8 @@ function renderView() {
   view.innerHTML = renderer.render();
   bindCommon(view);
   renderer.bind(view);
+  // Al cambiar de pantalla, lo pendiente de la anterior ya no está en el DOM.
+  updateSaveBar();
 }
 
 function openNav() {
@@ -3014,6 +3652,8 @@ async function boot() {
   $('#app-view').hidden = false;
 
   renderAccount();
+  bindSaveBar();
+  bindSearch();
   await refreshStatus();
 
   try {

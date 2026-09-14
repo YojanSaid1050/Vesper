@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 const guildSchema = new mongoose.Schema({
   guildId: { type: String, required: true, unique: true, index: true },
-  schemaVersion: { type: Number, default: 6, min: 1 },
+  schemaVersion: { type: Number, default: 7, min: 1 },
   general: {
     welcomeChannel: { type: String, default: null },
     goodbyeChannel: { type: String, default: null },
@@ -61,6 +61,10 @@ const guildSchema = new mongoose.Schema({
   // mapa libre porque el catálogo crece; la validación de cada campo la hace
   // src/web/configSanitizer.js antes de escribir.
   embeds: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
+  // Interruptor, canal y mención de cada aviso por separado. Mismo criterio:
+  // mapa libre validado en configSanitizer. Un aviso sin entrada aquí se
+  // comporta como siempre, según su módulo.
+  alerts: { type: mongoose.Schema.Types.Mixed, default: () => ({}) },
   features: {
     tiktok: { type: Boolean, default: true },
     twitch: { type: Boolean, default: true },

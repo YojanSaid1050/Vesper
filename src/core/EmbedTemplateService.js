@@ -38,18 +38,35 @@ function defaultEmbedsConfig() {
   return {};
 }
 
+// Discord solo convierte <@123…> en una mención azul dentro de la DESCRIPCIÓN
+// de un embed. En el título, en el pie y en el nombre del autor lo deja tal
+// cual, y el lector ve un número en bruto — era exactamente lo que pasaba en
+// la despedida de Ankerie Dimension. Así que en esos huecos {user} se
+// sustituye por el nombre de la persona en vez de por la mención.
+const MENTION_SAFE_FIELDS = new Set(['description', 'message', 'content']);
+
+function rendersMentions(field, layout) {
+  // En el contenedor Components V2 todo es texto de mensaje, y ahí las
+  // menciones sí funcionan en cualquier hueco.
+  if (layout === 'components_v2') return true;
+  return MENTION_SAFE_FIELDS.has(String(field || 'description'));
+}
+
 // Sustituye las variables que el administrador puede escribir en el panel.
 // Devuelve null si no hay plantilla, para que quien llama aplique su propio
 // valor por defecto sin confundirlo con una cadena vacía.
-function applyVariables(template, member) {
+function applyVariables(template, member, options = {}) {
   if (template === null || template === undefined) return null;
   const text = String(template);
   if (!text.trim()) return null;
   const guild = member?.guild;
+  const name = member?.displayName ?? member?.user?.username ?? '';
+  const mentions = options.mentions !== false;
   return text
-    .replaceAll('{user}', member ? member.toString() : '')
+    .replaceAll('{user}', mentions ? (member ? member.toString() : '') : (name ? `@${name}` : ''))
     .replaceAll('{username}', member?.user?.username ?? '')
-    .replaceAll('{displayName}', member?.displayName ?? member?.user?.username ?? '')
+    .replaceAll('{userTag}', member?.user?.tag ?? member?.user?.username ?? '')
+    .replaceAll('{displayName}', name)
     .replaceAll('{userId}', member?.id ?? '')
     .replaceAll('{server}', guild?.name ?? '')
     .replaceAll('{memberCount}', guild?.memberCount === undefined ? '' : String(guild.memberCount));
@@ -75,22 +92,26 @@ function imageUrl(value) {
 // usaba antes de que esto fuese configurable.
 function resolveEmbedTemplate(config, kind, member, fallbacks = {}) {
   const stored = (config?.embeds?.[kind]) || {};
+  const layout = normalizeLayout(stored.layout, fallbacks.layout);
+  const plain = { mentions: false };
   return {
-    title: applyVariables(stored.title, member) ?? fallbacks.title ?? null,
+    title: applyVariables(stored.title, member, rendersMentions('title', layout) ? {} : plain) ?? fallbacks.title ?? null,
     message: applyVariables(stored.message, member) ?? fallbacks.message ?? null,
-    footer: applyVariables(stored.footer, member) ?? fallbacks.footer ?? null,
+    footer: applyVariables(stored.footer, member, rendersMentions('footer', layout) ? {} : plain) ?? fallbacks.footer ?? null,
     color: colorNumber(stored.color, fallbacks.color),
     image: imageUrl(stored.image) ?? fallbacks.image ?? null,
     thumbnail: stored.thumbnail === undefined || stored.thumbnail === null
       ? (fallbacks.thumbnail !== false)
       : stored.thumbnail !== false,
-    layout: normalizeLayout(stored.layout, fallbacks.layout)
+    layout
   };
 }
 
 module.exports = {
   EMBED_KINDS,
   LAYOUTS,
+  MENTION_SAFE_FIELDS,
+  rendersMentions,
   normalizeLayout,
   EMBED_FIELD_LIMITS,
   defaultEmbedTemplate,

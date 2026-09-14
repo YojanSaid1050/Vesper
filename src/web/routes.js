@@ -46,6 +46,7 @@ const { verifyStreamer } = require('../platforms/twitch/utils');
 const { verifyChannel } = require('../platforms/youtube/utils');
 const { publishSelfRolePanel, publishTicketPanel, reviewSuggestion } = require('../core/CommunityService');
 const { catalogForPanel } = require('../core/EmbedCatalog');
+const { alertOverview } = require('../core/AlertRouter');
 
 const publicDir = path.join(__dirname, 'public');
 const authLimiter = createRateLimiter({ windowMs: 5 * 60 * 1000, max: 20 });
@@ -116,6 +117,7 @@ function serializedConfig(config) {
     branding: config.branding || {},
     profile: config.profile || {},
     embeds: config.embeds && typeof config.embeds === 'object' ? config.embeds : {},
+    alerts: config.alerts && typeof config.alerts === 'object' ? config.alerts : {},
     features: config.features || {},
     permissions: config.permissions || {},
     moderation: config.moderation || {},
@@ -331,7 +333,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     discordEnabled: dashboardEnabled() && sessionConfigured() && discordConfigured(),
     googleEnabled: dashboardEnabled() && sessionConfigured() && googleConfigured(),
     webAdminMode: webAdminMode(),
-    version: '2.9.0'
+    version: '3.0.0'
   }));
 
   app.get('/auth/discord', authLimiter, requireDashboard, async (req, res, next) => {
@@ -457,6 +459,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         messageCatalog: access.configure
           ? catalogForPanel(welcomeLayoutsFor(req.params.guildId))
           : null,
+        alerts: access.configure ? alertOverview(config) : null,
         identity: effectiveIdentity(config, client, access.guild),
         config: access.configure ? serializedConfig(config) : null,
         channels,
@@ -480,9 +483,9 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
       for (const [section, values] of Object.entries(updates)) {
         if (section === 'community') {
           for (const [subsection, fields] of Object.entries(values)) await updateCommunitySection(req.params.guildId, subsection, fields);
-        } else if (section === 'embeds') {
-          // Se guarda campo a campo (embeds.welcome.title, …) para que un
-          // formulario parcial no borre el resto del bloque.
+        } else if (section === 'embeds' || section === 'alerts') {
+          // Se guarda campo a campo (embeds.welcome.title, alerts.log_voice_join.enabled…)
+          // para que un formulario parcial no borre el resto del bloque.
           const flattened = {};
           for (const [kind, fields] of Object.entries(values)) {
             for (const [field, value] of Object.entries(fields)) flattened[`${kind}.${field}`] = value;

@@ -1,4 +1,5 @@
 const { MODULE_DEFAULTS, isModuleEnabledConfig } = require('../config/guildPolicy');
+const { joinWithinLimit } = require('../utils/discordLimits');
 
 function configured(value) {
   return Boolean(Array.isArray(value) ? value.length : value);
@@ -32,9 +33,16 @@ function moduleSummary(config = {}) {
     .join('\n');
 }
 
-function mentionList(ids = [], kind = 'role') {
+// El recorte era de 1000 caracteres POR LISTA, pero luego se juntaban tres en
+// un mismo campo de embed, que solo admite 1024: con muchos roles el comando
+// fallaba entero con un error 50035. Ahora cada lista pide su propio límite y
+// se dice cuántos quedan fuera.
+function mentionList(ids = [], kind = 'role', limit = 300) {
   if (!ids.length) return 'Sin configurar';
-  return ids.map(id => kind === 'channel' ? `<#${id}>` : `<@&${id}>`).join(', ').slice(0, 1000);
+  return joinWithinLimit(
+    ids.map(id => (kind === 'channel' ? `<#${id}>` : `<@&${id}>`)),
+    { limit, separator: ', ', empty: 'Sin configurar' }
+  );
 }
 
 module.exports = { setupChecks, moduleSummary, mentionList };

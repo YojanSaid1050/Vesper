@@ -55,10 +55,25 @@ module.exports = {
           }
         } catch (error) {
           console.error('Error en confirmación tiktok-clear:', error);
-          await i.update({ content: `❌ Error al eliminar: ${error.message}`, embeds: [], components: [] });
+          // Si la confirmación ya se envió, `update` lanza
+          // InteractionAlreadyReplied y el usuario no se entera de nada.
+          const aviso = { content: `❌ Error al eliminar: ${error.message}`, embeds: [], components: [] };
+          if (i.replied || i.deferred) await i.followUp({ content: aviso.content, flags: 64 }).catch(() => null);
+          else await i.update(aviso).catch(() => null);
         }
       });
-      
+
+      // Sin esto, pasados los 15 segundos los botones seguían visibles y al
+      // pulsarlos Discord mostraba «La interacción falló» sin explicar nada.
+      collector.on('end', async collected => {
+        if (collected.size) return;
+        await interaction.editReply({
+          content: '⌛ La confirmación caducó. Vuelve a ejecutar el comando si quieres continuar.',
+          embeds: [],
+          components: []
+        }).catch(() => null);
+      });
+
     } catch (error) {
       console.error('Error en tiktok-clear:', error);
       await interaction.reply({ content: `❌ Error al procesar la solicitud: ${error.message}`, flags: 64 });

@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
+const { clampEmbed } = require('../../utils/discordLimits');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { setupChecks, moduleSummary, mentionList } = require('../../core/SetupService');
 
@@ -32,6 +33,6 @@ module.exports = {
       .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
       .setTimestamp();
 
-    await interaction.reply({ embeds: [embed], flags: 64 });
+    await interaction.reply({ embeds: [clampEmbed(embed)], flags: 64 });
   }
 };

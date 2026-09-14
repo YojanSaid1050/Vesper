@@ -3,6 +3,7 @@ const { MODULE_DEFAULTS, isAnyMainGuild, isMainGuild } = require('../config/guil
 const { normalizeAllowedDomain } = require('../core/ModerationService');
 const { EMBED_FIELD_LIMITS } = require('../core/EmbedTemplateService');
 const { isKnownKind, kindInfo } = require('../core/EmbedCatalog');
+const { ROUTABLE } = require('../core/AlertRouter');
 
 class ValidationError extends Error {
   constructor(message) {
@@ -199,6 +200,35 @@ function sanitizeGuildPatch(input, guild) {
       if (Object.keys(result).length) target[kind] = result;
     }
     if (Object.keys(target).length) updates.embeds = target;
+  }
+
+  // Interruptor, canal y mención de cada aviso por separado.
+  if (input.alerts !== undefined) {
+    const source = input.alerts;
+    if (!source || typeof source !== 'object' || Array.isArray(source)) throw new ValidationError('alerts no es válido.');
+    const target = {};
+    for (const kind of Object.keys(source)) {
+      if (!ROUTABLE.includes(kind)) throw new ValidationError(`Aviso desconocido o no configurable: ${kind}`);
+      if (source[kind] === undefined) continue;
+      const block = source[kind];
+      if (!block || typeof block !== 'object' || Array.isArray(block)) throw new ValidationError(`alerts.${kind} no es válido.`);
+      const result = {};
+      if (block.enabled !== undefined) {
+        result.enabled = block.enabled === null ? null : booleanValue(block.enabled, `alerts.${kind}.enabled`);
+      }
+      if (block.channel !== undefined) {
+        result.channel = block.channel === null || block.channel === ''
+          ? null
+          : channelValue(guild, block.channel, `alerts.${kind}.channel`);
+      }
+      if (block.ping !== undefined) {
+        result.ping = block.ping === null || block.ping === ''
+          ? null
+          : roleValue(guild, block.ping, `alerts.${kind}.ping`);
+      }
+      if (Object.keys(result).length) target[kind] = result;
+    }
+    if (Object.keys(target).length) updates.alerts = target;
   }
 
   if (input.features !== undefined) {

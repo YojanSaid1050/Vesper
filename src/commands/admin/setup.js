@@ -5,6 +5,7 @@ const {
   EmbedBuilder
 } = require('discord.js');
 const { CAPABILITIES } = require('../../core/PermissionService');
+const { clampEmbed } = require('../../utils/discordLimits');
 const {
   getGuildConfig,
   updateGuildSection,
@@ -26,9 +27,17 @@ function optionalChannel(option, name, description) {
   return option.setName(name).setDescription(description).addChannelTypes(...TEXT_CHANNEL_TYPES);
 }
 
+// Devuelve true si se puede escribir, false si no, y null si no se pudo
+// comprobar. Antes las dos últimas situaciones se confundían: cuando el
+// miembro del bot no estaba en caché, `permissionsFor` devolvía null y
+// canales perfectamente válidos se rechazaban con un mensaje que no era
+// cierto.
 function channelWritable(interaction, channel) {
-  const permissions = channel.permissionsFor(interaction.guild.members.me);
-  return permissions?.has([
+  const me = interaction.guild.members.me;
+  if (!me) return null;
+  const permissions = channel.permissionsFor(me);
+  if (!permissions) return null;
+  return permissions.has([
     PermissionFlagsBits.ViewChannel,
     PermissionFlagsBits.SendMessages,
     PermissionFlagsBits.EmbedLinks
@@ -133,7 +142,7 @@ module.exports = {
     const config = await getGuildConfig(guildId);
 
     if (subcommand === 'estado') {
-      return interaction.reply({ embeds: [statusEmbed(interaction.guild, config)], flags: 64 });
+      return interaction.reply({ embeds: [clampEmbed(statusEmbed(interaction.guild, config))], flags: 64 });
     }
 
     if (subcommand === 'canales') {
@@ -155,7 +164,11 @@ module.exports = {
       for (const [optionName, [section, key]] of Object.entries(mapping)) {
         const channel = interaction.options.getChannel(optionName);
         if (!channel) continue;
-        if (!channelWritable(interaction, channel)) {
+        const writable = channelWritable(interaction, channel);
+        if (writable === null) {
+          return interaction.reply({ content: `Todavía no puedo comprobar mis permisos en ${channel}. Espera unos segundos y vuelve a intentarlo.`, flags: 64 });
+        }
+        if (!writable) {
           return interaction.reply({ content: `No puedo ver, escribir o insertar enlaces en ${channel}.`, flags: 64 });
         }
         if (!updates[section]) updates[section] = {};
@@ -164,7 +177,14 @@ module.exports = {
       }
       const botRole = interaction.options.getRole('rol_bots');
       if (botRole) {
-        if (botRole.managed || botRole.id === interaction.guild.id || !interaction.guild.members.me.permissions.has(PermissionFlagsBits.ManageRoles) || botRole.position >= interaction.guild.members.me.roles.highest.position) {
+        // `members.me` puede ser null si el miembro del bot no está en caché
+        // (pasa justo después de arrancar): antes eso era un TypeError y el
+        // administrador solo veía «Error ejecutando el comando».
+        const me = interaction.guild.members.me || await interaction.guild.members.fetchMe().catch(() => null);
+        if (!me) {
+          return interaction.reply({ content: 'Todavía no puedo comprobar mis propios permisos en este servidor. Espera unos segundos y vuelve a intentarlo.', flags: 64 });
+        }
+        if (botRole.managed || botRole.id === interaction.guild.id || !me.permissions.has(PermissionFlagsBits.ManageRoles) || botRole.position >= me.roles.highest.position) {
           return interaction.reply({ content: 'No puedo asignar ese rol a bots por la jerarquía de roles o porque me falta Gestionar roles.', flags: 64 });
         }
         if (!updates.general) updates.general = {};

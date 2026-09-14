@@ -90,7 +90,7 @@ async function mainMemberAdd(member, config) {
         await sendBrandedMessage(channel, buildMessage('log_bot_join', {
           config,
           vars: memberVars(member, { role: roleLabel }),
-          defaults: { title: '🤖 Bot Added', color: '#5865F2', thumbnailUrl: member.user.displayAvatarURL() },
+          defaults: { title: '🤖 Bot añadido', color: '#5865F2', thumbnailUrl: member.user.displayAvatarURL() },
           fields: [
             { name: '🤖 Bot', value: member.user.tag },
             { name: '🆔 ID', value: member.id },
@@ -114,7 +114,7 @@ async function mainMemberAdd(member, config) {
         config,
         vars: memberVars(member),
         defaults: {
-          title: member.user.bot ? '🤖 Bot Joined' : '📥 Member Joined',
+          title: member.user.bot ? '🤖 Bot añadido' : '📥 Miembro entró',
           color: member.user.bot ? '#5865F2' : '#57F287',
           thumbnailUrl: member.user.displayAvatarURL()
         },
@@ -143,7 +143,7 @@ async function mainMemberRemove(member, config) {
         config,
         vars: memberVars(member),
         defaults: {
-          title: member.user.bot ? '🤖 Bot Left' : '📤 Member Left',
+          title: member.user.bot ? '🤖 Bot retirado' : '📤 Miembro salió',
           color: '#ED4245',
           thumbnailUrl: member.user.displayAvatarURL()
         },

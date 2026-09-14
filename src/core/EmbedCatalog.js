@@ -10,7 +10,7 @@
 // sale EXACTAMENTE igual que antes de que esto existiera. La configuración
 // sustituye piezas; nunca inventa un formato nuevo por su cuenta.
 
-const { colorNumber, imageUrl, normalizeLayout } = require('./EmbedTemplateService');
+const { colorNumber, imageUrl, normalizeLayout, rendersMentions } = require('./EmbedTemplateService');
 const { containerPayload } = require('./EmbedLayouts');
 
 // Variables comunes a casi todos los registros.
@@ -273,28 +273,28 @@ const FACTORY = Object.freeze({
   },
   boost_stopped: { title: '💔 Boost retirado', color: '#747F8D' },
   boost_level: { title: '🚀 Nuevo nivel de mejora', color: '#F47FFF' },
-  log_member_join: { title: '📥 Member Joined', color: '#57F287' },
-  log_member_leave: { title: '📤 Member Left', color: '#ED4245' },
-  log_bot_join: { title: '🤖 Bot Added', color: '#5865F2' },
-  log_bot_leave: { title: '🤖 Bot Left', color: '#ED4245' },
-  log_nickname: { title: '📝 Nickname Updated', color: '#00B0F4' },
-  log_roles_added: { title: '🎭 Role Added', color: '#57F287' },
-  log_roles_removed: { title: '❌ Role Removed', color: '#ED4245' },
-  log_timeout_on: { title: '🔇 User Timed Out', color: '#ED4245' },
-  log_timeout_off: { title: '🔊 Timeout Removed', color: '#57F287' },
-  log_ban_added: { title: '🔨 User Banned', color: '#ED4245' },
-  log_ban_removed: { title: '🔓 User Unbanned', color: '#57F287' },
+  log_member_join: { title: '📥 Miembro entró', color: '#57F287' },
+  log_member_leave: { title: '📤 Miembro salió', color: '#ED4245' },
+  log_bot_join: { title: '🤖 Bot añadido', color: '#5865F2' },
+  log_bot_leave: { title: '🤖 Bot retirado', color: '#ED4245' },
+  log_nickname: { title: '📝 Apodo cambiado', color: '#00B0F4' },
+  log_roles_added: { title: '🎭 Roles añadidos', color: '#57F287' },
+  log_roles_removed: { title: '❌ Roles retirados', color: '#ED4245' },
+  log_timeout_on: { title: '🔇 Miembro aislado', color: '#ED4245' },
+  log_timeout_off: { title: '🔊 Aislamiento retirado', color: '#57F287' },
+  log_ban_added: { title: '🔨 Miembro baneado', color: '#ED4245' },
+  log_ban_removed: { title: '🔓 Baneo retirado', color: '#57F287' },
   automod_notice: { message: '{user}, tu mensaje fue retirado: {reason}. Caso **#{case}**.' },
   automod_dm: { message: 'Recibiste una advertencia en **{server}**.\nMotivo: {reason}\nCaso: **#{case}**' },
-  log_message_deleted: { title: '🗑️ Message Deleted', color: '#ED4245' },
-  log_message_edited: { title: '✏️ Message Edited', color: '#FAA61A' },
-  log_channel_created: { title: '📁 Channel Created', color: '#57F287' },
-  log_channel_deleted: { title: '🗑️ Channel Deleted', color: '#ED4245' },
-  log_role_created: { title: '🎭 Role Created', color: '#57F287' },
-  log_role_deleted: { title: '❌ Role Deleted', color: '#FF4D4D' },
-  log_voice_join: { title: '🔊 Voice Joined', color: '#57F287' },
-  log_voice_leave: { title: '📴 Voice Left', color: '#ED4245' },
-  log_voice_move: { title: '🔄 Voice Moved', color: '#5865F2' },
+  log_message_deleted: { title: '🗑️ Mensaje borrado', color: '#ED4245' },
+  log_message_edited: { title: '✏️ Mensaje editado', color: '#FAA61A' },
+  log_channel_created: { title: '📁 Canal creado', color: '#57F287' },
+  log_channel_deleted: { title: '🗑️ Canal borrado', color: '#ED4245' },
+  log_role_created: { title: '🎭 Rol creado', color: '#57F287' },
+  log_role_deleted: { title: '❌ Rol borrado', color: '#FF4D4D' },
+  log_voice_join: { title: '🔊 Entró a voz', color: '#57F287' },
+  log_voice_leave: { title: '📴 Salió de voz', color: '#ED4245' },
+  log_voice_move: { title: '🔄 Cambió de canal de voz', color: '#5865F2' },
   log_messages_purged: { title: '🧹 Mensajes purgados', color: '#FAA61A' },
   log_thread_created: { title: '🧵 Hilo creado', color: '#57F287' },
   notify_twitch_live: { title: '{creator} está en directo en Twitch', color: '#9146FF' },
@@ -369,15 +369,20 @@ function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = 
 
   // Un campo vacío o en blanco significa "usa el valor original", no "déjalo
   // en blanco": así el editor puede vaciarse para volver al diseño de fábrica.
-  const resolve = value => {
+  const resolve = (value, table = vars) => {
     if (value === null || value === undefined) return null;
     const text = String(value);
-    return text.trim() ? substitute(text, vars) : null;
+    return text.trim() ? substitute(text, table) : null;
   };
 
-  const title = resolve(stored.title) ?? defaults.title ?? null;
+  // El título y el pie de un embed clásico no convierten <@123…> en una
+  // mención: sale el número en bruto. En esos huecos se usa el nombre.
+  const layoutNow = normalizeLayout(stored.layout, defaults.layout);
+  const flat = rendersMentions('title', layoutNow) ? vars : plainVars(vars);
+
+  const title = resolve(stored.title, flat) ?? defaults.title ?? null;
   const message = resolve(stored.message);
-  const footer = resolve(stored.footer) ?? defaults.footer ?? null;
+  const footer = resolve(stored.footer, flat) ?? defaults.footer ?? null;
   const image = imageUrl(stored.image) ?? defaults.image ?? null;
   const color = colorNumber(stored.color, colorNumber(defaults.color, 0x5865F2));
   const showThumbnail = stored.thumbnail === undefined || stored.thumbnail === null
@@ -392,7 +397,7 @@ function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = 
   // El administrador elige con qué forma sale el mensaje. Si no ha elegido
   // ninguna, se usa la de fábrica de ese mensaje en ese servidor, así que
   // nada cambia hasta que se toca el selector a propósito.
-  const layout = normalizeLayout(stored.layout, defaults.layout);
+  const layout = layoutNow;
 
   const body = message
     ?? (defaults.description ? substitute(defaults.description, vars) : null);
@@ -421,6 +426,26 @@ function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = 
   if (footer) embed.footer = { text: footer };
 
   return { embeds: [embed] };
+}
+
+// Versión de las variables sin menciones, para los huecos donde Discord no
+// las convierte. `<@123>` pasa a `@Nombre`, `<#123>` a `#canal`, etc.
+function plainVars(vars) {
+  const plain = { ...vars };
+  if (typeof plain.user === 'string' && /^<@!?\d+>$/.test(plain.user)) {
+    const name = plain.displayName || plain.username;
+    plain.user = name ? `@${name}` : plain.userId ? `@${plain.userId}` : '';
+  }
+  if (typeof plain.channel === 'string' && /^<#\d+>$/.test(plain.channel)) {
+    plain.channel = plain.channelName ? `#${plain.channelName}` : plain.channel;
+  }
+  if (typeof plain.role === 'string' && /^<@&\d+>$/.test(plain.role)) {
+    plain.role = plain.roleName ? `@${plain.roleName}` : plain.role;
+  }
+  if (typeof plain.executor === 'string' && /^<@!?\d+>$/.test(plain.executor)) {
+    plain.executor = plain.executorName ? `@${plain.executorName}` : plain.executor;
+  }
+  return plain;
 }
 
 // Sustituye {variables} por sus valores. Se hace aquí y no en
@@ -458,6 +483,7 @@ module.exports = {
   isCustomised,
   buildMessage,
   containerPayload,
+  plainVars,
   substitute,
   memberVars
 };

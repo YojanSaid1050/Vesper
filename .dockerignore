@@ -7,3 +7,5 @@ temp
 coverage
 *.zip
 npm-debug.log*
+
+bin/

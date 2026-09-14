@@ -42,19 +42,30 @@ module.exports = {
             await i.deferUpdate();
             await interaction.editReply({ content: '⏳ Eliminando todos los servidores...', embeds: [], components: [] });
             
+            // Si la base de datos falla a mitad, antes la promesa quedaba
+            // rechazada sin capturar y el mensaje se quedaba para siempre en
+            // «⏳ Eliminando…», sin decir cuántos se habían borrado.
             let deleted = 0;
+            let failure = null;
             for (const guild of guilds) {
-                await deleteGuild(guild.guildId);
-                deleted++;
+                try {
+                    await deleteGuild(guild.guildId);
+                    deleted++;
+                } catch (error) {
+                    failure = error;
+                    break;
+                }
             }
-            
+
             const resultEmbed = new EmbedBuilder()
-                .setTitle('✅ Base de datos limpiada')
-                .setDescription(`Se eliminaron **${deleted}** servidores de la base de datos.\n\nLa base de datos está completamente vacía.`)
-                .setColor(0x00FF00)
+                .setTitle(failure ? '⚠️ Limpieza incompleta' : '✅ Base de datos limpiada')
+                .setDescription(failure
+                    ? `Se eliminaron **${deleted}** de **${guilds.length}** servidores antes de fallar.\n\nMotivo: ${String(failure.message).slice(0, 500)}`
+                    : `Se eliminaron **${deleted}** servidores de la base de datos.\n\nLa base de datos está completamente vacía.`)
+                .setColor(failure ? 0xFAA61A : 0x00FF00)
                 .setTimestamp();
-            
-            await interaction.editReply({ content: null, embeds: [resultEmbed], components: [] });
+
+            await interaction.editReply({ content: null, embeds: [resultEmbed], components: [] }).catch(() => null);
         });
 
         collector.on('end', collected => {

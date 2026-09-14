@@ -4,35 +4,12 @@ const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a
 const { liveEmbed: twitchLiveEmbed } = require('../../platforms/twitch/embeds');
 const { liveEmbed: tiktokLiveEmbed, videoEmbed: tiktokVideoEmbed } = require('../../platforms/tiktok/embeds');
 
-const welcomeEmbed = {
-  buildWelcomePayload: (member) => ({
-    flags: 32768,
-    components: [{
-      type: 17, accent_color: 16777215, spoiler: false,
-      components: [
-        { type: 10, content: '# ⛧°. ⋆༺ A new wanderer has arrived ༻⋆. °⛧' },
-        { type: 14, spacing: 1 },
-        { type: 10, content: `### Welcome to Embers Void, ${member}!\n\n༺𓆩~~Let the void guide your path.~~𓆪༻` },
-        { type: 12, items: [{ media: { url: 'https://i.redd.it/gaoeixac0boe1.gif' } }] }
-      ]
-    }]
-  })
-};
-
-const goodbyeEmbed = {
-  buildGoodbyePayload: (member) => ({
-    flags: 32768,
-    components: [{
-      type: 17, accent_color: 0, spoiler: false,
-      components: [
-        { type: 10, content: '# ☾°.⋆༺ The void claims another soul ༻⋆.°☽' },
-        { type: 14, spacing: 1 },
-        { type: 10, content: `### Farewell, ${member.user?.username || member.username}...\n\nAn echo has faded into silence.\n\n༺𓆩~~May its embers continue to burn beyond the void.~~𓆪༻` },
-        { type: 12, items: [{ media: { url: 'https://i.redd.it/vru2z0kl9uaf1.gif' } }] }
-      ]
-    }]
-  })
-};
+// Las pruebas usan EXACTAMENTE las mismas funciones que publican de verdad.
+// Antes había aquí una copia a mano del diseño, en texto plano y sin leer la
+// configuración del servidor: quien personalizaba la bienvenida desde el panel
+// la probaba con /testbranding y veía otra cosa.
+const { buildWelcomePayload } = require('../../events/guild/memberAdd');
+const { buildGoodbyePayload } = require('../../events/guild/memberRemove');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -57,10 +34,10 @@ module.exports = {
     let payload;
     switch (tipo) {
       case 'welcome':
-        payload = welcomeEmbed.buildWelcomePayload(interaction.user);
+        payload = buildWelcomePayload(interaction.member, config);
         break;
       case 'goodbye':
-        payload = goodbyeEmbed.buildGoodbyePayload({ user: { username: interaction.user.username } });
+        payload = buildGoodbyePayload(interaction.member, config);
         break;
       case 'twitch':
         payload = twitchLiveEmbed({
@@ -107,7 +84,15 @@ module.exports = {
         };
     }
 
-    await sendBrandedMessage(interaction.channel, payload);
-    await interaction.editReply({ content: `✅ Prueba de **${tipo}** enviada correctamente.` });
+    // `sendBrandedMessage` se traga sus propios errores y devuelve null. Antes
+    // se confirmaba el éxito sin mirarlo, así que cuando el bot no podía
+    // escribir en el canal el administrador leía «enviada correctamente» y no
+    // aparecía ningún mensaje.
+    const sent = await sendBrandedMessage(interaction.channel, payload);
+    await interaction.editReply({
+      content: sent
+        ? `✅ Prueba de **${tipo}** enviada correctamente.`
+        : `❌ No pude publicar la prueba en ${interaction.channel}. Revisa que tenga permiso para escribir e insertar enlaces ahí.`
+    });
   }
 };

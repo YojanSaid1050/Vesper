@@ -2,6 +2,17 @@ const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('disco
 const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 
+// El refresco del panel estaba escrito después de los `return`, así que nunca
+// llegaba a ejecutarse y el panel seguía mostrando la configuración vieja.
+async function refreshDashboard(interaction) {
+  try {
+    const activePanel = await getActivePanel(interaction.guildId);
+    await updateDashboard(interaction.client, interaction.guildId, activePanel.type, activePanel.mode);
+  } catch {
+    // Que el panel no se refresque no debe hacer fallar el comando.
+  }
+}
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('tiktok-setchannel')
@@ -18,16 +29,15 @@ module.exports = {
     if (subcommand === 'live') {
       const channel = interaction.options.getChannel('canal');
       await updateGuildSection(interaction.guildId, 'tiktok', { ...config.tiktok, liveChannel: channel.id });
+      await refreshDashboard(interaction);
       return interaction.editReply({ content: `✅ Canal de directos configurado: <#${channel.id}>` });
     }
 
     if (subcommand === 'videos') {
       const channel = interaction.options.getChannel('canal');
       await updateGuildSection(interaction.guildId, 'tiktok', { ...config.tiktok, videoChannel: channel.id });
+      await refreshDashboard(interaction);
       return interaction.editReply({ content: `✅ Canal de videos configurado: <#${channel.id}>` });
     }
-// Refrescar dashboard automáticamente
-    const activePanel = await getActivePanel(interaction.guildId);
-    await updateDashboard(interaction.client, interaction.guildId, activePanel.type, activePanel.mode);
   }
 };

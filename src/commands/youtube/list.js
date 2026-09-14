@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { joinWithinLimit } = require('../../utils/discordLimits');
 const { getGuildConfig } = require('../../database/mongoManager');
 const { getChannelInfo } = require('../../platforms/youtube/utils');
 
@@ -30,7 +31,11 @@ module.exports = {
       .setTitle('📺 Canales de YouTube monitoreados')
       .setColor(0xFF0000)
       .addFields(
-        { name: '🎭 Canales vigilados', value: channelInfoList.map(c => c.error ? `• \`${c.name}\` (⚠️ No encontrado)` : `• **${c.name}**\n  └ \`${c.handle || c.id}\``).join('\n') + (users.length > 25 ? `\n\n*... y ${users.length - 25} más*` : '') || 'Ninguno', inline: false },
+        // Un valor de campo admite 1024 caracteres: con ~20 canales de nombre
+        // largo se pasaba y el comando no mostraba nada.
+        { name: '🎭 Canales vigilados', value: joinWithinLimit(
+          channelInfoList.map(c => c.error ? `• \`${c.name}\` (⚠️ No encontrado)` : `• **${c.name}**\n  └ \`${c.handle || c.id}\``)
+        ), inline: false },
         { name: '🔴 Canal de Directos', value: liveChannel ? `<#${liveChannel}>` : '`No configurado`', inline: true },
         { name: '📹 Canal de Videos', value: videoChannel ? `<#${videoChannel}>` : '`No configurado`', inline: true },
         { name: '📱 Canal de Shorts', value: shortChannel ? `<#${shortChannel}>` : '`No configurado`', inline: true }
