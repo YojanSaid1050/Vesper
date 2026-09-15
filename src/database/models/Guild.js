@@ -3,7 +3,10 @@ const mongoose = require('mongoose');
 
 const guildSchema = new mongoose.Schema({
   guildId: { type: String, required: true, unique: true, index: true },
-  schemaVersion: { type: Number, default: 7, min: 1 },
+  schemaVersion: { type: Number, default: 8, min: 1 },
+  // Plan del servidor: 'free' o 'premium'. Los dos Main no lo usan, su plan
+  // sale de MAIN_GUILD_ID / THEMED_MAIN_GUILD_IDS.
+  plan: { type: String, enum: ['free', 'premium'], default: 'free' },
   general: {
     welcomeChannel: { type: String, default: null },
     goodbyeChannel: { type: String, default: null },

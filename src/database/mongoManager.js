@@ -226,7 +226,10 @@ async function updateGuildSection(guildId, section, values) {
   await connectMongo();
   
   try {
-    const allowedSections = new Set(['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'features', 'permissions', 'moderation', 'music', 'deals', 'testPanel']);
+    // OJO: 'alerts' tiene que estar aquí. Sin ella, guardar el interruptor de
+    // un registro desde el panel lanzaba «Sección de configuración no
+    // permitida» y no se guardaba nada.
+    const allowedSections = new Set(['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'alerts', 'features', 'permissions', 'moderation', 'music', 'deals', 'testPanel']);
     if (!allowedSections.has(section)) throw new Error(`Sección de configuración no permitida: ${section}`);
 
     const update = {};
@@ -245,6 +248,21 @@ async function updateGuildSection(guildId, section, values) {
     console.error(`Error actualizando sección ${section} para guild ${guildId}:`, error.message);
     throw error;
   }
+}
+
+// El plan es un campo suelto, no una sección: `updateGuildSection` prefija con
+// el nombre de la sección y aquí no hay ninguna.
+async function setGuildPlan(guildId, plan) {
+  if (!guildId) throw new Error('guildId es requerido');
+  if (!['free', 'premium'].includes(plan)) throw new Error(`Plan no permitido: ${plan}`);
+  await connectMongo();
+  const result = await Guild.findOneAndUpdate(
+    { guildId },
+    { $set: { plan }, $setOnInsert: { guildId } },
+    { returnDocument: 'after', upsert: true }
+  );
+  invalidateGuildConfig(guildId);
+  return result.toObject();
 }
 
 async function updateCommunitySection(guildId, subsection, values) {
@@ -349,6 +367,7 @@ module.exports = {
   getGuildConfig,
   updateGuildConfig,
   updateGuildSection,
+  setGuildPlan,
   updateCommunitySection,
   addGuildListItem,
   removeGuildListItem,

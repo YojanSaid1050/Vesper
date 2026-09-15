@@ -1,6 +1,6 @@
 {
   "name": "vesper-bot",
-  "version": "3.0.0",
+  "version": "3.2.0",
   "description": "Vesper - Discord Bot for streaming monitoring",
   "main": "src/index.js",
   "scripts": {
@@ -36,7 +36,8 @@
     "env:check": "node scripts/check-env.js",
     "help": "echo 'Comandos disponibles: start, dev, deploy, clean, logs, status, mongo:stats, mongo:clean, tiktok-test'",
     "lint": "eslint src scripts test",
-    "music:setup": "node scripts/ensure-ytdlp.js"
+    "music:setup": "node scripts/ensure-ytdlp.js",
+    "diagnostico": "node scripts/diagnose.js"
   },
   "dependencies": {
     "@discordjs/voice": "^0.19.2",

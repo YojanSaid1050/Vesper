@@ -220,7 +220,7 @@ test('la interfaz web es autocontenida y compatible con su propia CSP', () => {
   assert.match(html, /<dialog id="app-dialog"/, 'el diálogo propio debe estar en el HTML');
 });
 
-test('la raíz lleva al panel en el navegador y conserva el JSON para las sondas', async () => {
+test('la raíz enseña la portada en el navegador y conserva el JSON para las sondas', async () => {
   const express = require('express');
   const { mountHealthRoutes, buildRuntimeHealth } = require('../src/web/health');
 
@@ -238,9 +238,13 @@ test('la raíz lleva al panel en el navegador y conserva el JSON para las sondas
   const port = server.address().port;
 
   try {
+    // Antes la raíz redirigía al panel, que pide iniciar sesión: quien llegaba
+    // por primera vez se topaba con un formulario sin saber qué hace el bot.
     const browser = await fetch(`http://127.0.0.1:${port}/`, { headers: { Accept: 'text/html' }, redirect: 'manual' });
-    assert.equal(browser.status, 302, 'un navegador debe ser redirigido');
-    assert.equal(browser.headers.get('location'), '/panel');
+    assert.equal(browser.status, 200, 'un navegador debe recibir la portada');
+    const html = await browser.text();
+    assert.match(html, /<title>Vesper/, 'debe ser la portada, no un JSON');
+    assert.match(html, /href="\/panel"/, 'la portada debe llevar al panel');
 
     const probe = await fetch(`http://127.0.0.1:${port}/`, { headers: { Accept: 'application/json' } });
     assert.equal(probe.status, 200, 'un monitor que pida JSON debe seguir recibiéndolo');
@@ -434,4 +438,146 @@ test('el panel recibe todos los avisos agrupados', () => {
   assert.equal(total, ROUTABLE.length);
   assert.ok(overview.length >= 4, 'deben venir repartidos por tema');
   assert.ok(overview.every(group => group.items.every(item => item.label && item.kind)));
+});
+
+/* ------------------------------------------------------------------ */
+/* Qué es exclusivo de los dos Main y qué tiene cualquier servidor     */
+/* ------------------------------------------------------------------ */
+
+const { featureAvailable, MAIN_ONLY_FEATURES, PREMIUM_FEATURES, guildPlan, lockedFeatures } = require('../src/config/guildPolicy');
+const { THEMES, applyTheme, clearTheme, themesForPanel } = require('../src/core/MessageThemes');
+const { KINDS } = require('../src/core/EmbedCatalog');
+
+test('la identidad propia del bot es solo de los dos Main', () => {
+  const antes = { main: process.env.MAIN_GUILD_ID, temas: process.env.THEMED_MAIN_GUILD_IDS };
+  process.env.MAIN_GUILD_ID = 'main-guild';
+  process.env.THEMED_MAIN_GUILD_IDS = 'themed-guild';
+  try {
+    assert.equal(featureAvailable('profile', 'main-guild'), true);
+    assert.equal(featureAvailable('profile', 'themed-guild'), true);
+    assert.equal(featureAvailable('profile', '999999999999999999'), false);
+  } finally {
+    if (antes.main === undefined) delete process.env.MAIN_GUILD_ID; else process.env.MAIN_GUILD_ID = antes.main;
+    if (antes.temas === undefined) delete process.env.THEMED_MAIN_GUILD_IDS; else process.env.THEMED_MAIN_GUILD_IDS = antes.temas;
+  }
+});
+
+test('lo que no consume recursos está disponible en cualquier servidor', () => {
+  for (const feature of ['embeds', 'alerts', 'moderation', 'messageThemes', 'welcome', 'logs', 'tickets']) {
+    assert.equal(featureAvailable(feature, '999999999999999999'), true, `${feature} no debería estar restringido`);
+  }
+  assert.equal(MAIN_ONLY_FEATURES.length, 3, 'la lista de exclusivas debe quedarse corta a propósito');
+});
+
+test('lo que consume recursos es de plan premium', () => {
+  const gratis = '999999999999999999';
+  for (const feature of PREMIUM_FEATURES) {
+    assert.equal(featureAvailable(feature, gratis), false, `${feature} debería requerir plan`);
+    assert.equal(featureAvailable(feature, gratis, { plan: 'premium' }), true, `${feature} debería abrirse con plan`);
+  }
+  assert.deepEqual([...PREMIUM_FEATURES].sort(), ['deals', 'music', 'tiktok', 'twitch', 'youtube']);
+});
+
+test('los dos Main lo tienen todo sin necesitar plan', () => {
+  const antes = { main: process.env.MAIN_GUILD_ID, temas: process.env.THEMED_MAIN_GUILD_IDS };
+  process.env.MAIN_GUILD_ID = 'main-guild';
+  process.env.THEMED_MAIN_GUILD_IDS = 'themed-guild';
+  try {
+    for (const id of ['main-guild', 'themed-guild']) {
+      assert.equal(guildPlan(id), 'main');
+      for (const feature of [...PREMIUM_FEATURES, ...MAIN_ONLY_FEATURES]) {
+        assert.equal(featureAvailable(feature, id), true, `${feature} debería estar en ${id}`);
+      }
+      assert.deepEqual(lockedFeatures(id), [], 'un Main no tiene nada bloqueado');
+    }
+  } finally {
+    if (antes.main === undefined) delete process.env.MAIN_GUILD_ID; else process.env.MAIN_GUILD_ID = antes.main;
+    if (antes.temas === undefined) delete process.env.THEMED_MAIN_GUILD_IDS; else process.env.THEMED_MAIN_GUILD_IDS = antes.temas;
+  }
+});
+
+test('el premium se puede conceder por entorno o desde el panel', () => {
+  const antes = process.env.PREMIUM_GUILD_IDS;
+  process.env.PREMIUM_GUILD_IDS = '777777777777777777';
+  try {
+    assert.equal(guildPlan('777777777777777777'), 'premium', 'por la lista del entorno');
+    assert.equal(guildPlan('888888888888888888'), 'free');
+    assert.equal(guildPlan('888888888888888888', { plan: 'premium' }), 'premium', 'concedido desde el panel');
+  } finally {
+    if (antes === undefined) delete process.env.PREMIUM_GUILD_IDS; else process.env.PREMIUM_GUILD_IDS = antes;
+  }
+});
+
+test('un servidor gratis sabe exactamente qué le falta', () => {
+  const bloqueadas = lockedFeatures('999999999999999999');
+  assert.ok(bloqueadas.includes('youtube'));
+  assert.ok(bloqueadas.includes('music'));
+  assert.ok(bloqueadas.includes('profile'));
+  assert.ok(!bloqueadas.includes('embeds'), 'los mensajes nunca se bloquean');
+});
+
+/* ------------------------------------------------------------------ */
+/* Paquetes de mensajes                                                */
+/* ------------------------------------------------------------------ */
+
+test('cada paquete cubre los 38 mensajes del catálogo, ni uno más', () => {
+  for (const [id, theme] of Object.entries(THEMES)) {
+    const suyos = Object.keys(theme.messages);
+    assert.deepEqual(suyos.slice().sort(), KINDS.slice().sort(), `el paquete «${id}» no coincide con el catálogo`);
+  }
+});
+
+test('todos los mensajes de un paquete llevan color', () => {
+  for (const theme of Object.values(THEMES)) {
+    for (const [kind, entry] of Object.entries(theme.messages)) {
+      assert.match(String(entry.color), /^#[0-9A-Fa-f]{6}$/, `${theme.id}/${kind} sin color válido`);
+    }
+  }
+});
+
+test('el paquete de limones conserva la voz de AnkeBot', () => {
+  const limones = THEMES.limones.messages;
+  assert.match(limones.welcome.footer, /Reclama tu limón/);
+  assert.match(limones.goodbye.footer, /Devuelve los limones/);
+  assert.match(limones.welcome.title, /🍋/);
+});
+
+test('el paquete Void mantiene el diseño original de Embers Void', () => {
+  const memberAdd = require('../src/events/guild/memberAdd');
+  assert.equal(THEMES.void.messages.welcome.title, memberAdd.WELCOME_DEFAULT_TITLE);
+});
+
+test('aplicar un paquete devuelve algo que se puede guardar tal cual', () => {
+  const embeds = applyTheme('limones');
+  assert.equal(Object.keys(embeds).length, KINDS.length);
+  const guild = mockGuild();
+  // Pasa por el mismo saneador que usa la API, sin lanzar.
+  const result = sanitizeGuildPatch({ embeds }, guild);
+  assert.equal(Object.keys(result.embeds).length, KINDS.length);
+});
+
+test('se puede aplicar un paquete a unos pocos mensajes', () => {
+  const embeds = applyTheme('void', { kinds: ['welcome', 'goodbye'] });
+  assert.deepEqual(Object.keys(embeds), ['welcome', 'goodbye']);
+});
+
+test('quitar el paquete vacía todos los campos, que es volver a fábrica', () => {
+  const embeds = clearTheme(KINDS);
+  assert.equal(Object.keys(embeds).length, KINDS.length);
+  assert.deepEqual(embeds.welcome, { title: null, message: null, footer: null, image: null, color: null, layout: null });
+});
+
+test('un paquete inventado no devuelve nada', () => {
+  assert.equal(applyTheme('inventado'), null);
+});
+
+test('el panel recibe los paquetes sin los 38 mensajes de cada uno', () => {
+  const panel = themesForPanel();
+  assert.equal(panel.length, 2);
+  for (const theme of panel) {
+    assert.ok(theme.name && theme.tagline && theme.accent);
+    assert.equal(theme.swatches.length, 4);
+    assert.equal(theme.count, KINDS.length);
+    assert.ok(theme.sample.welcome, 'debe traer una muestra para la vista previa');
+  }
 });

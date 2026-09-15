@@ -108,7 +108,7 @@ async function monitorStreams(client) {
 }
 
 async function processGuildStreams(guildId, config, client, streamStatus) {
-  if (!isModuleEnabledConfig(config, 'twitch')) return null;
+  if (!isModuleEnabledConfig(config, 'twitch', guildId)) return null;
   const twitchConfig = config.twitch || {};
   const users = twitchConfig.users || [];
   const liveChannelId = twitchConfig.liveChannel;

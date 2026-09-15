@@ -107,14 +107,23 @@ test('la configuración de ofertas aplica límites sensatos', () => {
   assert.equal(dealsConfig({}).steamSpecials, false, 'las rebajas de Steam son opt-in');
 });
 
-test('solo entran los servidores con el módulo activo y un canal elegido', () => {
+test('solo entran los servidores con el módulo activo, un canal elegido y plan', () => {
   const guilds = {
-    conTodo: { features: { deals: true }, deals: { channel: '123' } },
-    sinCanal: { features: { deals: true }, deals: {} },
-    apagado: { features: { deals: false }, deals: { channel: '123' } }
+    // Las ofertas consultan tres tiendas cada media hora: son de plan premium.
+    conTodo: { plan: 'premium', features: { deals: true }, deals: { channel: '123' } },
+    sinCanal: { plan: 'premium', features: { deals: true }, deals: {} },
+    apagado: { plan: 'premium', features: { deals: false }, deals: { channel: '123' } },
+    sinPlan: { features: { deals: true }, deals: { channel: '123' } }
   };
   const eligible = collectEligibleGuilds(guilds);
   assert.deepEqual(eligible.map(entry => entry.guildId), ['conTodo']);
+});
+
+test('un servidor que pierde el plan deja de consultar, aunque siga configurado', () => {
+  // Es el punto del plan: que el gasto pare solo, sin tener que tocar nada.
+  const configurado = { features: { deals: true }, deals: { channel: '123' } };
+  assert.deepEqual(collectEligibleGuilds({ sinPlan: configurado }), []);
+  assert.equal(collectEligibleGuilds({ conPlan: { ...configurado, plan: 'premium' } }).length, 1);
 });
 
 test('el aviso usa el formato por defecto y admite personalización', () => {

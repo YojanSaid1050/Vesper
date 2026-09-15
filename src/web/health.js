@@ -12,6 +12,8 @@
 //   - `ready` → ¿está todo operativo? Es la señal estricta, para diagnóstico,
 //     para el panel y para validar un despliegue.
 
+const path = require('node:path');
+
 function buildRuntimeHealth({ getClient, getMongoStatus, getMonitorStats, isShuttingDown }) {
   return function runtimeHealth() {
     const client = getClient();
@@ -35,12 +37,14 @@ function buildRuntimeHealth({ getClient, getMongoStatus, getMonitorStats, isShut
 }
 
 function mountHealthRoutes(app, { runtimeHealth, getClient, isShuttingDown }) {
-  // La raíz la abre una persona en el navegador, no una sonda: llevarla al
-  // panel evita que lo primero que vea sea un JSON. Los monitores de uptime que
-  // apunten a "/" y pidan JSON siguen recibiendo el estado de siempre.
+  // La raíz la abre una persona en el navegador, no una sonda. Antes redirigía
+  // al panel, que pide iniciar sesión: quien llega por primera vez se topaba
+  // con un formulario sin saber siquiera qué hace el bot. Ahora ve la portada,
+  // con un botón bien visible al panel. Los monitores de uptime que apunten a
+  // "/" y pidan JSON siguen recibiendo el estado de siempre.
   app.get('/', (req, res) => {
     const wantsJson = req.accepts(['html', 'json']) === 'json';
-    if (!wantsJson) return res.redirect(302, '/panel');
+    if (!wantsJson) return res.sendFile(path.join(__dirname, 'public', 'landing.html'));
     return res.json({
       status: 'online',
       timestamp: new Date().toISOString(),

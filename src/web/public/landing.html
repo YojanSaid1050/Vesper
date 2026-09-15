@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0d0d11">
+  <meta name="description" content="Vesper avisa cuando emites, saluda a quien entra, lleva el registro de tu servidor y pone música. Configúralo desde la web, sin tocar código.">
+  <title>Vesper · el bot que cuida tu servidor</title>
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTYiIGZpbGw9IiMxYjE0MjUiLz48dGV4dCB4PSIzMiIgeT0iNDUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjM4IiBmb250LXdlaWdodD0iNzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOWQ2M2ZmIj5WPC90ZXh0Pjwvc3ZnPg==">
+  <link rel="stylesheet" href="/panel/assets/landing.css">
+</head>
+<body>
+  <a class="skip-link" href="#funciones">Saltar al contenido</a>
+
+  <header class="top">
+    <a class="logo" href="/">
+      <span class="logo-mark" aria-hidden="true">V</span>
+      <span class="logo-text">Vesper</span>
+    </a>
+
+    <nav class="top-nav" aria-label="Secciones">
+      <a href="#funciones">Funciones</a>
+      <a href="#planes">Planes</a>
+      <a href="#empezar">Cómo empezar</a>
+    </nav>
+
+    <div class="top-actions">
+      <div class="theme-switch" role="group" aria-label="Tema">
+        <button type="button" data-theme-option="auto" title="El del sistema" aria-pressed="false">◐</button>
+        <button type="button" data-theme-option="claro" title="Claro" aria-pressed="false">☀</button>
+        <button type="button" data-theme-option="oscuro" title="Oscuro" aria-pressed="false">☾</button>
+      </div>
+      <a class="button ghost" href="/panel">Abrir el panel</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- ------------------------------------------------------------ -->
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Bot de Discord · en castellano</p>
+        <h1>Tu servidor, <span class="accent">cuidado</span> mientras tú no miras.</h1>
+        <p class="lead">
+          Avisa cuando empiezas a emitir, saluda a quien entra, anota todo lo que pasa
+          y pone música. Se configura entero desde la web: ni un comando, ni una línea
+          de código.
+        </p>
+        <div class="hero-actions">
+          <a class="button big" href="/panel">Empezar gratis</a>
+          <a class="button ghost big" href="#funciones">Ver qué hace</a>
+        </div>
+        <p class="fine">Gratis para siempre lo esencial. Sin tarjeta para empezar.</p>
+      </div>
+
+      <!-- Un ejemplo de lo que la gente verá en su servidor, dibujado con CSS
+           para que cargue al instante y se vea igual en claro y en oscuro. -->
+      <div class="hero-demo" aria-label="Ejemplo de mensaje de Vesper">
+        <div class="chat">
+          <div class="chat-msg">
+            <span class="chat-avatar" aria-hidden="true">V</span>
+            <div class="chat-body">
+              <div class="chat-head"><strong>Vesper</strong><span class="chat-tag">BOT</span><span class="chat-time">hoy a las 21:04</span></div>
+              <div class="chat-embed">
+                <div class="chat-title">⛧ Yojan está en directo</div>
+                <div class="chat-text">Terminando el bot de Discord · pásate</div>
+                <div class="chat-image" aria-hidden="true"></div>
+                <div class="chat-foot">Twitch · ahora</div>
+              </div>
+            </div>
+          </div>
+          <div class="chat-msg">
+            <span class="chat-avatar" aria-hidden="true">V</span>
+            <div class="chat-body">
+              <div class="chat-head"><strong>Vesper</strong><span class="chat-tag">BOT</span><span class="chat-time">hoy a las 21:07</span></div>
+              <div class="chat-embed lemon">
+                <div class="chat-title">🍋 Bienvenid@ a Ankerie Dimension :3</div>
+                <div class="chat-text">Olaaa <span class="chat-mention">@nuevo-miembro</span>, espero te sientas como en casa</div>
+                <div class="chat-foot">Reclama tu limón</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ -->
+    <section class="strip" aria-label="En cifras">
+      <div><strong>38</strong><span>mensajes editables</span></div>
+      <div><strong>27</strong><span>registros con interruptor</span></div>
+      <div><strong>3</strong><span>redes vigiladas</span></div>
+      <div><strong>0 €</strong><span>para empezar</span></div>
+    </section>
+
+    <!-- ------------------------------------------------------------ -->
+    <section id="funciones" class="section">
+      <header class="section-head">
+        <p class="eyebrow">Qué hace</p>
+        <h2>Todo lo que hace falta, y nada que sobre</h2>
+        <p class="lead">Cada función se enciende y se apaga por su cuenta. Lo que no uses, no molesta.</p>
+      </header>
+
+      <div class="cards">
+        <article class="card">
+          <span class="card-icon" aria-hidden="true">✉</span>
+          <h3>Bienvenidas y despedidas</h3>
+          <p>Un mensaje al entrar y otro al salir, con el texto, el color y la imagen que tú elijas. Da las gracias por los boosts solo.</p>
+          <span class="tag free">Gratis</span>
+        </article>
+
+        <article class="card">
+          <span class="card-icon" aria-hidden="true">☰</span>
+          <h3>Registros al detalle</h3>
+          <p>27 avisos distintos —quién entra, qué se borra, quién modera— y cada uno con su interruptor, su canal y a quién mencionar.</p>
+          <span class="tag free">Gratis</span>
+        </article>
+
+        <article class="card">
+          <span class="card-icon" aria-hidden="true">✎</span>
+          <h3>Escribe tú los mensajes</h3>
+          <p>Los 38 avisos son editables desde la web, con vista previa. O aplica un paquete y quedan todos escritos de golpe.</p>
+          <span class="tag free">Gratis</span>
+        </article>
+
+        <article class="card">
+          <span class="card-icon" aria-hidden="true">⚖</span>
+          <h3>Moderación que no duerme</h3>
+          <p>Filtros de enlaces, palabras y menciones. Avisos, aislamientos y un historial de casos que puedes consultar.</p>
+          <span class="tag free">Gratis</span>
+        </article>
+
+        <article class="card">
+          <span class="card-icon" aria-hidden="true">☺</span>
+          <h3>Tickets y comunidad</h3>
+          <p>Soporte por tickets, buzón de sugerencias, autorroles con botones y un tablón de mensajes destacados.</p>
+          <span class="tag free">Gratis</span>
+        </article>
+
+        <article class="card premium">
+          <span class="card-icon" aria-hidden="true">◎</span>
+          <h3>Avisos de directos</h3>
+          <p>TikTok, Twitch y YouTube. Vesper mira cada pocos minutos y avisa en cuanto empiezas, con el enlace y a quien tú digas.</p>
+          <span class="tag prem">Premium</span>
+        </article>
+
+        <article class="card premium">
+          <span class="card-icon" aria-hidden="true">♪</span>
+          <h3>Música</h3>
+          <p>Busca y reproduce en el canal de voz. Cola, votos para saltar, volumen y límites configurables.</p>
+          <span class="tag prem">Premium</span>
+        </article>
+
+        <article class="card premium">
+          <span class="card-icon" aria-hidden="true">◈</span>
+          <h3>Ofertas y juegos gratis</h3>
+          <p>Avisa cuando Epic regala un juego, Steam rebaja algo o aparece un sorteo. Sin repetirse nunca.</p>
+          <span class="tag prem">Premium</span>
+        </article>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ -->
+    <section id="planes" class="section">
+      <header class="section-head">
+        <p class="eyebrow">Planes</p>
+        <h2>Gratis lo que no cuesta. Premium lo que sí.</h2>
+        <p class="lead">
+          No es un muro para sacarte dinero: vigilar tres redes para muchos servidores,
+          a todas horas, consume procesador y cuota de verdad. Todo lo demás es gratis
+          y lo seguirá siendo.
+        </p>
+      </header>
+
+      <div class="plans">
+        <article class="plan">
+          <header>
+            <h3>Gratis</h3>
+            <p class="plan-price">0 €<span>/ siempre</span></p>
+            <p class="plan-note">Para cualquier servidor, desde el primer día.</p>
+          </header>
+          <ul>
+            <li>Bienvenidas, despedidas y boosts</li>
+            <li>Los 27 registros, con canal y mención propios</li>
+            <li>Los 38 mensajes editables y los paquetes</li>
+            <li>Moderación automática y casos</li>
+            <li>Tickets, sugerencias, autorroles y destacados</li>
+            <li>Panel web completo</li>
+          </ul>
+          <a class="button ghost" href="/panel">Empezar ahora</a>
+        </article>
+
+        <article class="plan featured">
+          <span class="plan-flag">Lo que consume recursos</span>
+          <header>
+            <h3>Premium</h3>
+            <p class="plan-price">Por servidor</p>
+            <p class="plan-note">Todo lo gratis, más lo que hay que estar vigilando.</p>
+          </header>
+          <ul>
+            <li><strong>Avisos de TikTok, Twitch y YouTube</strong></li>
+            <li><strong>Música</strong> en canales de voz</li>
+            <li><strong>Ofertas y juegos gratis</strong></li>
+            <li>Prioridad cuando algo falla</li>
+          </ul>
+          <a class="button" href="/panel">Pedirlo desde el panel</a>
+          <p class="plan-fine">Lo concede el propietario del bot. Escríbele desde el panel de tu servidor.</p>
+        </article>
+      </div>
+
+      <p class="plan-why">
+        ¿Por qué justo eso? Porque saludar a alguien que entra es responder a algo que
+        Discord ya avisa, y no cuesta nada. Vigilar si empezaste a emitir obliga a
+        preguntar cada pocos minutos, por cada cuenta, todo el día. Es la diferencia
+        entre escuchar y estar llamando.
+      </p>
+    </section>
+
+    <!-- ------------------------------------------------------------ -->
+    <section id="empezar" class="section narrow">
+      <header class="section-head">
+        <p class="eyebrow">Cómo empezar</p>
+        <h2>Tres pasos y está funcionando</h2>
+      </header>
+
+      <ol class="steps">
+        <li>
+          <span class="step-num">1</span>
+          <div>
+            <h3>Añade Vesper a tu servidor</h3>
+            <p>Con permisos de administrador, para que pueda crear webhooks y gestionar roles.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">2</span>
+          <div>
+            <h3>Entra al panel</h3>
+            <p>Con tu cuenta de Discord. Verás solo los servidores donde puedes administrar.</p>
+          </div>
+        </li>
+        <li>
+          <span class="step-num">3</span>
+          <div>
+            <h3>Elige qué quieres que haga</h3>
+            <p>El panel te pregunta y te lleva a cada sitio. No hace falta configurarlo todo.</p>
+          </div>
+        </li>
+      </ol>
+
+      <div class="cta">
+        <h2>¿Lo probamos?</h2>
+        <p>Lo esencial es gratis y no pide tarjeta.</p>
+        <a class="button big" href="/panel">Abrir el panel</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="foot-brand">
+      <span class="logo-mark small" aria-hidden="true">V</span>
+      <div>
+        <strong>Vesper</strong>
+        <small>Hecho para Embers Void y Ankerie Dimension, abierto para cualquiera.</small>
+      </div>
+    </div>
+    <nav class="foot-links" aria-label="Enlaces">
+      <a href="/panel">Panel</a>
+      <a href="#funciones">Funciones</a>
+      <a href="#planes">Planes</a>
+      <a href="/health">Estado</a>
+    </nav>
+  </footer>
+
+  <script src="/panel/assets/landing.js" defer></script>
+</body>
+</html>

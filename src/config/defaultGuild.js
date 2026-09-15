@@ -1,7 +1,7 @@
 const { moduleDefaults, isMainGuild, isThemedMainGuild } = require('./guildPolicy');
 const { defaultEmbedsConfig } = require('../core/EmbedTemplateService');
 
-const CURRENT_SCHEMA_VERSION = 7;
+const CURRENT_SCHEMA_VERSION = 8;
 
 function defaultProfileConfig(guildId = null) {
   if (isThemedMainGuild(guildId)) {
@@ -53,6 +53,7 @@ function createDefaultGuildConfig(guildId = null) {
     ...(guildId ? { guildId: String(guildId) } : {}),
     schemaVersion: CURRENT_SCHEMA_VERSION,
     alerts: {},
+    plan: 'free',
     general: { welcomeChannel: null, goodbyeChannel: null, logChannel: null, botLogChannel: null, botRole: null, boostChannel: null },
     dashboard: { channel: null, message: null, enabled: false, currentPanel: 'main', currentMode: 'default' },
     tiktok: { liveChannel: null, videoChannel: null, users: [], showUsers: false, pingRole: null },

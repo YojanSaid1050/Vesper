@@ -29,7 +29,7 @@ const {
 } = require('@discordjs/voice');
 const { PermissionFlagsBits } = require('discord.js');
 const { getGuildConfig } = require('../database/mongoManager');
-const { isModuleEnabledConfig } = require('../config/guildPolicy');
+const { isModuleEnabledConfig, featureAvailable } = require('../config/guildPolicy');
 const sources = require('./music/sources');
 
 const DEFAULTS = Object.freeze({
@@ -150,7 +150,11 @@ class MusicService {
 
   async ensureAllowed(interaction) {
     const config = await getGuildConfig(interaction.guildId);
-    if (!isModuleEnabledConfig(config, 'music')) throw new Error('El módulo de música está desactivado para este servidor');
+    if (!isModuleEnabledConfig(config, 'music', interaction.guildId)) {
+      throw new Error(featureAvailable('music', interaction.guildId, config)
+        ? 'El módulo de música está desactivado para este servidor'
+        : 'La música forma parte del plan premium. Este servidor todavía no lo tiene.');
+    }
     const reason = this.unavailableExplanation();
     if (reason) throw new Error(reason);
 
