@@ -1063,6 +1063,32 @@ body[data-mode="light"] .md-block { background: rgba(6, 6, 7, .07); }
 }
 .shortcut:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
 .shortcut-icon { font-size: 1.1rem; color: var(--accent); }
+
+/* ------------------------------------------------------------------ */
+/* Funciones bloqueadas por plan                                       */
+/* ------------------------------------------------------------------ */
+
+.locked-body { display: grid; gap: .6rem; min-width: 0; }
+.locked-body p { color: var(--text-2); font-size: .88rem; }
+.locked-list { display: grid; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+.locked-list li {
+  position: relative; padding-left: 1.3rem;
+  color: var(--text-2); font-size: .85rem; line-height: 1.5;
+}
+.locked-list li::before { content: '✓'; position: absolute; left: 0; color: var(--ok); font-weight: 700; }
+
+/* Distintivo del plan, junto al servidor en la barra lateral. */
+.plan-badge {
+  display: inline-flex; align-items: center; gap: .25rem;
+  padding: .08rem .42rem; border-radius: 999px;
+  font-size: .62rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+}
+.plan-badge.main { background: var(--accent); color: var(--accent-ink); }
+.plan-badge.premium { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-line); }
+.plan-badge.free { background: var(--surface-3); color: var(--text-3); }
+
+.nav-item.locked { opacity: .55; }
+.nav-item .nav-lock { margin-left: auto; color: var(--text-3); font-size: .7rem; }
 .shortcut strong { font-size: .88rem; }
 .shortcut small { color: var(--text-2); font-size: .76rem; line-height: 1.45; }
 
@@ -1111,3 +1137,81 @@ body[data-mode="light"] .md-block { background: rgba(6, 6, 7, .07); }
   .search-trigger { max-width: none; }
   .pill { font-size: .72rem; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Claro / oscuro: preferencia del usuario, no del servidor            */
+/* ------------------------------------------------------------------ */
+
+.theme-switch {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: .2rem;
+  margin-bottom: .6rem; padding: .2rem;
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2);
+}
+.theme-switch button {
+  padding: .3rem 0; border: 0; border-radius: var(--r-sm);
+  background: none; color: var(--text-3); font-size: .9rem; cursor: pointer;
+  transition: background .12s ease, color .12s ease;
+}
+.theme-switch button:hover { color: var(--text); }
+.theme-switch button.active { background: var(--accent-soft); color: var(--accent); }
+.theme-switch button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* ------------------------------------------------------------------ */
+/* Paquetes de mensajes                                                */
+/* ------------------------------------------------------------------ */
+
+.theme-grid {
+  display: grid; gap: .55rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+}
+.theme-card {
+  display: grid; gap: .3rem; align-content: start; min-width: 0; text-align: left;
+  padding: .85rem; border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--surface-2); color: var(--text); cursor: pointer;
+  transition: border-color .12s ease, transform .12s ease;
+}
+.theme-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.theme-card:disabled { opacity: .55; cursor: progress; }
+.theme-card strong { font-size: .92rem; }
+.theme-card small { color: var(--text-2); font-size: .76rem; line-height: 1.45; }
+.theme-swatches { display: flex; gap: .2rem; margin-bottom: .2rem; }
+.theme-swatches span {
+  width: 1.5rem; height: 1.5rem; border-radius: .3rem;
+  background: var(--c); border: 1px solid var(--line);
+}
+.theme-sample {
+  margin-top: .35rem; padding: .45rem .55rem; border-radius: var(--r-sm);
+  background: var(--surface-3); font-size: .8rem; line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.theme-sample .md-h1 { font-size: .95rem; }
+.theme-count { color: var(--text-3); font-size: .7rem; letter-spacing: .04em; text-transform: uppercase; }
+
+/* ------------------------------------------------------------------ */
+/* Primeros pasos                                                      */
+/* ------------------------------------------------------------------ */
+
+.steps { display: grid; gap: .4rem; min-width: 0; }
+.step {
+  display: grid; gap: .7rem; align-items: center; min-width: 0; text-align: left;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: .7rem .8rem; border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  background: var(--surface-2); color: var(--text); cursor: pointer;
+  transition: border-color .12s ease, background .12s ease;
+}
+.step:hover { border-color: var(--accent); background: var(--accent-soft); }
+.step-icon {
+  display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 999px;
+  background: var(--surface-3); color: var(--accent); font-size: .9rem;
+}
+.step.done { opacity: .62; }
+.step.done .step-icon { background: var(--ok-soft); color: var(--ok); }
+.step-body { display: grid; gap: .1rem; min-width: 0; }
+.step-body strong { font-size: .88rem; }
+.step-body small { color: var(--text-2); font-size: .77rem; line-height: 1.45; }
+.step-go { color: var(--text-3); font-size: 1rem; }
+.step:hover .step-go { color: var(--accent); }
+
+.plan-state { display: grid; gap: .45rem; justify-items: start; margin-bottom: .6rem; }
+.switch.locked { opacity: .6; cursor: not-allowed; }
+.switch.locked input { cursor: not-allowed; }

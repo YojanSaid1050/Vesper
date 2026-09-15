@@ -1,5 +1,135 @@
 # Changelog
 
+## 3.2.0 — Planes, portada y acceso con Google explicado
+
+### Añadido · Planes: gratis, premium y principal
+Los monitores no son gratis de tener encendidos. Vigilar TikTok, Twitch y
+YouTube significa preguntar cada pocos minutos, por cada cuenta, todo el día;
+las ofertas consultan tres tiendas cada media hora; y la música arranca un
+ffmpeg y un yt-dlp por cada servidor que suena. Con unos cuantos servidores
+así, una máquina modesta se queda sin procesador y sin cuota.
+
+| | Gratis | Premium | Principal |
+| --- | --- | --- | --- |
+| Bienvenidas, despedidas y boosts | ✅ | ✅ | ✅ |
+| Los 27 registros con canal y mención | ✅ | ✅ | ✅ |
+| Los 38 mensajes y los paquetes | ✅ | ✅ | ✅ |
+| Moderación, tickets, sugerencias, autorroles | ✅ | ✅ | ✅ |
+| **TikTok, Twitch y YouTube** | ❌ | ✅ | ✅ |
+| **Música** | ❌ | ✅ | ✅ |
+| **Ofertas y juegos gratis** | ❌ | ✅ | ✅ |
+| Identidad propia del bot | ❌ | ❌ | ✅ |
+| Panel dentro de Discord | ❌ | ❌ | ✅ |
+
+- El premium se concede por `PREMIUM_GUILD_IDS` o desde el panel: solo el
+  propietario del bot ve el botón, porque es una decisión sobre la máquina.
+- **Un servidor que pierde el plan deja de consultar solo.** El corte está en
+  los monitores, no en la interfaz: aunque la configuración siga diciendo que
+  el módulo está activo, no se hace ni una petición.
+- Las funciones de plan **no se esconden**: salen en el menú con un candado y,
+  al entrar, una pantalla explica por qué y qué sí está incluido. Esconderlas
+  dejaría al administrador preguntándose por qué a él le falta algo.
+- Embers Void y Ankerie Dimension son «principal» por serlo: no necesitan plan.
+
+### Añadido · Portada
+- La raíz del sitio ya no redirige al panel. Ahora hay una portada de verdad:
+  héroe con un ejemplo de lo que la gente verá en su servidor, las funciones
+  divididas entre gratis y premium, la comparativa de planes, tres pasos para
+  empezar y pie.
+- Comparte el claro/oscuro con el panel, así que pasar de una a otro no cambia
+  de fondo a mitad de camino.
+- Es lo único indexable del sitio; el panel y la API siguen con `noindex`.
+
+### Corregido
+- **Guardar un registro fallaba.** `alerts` no estaba en la lista de secciones
+  que la base de datos acepta, así que tocar cualquier interruptor de la
+  pantalla de registros lanzaba «Sección de configuración no permitida» y no
+  se guardaba nada. Es un fallo que introduje yo en la 3.0.0.
+- El plan se guarda con su propia función: `updateGuildSection` prefija con el
+  nombre de la sección y `plan` es un campo suelto.
+
+### Documentado · El acceso con Google
+El error era `redirect_uri_mismatch`. Vesper construía bien la dirección, pero
+no decía cuál era. Hay que dar de alta **exactamente** esto en Google Cloud
+Console → Credenciales → URIs de redireccionamiento autorizados:
+
+```
+https://TU-DOMINIO/auth/google/callback
+```
+
+`npm run diagnostico acceso` imprime las dos direcciones (Discord y Google)
+listas para copiar, y los errores de OAuth ahora las nombran en el propio
+mensaje.
+
+
+## 3.1.0 — Paquetes de mensajes, tema propio y diagnóstico real
+
+### Añadido · Paquetes de mensajes
+- Dos paquetes que escriben **los 38 avisos de golpe**, en un mismo tono y con
+  una misma paleta:
+  - **Void** — morado profundo, negro y blanco, con los ornamentos de Embers
+    Void. La bienvenida es, carácter a carácter, el diseño original.
+  - **Limones** — amarillo cítrico y cielo pastel, con la voz de AnkeBot y sus
+    guiños («Reclama tu limón», «Devuelve los limones», 🍋 por todas partes).
+- Se aplican desde «Todos los mensajes» con un clic, y hay un tercero,
+  **«Sin paquete»**, que devuelve los 38 a su texto original.
+- Están disponibles en **cualquier servidor**, no solo en los dos Main: un
+  servidor nuevo puede partir de uno y retocarlo.
+- Aplicar un paquete solo escribe en `embeds`, así que se puede deshacer
+  eligiendo otro o volviendo a lo de fábrica, y luego afinar mensaje a mensaje.
+
+### Cambiado · El claro y el oscuro son tuyos, no del servidor
+- Antes el panel decidía el fondo a partir del color del servidor: Embers Void
+  salía oscuro y Ankerie Dimension blanco, y saltar entre uno y otro te cambiaba
+  la pantalla entera. Con más servidores eso sería insoportable.
+- Ahora eliges **claro, oscuro o el del sistema** en la esquina inferior
+  izquierda, se recuerda en tu navegador y se respeta en todos los servidores.
+  Si lo dejas en «el del sistema» y tu equipo cambia solo al anochecer, el panel
+  cambia con él.
+- El color del servidor **sigue tiñendo el panel**: es lo que hace reconocer de
+  un vistazo dónde estás. Lo que ya no decide es si el fondo es blanco o negro.
+
+### Añadido · Diagnóstico contra los servicios reales
+- `npm run diagnostico` prueba de verdad, desde el alojamiento, lo que el bot
+  necesita: feeds de YouTube, token y canales de Twitch, el navegador de TikTok,
+  las tres fuentes de ofertas, MongoDB y el motor de música —incluido abrir el
+  audio y comprobar que llegan Ogg/Opus válidos.
+- Se puede acotar a un grupo: `npm run diagnostico musica`, `… twitch`, `… acceso`.
+- Los canales y cuentas de prueba se cambian con `DIAGNOSTICO_YOUTUBE`,
+  `DIAGNOSTICO_TWITCH`, `DIAGNOSTICO_TIKTOK` y `DIAGNOSTICO_MUSICA`.
+
+### Corregido · El acceso con Google
+- El error de Google era `redirect_uri_mismatch`: la dirección de vuelta de
+  Vesper no estaba dada de alta en Google Cloud Console. El código la construía
+  bien, pero el mensaje no decía cuál era ni dónde pegarla.
+- Ahora los errores de OAuth se traducen y **dicen la dirección exacta**:
+  «añade esta URI de redireccionamiento autorizado: …/auth/google/callback».
+- `npm run diagnostico acceso` imprime las dos direcciones (Discord y Google)
+  listas para copiar.
+
+### Añadido · Primeros pasos
+- Un servidor recién añadido no necesita trece pantallas: la de inicio le
+  pregunta qué quiere que haga Vesper —saludar, registrar, avisar de directos,
+  darle voz propia, moderar— y lleva a cada sitio. Desaparece sola cuando ya
+  está montado.
+
+### Documentado · Qué es exclusivo de los dos Main
+Se deja escrito en el código, y se comprueba con pruebas:
+
+| Función | Embers Void y Ankerie Dimension | Cualquier otro servidor |
+| --- | --- | --- |
+| 38 mensajes editables, dos formatos de embed | ✅ | ✅ |
+| 27 registros con canal y mención propios | ✅ | ✅ |
+| Paquetes de mensajes | ✅ | ✅ |
+| TikTok, Twitch, YouTube, ofertas, moderación, comunidad, música | ✅ | ✅ |
+| **Identidad propia del bot** (apodo, avatar y colores por servidor) | ✅ | ❌ |
+| **Panel de control dentro de Discord** | ✅ | ❌ |
+| **Comandos de identidad** (`/branding`, `/setbotname`…) | ✅ | ❌ |
+
+La lista de exclusivas es corta a propósito: solo lo que cambia la cara del bot
+o ocupa un canal permanente.
+
+
 ## 3.0.0 — Música que funciona, registros configurables y panel nuevo
 
 ### La música ya funciona

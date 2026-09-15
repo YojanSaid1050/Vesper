@@ -1,10 +1,54 @@
 const { baseUrl } = require('./security');
 
+// Las direcciones de vuelta que Vesper usa. Tienen que estar dadas de alta,
+// carácter a carácter, en el panel de cada proveedor: si no coinciden, el
+// proveedor rechaza el acceso antes incluso de preguntar nada.
+// Google llama a esto «URI de redireccionamiento autorizado» y devuelve
+// «Error 400: redirect_uri_mismatch»; Discord lo llama «Redirect» y devuelve
+// «Invalid OAuth2 redirect_uri».
+function redirectUris() {
+  let base = null;
+  try {
+    base = baseUrl();
+  } catch {
+    return { base: null, discord: null, google: null };
+  }
+  return {
+    base,
+    discord: `${base}/auth/discord/callback`,
+    google: `${base}/auth/google/callback`
+  };
+}
+
+// Los errores de OAuth son crípticos. Se traducen los dos o tres que se dan
+// de verdad, diciendo exactamente qué hay que pegar y dónde.
+function explainOAuthError(provider, raw) {
+  const uris = redirectUris();
+  const text = String(raw || '');
+  const uri = provider === 'Google' ? uris.google : uris.discord;
+
+  if (/redirect_uri_mismatch|invalid.*redirect/i.test(text)) {
+    return provider === 'Google'
+      ? `Google rechaza la dirección de vuelta. Entra en Google Cloud Console → Credenciales → tu ID de cliente OAuth y añade exactamente esta «URI de redireccionamiento autorizado»: ${uri}`
+      : `Discord rechaza la dirección de vuelta. Entra en el portal de desarrolladores → OAuth2 → Redirects y añade exactamente: ${uri}`;
+  }
+  if (/invalid_client|unauthorized_client/i.test(text)) {
+    return `${provider} no reconoce las credenciales. Comprueba el ID y el secreto de cliente en el alojamiento.`;
+  }
+  if (/invalid_grant/i.test(text)) {
+    return `${provider} rechazó el código de acceso. Suele pasar al recargar una página de vuelta antigua: vuelve a empezar desde el panel.`;
+  }
+  if (/access_denied/i.test(text)) {
+    return `Cancelaste el acceso en ${provider}.`;
+  }
+  return `${provider}: ${text}`;
+}
+
 async function responseJson(response, provider) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = data.error_description || data.error?.message || data.error || `Error HTTP ${response.status}`;
-    throw Object.assign(new Error(`${provider}: ${message}`), { statusCode: 401 });
+    throw Object.assign(new Error(explainOAuthError(provider, `${data.error || ''} ${message}`)), { statusCode: 401 });
   }
   return data;
 }
@@ -98,6 +142,8 @@ async function exchangeGoogleCode(code) {
 }
 
 module.exports = {
+  redirectUris,
+  explainOAuthError,
   discordConfigured,
   googleConfigured,
   discordAuthorizationUrl,

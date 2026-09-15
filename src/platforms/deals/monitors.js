@@ -39,7 +39,7 @@ function dealsConfig(config) {
 function collectEligibleGuilds(guilds) {
   const eligible = [];
   for (const [guildId, config] of Object.entries(guilds)) {
-    if (!isModuleEnabledConfig(config, 'deals')) continue;
+    if (!isModuleEnabledConfig(config, 'deals', guildId)) continue;
     const settings = dealsConfig(config);
     if (!settings.channel) continue;
     eligible.push({ guildId, config, settings });

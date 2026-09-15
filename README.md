@@ -1,4 +1,4 @@
-# Vesper Bot 3.0.0
+# Vesper Bot 3.2.0
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión 2.8 conserva la presentación visual original con
@@ -321,6 +321,74 @@ de sintaxis en Node.js 24.
 Entre las pruebas hay una que compara el mensaje de bienvenida y el de despedida
 de Embers Void, sin configuración guardada, contra el diseño original carácter a
 carácter. Si alguien cambia la estructura del embed sin querer, falla.
+
+## Planes
+
+Los monitores no son gratis de tener encendidos: vigilar tres redes significa
+preguntar cada pocos minutos, por cada cuenta, todo el día. Esa es la línea.
+
+| | Gratis | Premium | Principal |
+| --- | --- | --- | --- |
+| Bienvenidas, despedidas y boosts | ✅ | ✅ | ✅ |
+| Los 27 registros con canal y mención propios | ✅ | ✅ | ✅ |
+| Los 38 mensajes editables y los paquetes | ✅ | ✅ | ✅ |
+| Moderación, tickets, sugerencias, autorroles | ✅ | ✅ | ✅ |
+| Panel web completo | ✅ | ✅ | ✅ |
+| **TikTok, Twitch y YouTube** | ❌ | ✅ | ✅ |
+| **Música** | ❌ | ✅ | ✅ |
+| **Ofertas y juegos gratis** | ❌ | ✅ | ✅ |
+| Identidad propia del bot | ❌ | ❌ | ✅ |
+| Panel dentro de Discord | ❌ | ❌ | ✅ |
+
+«Principal» son Embers Void y Ankerie Dimension, por serlo. El premium se
+concede con `PREMIUM_GUILD_IDS` o desde el panel, donde solo lo ve el
+propietario del bot.
+
+Un servidor que pierde el plan **deja de consultar solo**: el corte está en los
+monitores, no en la interfaz. Aunque su configuración siga diciendo que el
+módulo está activo, no se hace ni una petición.
+
+## Qué tiene cada servidor
+
+Vesper no está pensado solo para Embers Void y Ankerie Dimension: cualquiera
+puede añadirlo. Lo único que se reserva a los dos servidores de casa es lo que
+cambia la cara del bot o le ocupa un canal permanente.
+
+Lo que se reserva a los dos servidores de casa es solo lo que cambia la cara
+del bot —apodo, avatar y colores propios— o le ocupa un canal permanente: el
+panel dentro de Discord y los comandos de identidad (`/branding`,
+`/setbotname`…). Ver la tabla de planes de arriba.
+
+## Paquetes de mensajes
+
+Personalizar 38 avisos a mano es una tarde entera, y dejar la mitad a medias
+queda peor que no haber tocado nada. Por eso hay paquetes que los escriben
+todos de golpe:
+
+| Paquete | Tono | Paleta |
+| --- | --- | --- |
+| **Void** | Solemne, con ornamentos. La voz de Vesper en Embers Void | Morado profundo, negro y blanco |
+| **Limones** | Cercano y con guiños. La voz de AnkeBot | Amarillo cítrico y cielo pastel |
+| **Sin paquete** | Los textos originales del bot | Los colores de Discord |
+
+Se aplican desde «Todos los mensajes» con un clic y se pueden deshacer. Después
+puedes retocar los mensajes que quieras uno a uno: el paquete solo es el punto
+de partida.
+
+## Comprobar que todo funciona de verdad
+
+```bash
+npm run diagnostico
+```
+
+Prueba, contra los servicios reales y desde el propio alojamiento: los feeds de
+YouTube, el token y los canales de Twitch, el navegador de TikTok, las tres
+fuentes de ofertas, MongoDB y el motor de música —incluido abrir el audio y
+comprobar que llega Ogg/Opus válido. También imprime las **direcciones de vuelta
+que hay que dar de alta** en Discord y en Google, que es lo que causa el
+`redirect_uri_mismatch` al entrar con Google.
+
+Se puede acotar: `npm run diagnostico musica`, `npm run diagnostico acceso`.
 
 ## Todos los mensajes son editables
 

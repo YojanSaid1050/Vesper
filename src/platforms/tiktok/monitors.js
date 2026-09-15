@@ -33,7 +33,7 @@ function collectEligibleGuilds(guilds, kind) {
   const channelKey = kind === 'live' ? 'liveChannel' : 'videoChannel';
   const eligible = [];
   for (const [guildId, config] of Object.entries(guilds)) {
-    if (!isModuleEnabledConfig(config, 'tiktok')) continue;
+    if (!isModuleEnabledConfig(config, 'tiktok', guildId)) continue;
     const tiktok = config.tiktok || {};
     const users = uniqueUsernames(tiktok.users || []);
     if (users.length === 0 || !tiktok[channelKey]) continue;

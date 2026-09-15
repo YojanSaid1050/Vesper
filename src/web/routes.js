@@ -4,9 +4,9 @@ const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const ModerationCase = require('../database/models/ModerationCase');
 const Suggestion = require('../database/models/Suggestion');
 const WebAuditLog = require('../database/models/WebAuditLog');
-const { getGuildConfig, updateGuildSection, updateCommunitySection, addGuildListItem, removeGuildListItem } = require('../database/mongoManager');
+const { getGuildConfig, updateGuildSection, setGuildPlan, updateCommunitySection, addGuildListItem, removeGuildListItem } = require('../database/mongoManager');
 const { setupChecks } = require('../core/SetupService');
-const { isModuleEnabledConfig, guildTier, isAnyMainGuild } = require('../config/guildPolicy');
+const { isModuleEnabledConfig, guildTier, isAnyMainGuild, guildPlan, lockedFeatures, PREMIUM_FEATURES, MAIN_ONLY_FEATURES } = require('../config/guildPolicy');
 const {
   createCase,
   getCase,
@@ -31,6 +31,7 @@ const {
   requireCsrf
 } = require('./WebSessionService');
 const {
+  redirectUris,
   discordConfigured,
   googleConfigured,
   discordAuthorizationUrl,
@@ -47,6 +48,8 @@ const { verifyChannel } = require('../platforms/youtube/utils');
 const { publishSelfRolePanel, publishTicketPanel, reviewSuggestion } = require('../core/CommunityService');
 const { catalogForPanel } = require('../core/EmbedCatalog');
 const { alertOverview } = require('../core/AlertRouter');
+const { themesForPanel, applyTheme, clearTheme } = require('../core/MessageThemes');
+const { KINDS } = require('../core/EmbedCatalog');
 
 const publicDir = path.join(__dirname, 'public');
 const authLimiter = createRateLimiter({ windowMs: 5 * 60 * 1000, max: 20 });
@@ -118,6 +121,7 @@ function serializedConfig(config) {
     profile: config.profile || {},
     embeds: config.embeds && typeof config.embeds === 'object' ? config.embeds : {},
     alerts: config.alerts && typeof config.alerts === 'object' ? config.alerts : {},
+    plan: config.plan === 'premium' ? 'premium' : 'free',
     features: config.features || {},
     permissions: config.permissions || {},
     moderation: config.moderation || {},
@@ -333,7 +337,12 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     discordEnabled: dashboardEnabled() && sessionConfigured() && discordConfigured(),
     googleEnabled: dashboardEnabled() && sessionConfigured() && googleConfigured(),
     webAdminMode: webAdminMode(),
-    version: '3.0.0'
+    // Las direcciones que hay que dar de alta en Discord y en Google. Se
+    // publican aquí para que la pantalla de acceso pueda enseñarlas cuando el
+    // proveedor las rechace: es literalmente lo único que hace falta saber
+    // para arreglar un «redirect_uri_mismatch».
+    redirectUris: redirectUris(),
+    version: '3.2.0'
   }));
 
   app.get('/auth/discord', authLimiter, requireDashboard, async (req, res, next) => {
@@ -459,7 +468,14 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         messageCatalog: access.configure
           ? catalogForPanel(welcomeLayoutsFor(req.params.guildId))
           : null,
+        plan: {
+          id: guildPlan(req.params.guildId, config),
+          locked: lockedFeatures(req.params.guildId, config),
+          premiumFeatures: [...PREMIUM_FEATURES],
+          mainOnlyFeatures: [...MAIN_ONLY_FEATURES]
+        },
         alerts: access.configure ? alertOverview(config) : null,
+        messageThemes: access.configure ? themesForPanel() : null,
         identity: effectiveIdentity(config, client, access.guild),
         config: access.configure ? serializedConfig(config) : null,
         channels,
@@ -471,6 +487,51 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         suggestions: suggestions.map(publicSuggestion),
         bot: { username: client.user.username, avatar: client.user.displayAvatarURL({ extension: 'png', size: 128 }) }
       });
+    } catch (error) { return next(error); }
+  });
+
+  // Conceder o quitar el plan premium. Solo el propietario global: es una
+  // decisión sobre recursos de la máquina, no sobre un servidor.
+  api.post('/guilds/:guildId/plan', requireSession, requireCsrf, async (req, res, next) => {
+    try {
+      if (!isGlobalOwner(req.webSession)) {
+        return res.status(403).json({ error: 'Solo el propietario del bot puede cambiar el plan de un servidor.' });
+      }
+      const plan = String(req.body?.plan ?? '');
+      if (!['free', 'premium'].includes(plan)) return res.status(400).json({ error: 'El plan debe ser «free» o «premium».' });
+
+      if (isAnyMainGuild(req.params.guildId)) {
+        return res.status(409).json({ error: 'Los servidores principales ya lo tienen todo: su plan no se cambia desde aquí.' });
+      }
+
+      await setGuildPlan(req.params.guildId, plan);
+      await recordAudit(req, req.params.guildId, 'plan.update', null, { plan });
+      const config = await getGuildConfig(req.params.guildId);
+      return res.json({ ok: true, plan: guildPlan(req.params.guildId, config), config: serializedConfig(config) });
+    } catch (error) { return next(error); }
+  });
+
+  // Aplicar (o quitar) un paquete de mensajes completo. Se hace aquí y no en
+  // el navegador para no mandar los 38 mensajes por la red en cada clic.
+  api.post('/guilds/:guildId/message-theme', requireSession, requireCsrf, async (req, res, next) => {
+    try {
+      const context = await accessFor(req, res, getClient);
+      if (!context) return;
+      if (!context.access.configure) return res.status(403).json({ error: 'Necesitas Administrar servidor para cambiar los mensajes.' });
+
+      const themeId = String(req.body?.theme ?? '');
+      const embeds = themeId === 'ninguno' ? clearTheme(KINDS) : applyTheme(themeId);
+      if (!embeds) return res.status(400).json({ error: 'Ese paquete de mensajes no existe.' });
+
+      const flattened = {};
+      for (const [kind, fields] of Object.entries(embeds)) {
+        for (const [field, value] of Object.entries(fields)) flattened[`${kind}.${field}`] = value;
+      }
+      await updateGuildSection(req.params.guildId, 'embeds', flattened);
+      await recordAudit(req, req.params.guildId, 'config.messageTheme', null, { theme: themeId });
+
+      const config = await getGuildConfig(req.params.guildId);
+      return res.json({ ok: true, theme: themeId, config: serializedConfig(config) });
     } catch (error) { return next(error); }
   });
 

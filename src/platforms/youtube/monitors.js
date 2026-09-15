@@ -171,7 +171,7 @@ async function monitorLives(client) {
 }
 
 async function processGuildLives(guildId, config, client, liveStatus) {
-  if (!isModuleEnabledConfig(config, 'youtube')) return null;
+  if (!isModuleEnabledConfig(config, 'youtube', guildId)) return null;
   const youtubeConfig = config.youtube || {};
   const users = youtubeConfig.users || [];
   const liveChannelId = youtubeConfig.liveChannel;
@@ -353,7 +353,7 @@ async function monitorVideos(client) {
 }
 
 async function processGuildVideos(guildId, config, client, videos) {
-  if (!isModuleEnabledConfig(config, 'youtube')) return null;
+  if (!isModuleEnabledConfig(config, 'youtube', guildId)) return null;
   const youtubeConfig = config.youtube || {};
   const users = youtubeConfig.users || [];
   const videoChannelId = youtubeConfig.videoChannel;
@@ -530,7 +530,7 @@ async function monitorShorts(client) {
 }
 
 async function processGuildShorts(guildId, config, client, shorts) {
-  if (!isModuleEnabledConfig(config, 'youtube')) return null;
+  if (!isModuleEnabledConfig(config, 'youtube', guildId)) return null;
   const youtubeConfig = config.youtube || {};
   const users = youtubeConfig.users || [];
   const shortChannelId = youtubeConfig.shortChannel;

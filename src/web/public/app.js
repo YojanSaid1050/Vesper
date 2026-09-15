@@ -28,7 +28,8 @@ const state = {
   loading: false,
   dirty: new Set(),
   searchResults: [],
-  searchIndex: 0
+  searchIndex: 0,
+  theme: 'auto'
 };
 
 const $ = selector => document.querySelector(selector);
@@ -169,26 +170,82 @@ function luminance({ r, g, b }) {
   return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
 }
 
+// El tema es una preferencia TUYA, no del servidor. Antes el panel se ponía
+// claro u oscuro según el color del servidor que estuvieras configurando: al
+// saltar entre uno y otro la pantalla cambiaba de blanco a negro, y con más
+// servidores eso sería insoportable. Ahora eliges claro, oscuro o «el del
+// sistema», y se queda así en todos.
+const THEME_KEY = 'vesper.tema';
+const THEMES = ['auto', 'claro', 'oscuro'];
+
+function storedTheme() {
+  try {
+    const value = localStorage.getItem(THEME_KEY);
+    return THEMES.includes(value) ? value : 'auto';
+  } catch {
+    // Navegación privada o almacenamiento bloqueado: se usa el del sistema.
+    return 'auto';
+  }
+}
+
+function saveTheme(theme) {
+  state.theme = THEMES.includes(theme) ? theme : 'auto';
+  try {
+    localStorage.setItem(THEME_KEY, state.theme);
+  } catch {
+    // Que no se pueda recordar no impide aplicarlo ahora.
+  }
+  applyTheme();
+}
+
+function systemPrefersLight() {
+  return window.matchMedia?.('(prefers-color-scheme: light)')?.matches ?? false;
+}
+
+function effectiveMode() {
+  if (state.theme === 'claro') return 'light';
+  if (state.theme === 'oscuro') return 'dark';
+  return systemPrefersLight() ? 'light' : 'dark';
+}
+
 function applyTheme() {
   const root = document.documentElement;
-  const guild = state.data?.guild;
   const profile = state.data?.config?.profile || {};
-  const fallback = guild?.tier === 'themed_main' ? '#8DDCF4' : '#9D63FF';
-  const accentHex = profile.primaryColor || fallback;
-  const rgb = parseHex(accentHex) || parseHex(fallback);
+
+  // El color del servidor sigue tiñendo el panel: es lo que hace que se
+  // reconozca de un vistazo dónde estás. Lo que ya no decide es si el fondo
+  // es blanco o negro.
+  const accentHex = profile.primaryColor || '#9D63FF';
+  const rgb = parseHex(accentHex) || parseHex('#9D63FF');
 
   root.style.setProperty('--accent', accentHex);
   root.style.setProperty('--accent-soft', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, .16)`);
   root.style.setProperty('--accent-line', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, .34)`);
   root.style.setProperty('--accent-ink', luminance(rgb) > 0.55 ? '#14101c' : '#ffffff');
 
-  // Un servidor con paleta clara merece un panel claro. Se deduce del propio
-  // color elegido, así que cambiar el color cambia también el lienzo.
-  const light = luminance(rgb) > 0.62;
-  document.body.dataset.mode = light ? 'light' : 'dark';
+  const mode = effectiveMode();
+  document.body.dataset.mode = mode;
+  document.body.dataset.theme = state.theme;
 
   const themeMeta = document.querySelector('meta[name="theme-color"]');
-  if (themeMeta) themeMeta.setAttribute('content', light ? '#f7f5fb' : '#0e0b14');
+  if (themeMeta) themeMeta.setAttribute('content', mode === 'light' ? '#f6f6f8' : '#0d0d11');
+
+  document.querySelectorAll('[data-theme-option]').forEach(button => {
+    const active = button.dataset.themeOption === state.theme;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function bindTheme() {
+  document.addEventListener('click', event => {
+    const button = event.target.closest('[data-theme-option]');
+    if (button) saveTheme(button.dataset.themeOption);
+  });
+  // Si está en «auto» y el sistema cambia de claro a oscuro, el panel sigue.
+  window.matchMedia?.('(prefers-color-scheme: light)')?.addEventListener?.('change', () => {
+    if (state.theme === 'auto') applyTheme();
+  });
 }
 
 /* ---------------------------------------------------------------- */
@@ -445,6 +502,7 @@ const SECTIONS = [
     title: 'Cómo se ve Vesper',
     hint: 'Nombre, avatar y color con los que publica en este servidor.',
     needs: 'configure',
+    feature: 'profile',
     keywords: ['identidad', 'nombre', 'avatar', 'color', 'marca', 'branding', 'apodo', 'tema']
   },
 
@@ -467,6 +525,7 @@ const SECTIONS = [
     title: 'TikTok, Twitch y YouTube',
     hint: 'Cuentas vigiladas, canales de destino y rol al que avisar.',
     needs: 'social',
+    feature: 'youtube',
     keywords: ['twitch', 'youtube', 'tiktok', 'directo', 'stream', 'video', 'short', 'notificación']
   },
   {
@@ -474,6 +533,7 @@ const SECTIONS = [
     title: 'Ofertas y juegos gratis',
     hint: 'Avisa cuando Epic regale un juego, Steam rebaje algo o aparezca un sorteo.',
     needs: 'configure',
+    feature: 'deals',
     keywords: ['epic', 'steam', 'gratis', 'oferta', 'rebaja', 'sorteo', 'giveaway', 'juego']
   },
 
@@ -503,6 +563,7 @@ const SECTIONS = [
     title: 'Reproductor de música',
     hint: 'Canales permitidos, límites de la cola y estado del motor de audio.',
     needs: 'configure',
+    feature: 'music',
     keywords: ['música', 'canción', 'voz', 'cola', 'volumen', 'dj', 'reproducir']
   },
 
@@ -534,6 +595,55 @@ function sectionAllowed(section) {
   return Boolean(state.data?.permissions?.[section.needs]);
 }
 
+// Las funciones de plan NO se esconden: se enseñan bloqueadas y explicadas.
+// Esconderlas dejaría al administrador preguntándose por qué a él le falta una
+// pantalla que otro sí tiene.
+function sectionLocked(section) {
+  const feature = section.feature;
+  if (!feature) return null;
+  const plan = state.data?.plan;
+  if (!plan || !plan.locked?.includes(feature)) return null;
+  return plan.mainOnlyFeatures?.includes(feature) ? 'main' : 'premium';
+}
+
+const FEATURE_LABELS = {
+  tiktok: 'los avisos de TikTok',
+  twitch: 'los avisos de Twitch',
+  youtube: 'los avisos de redes',
+  deals: 'las ofertas y juegos gratis',
+  music: 'la música',
+  profile: 'la identidad propia del bot',
+  discordPanel: 'el panel dentro de Discord',
+  brandingCommands: 'los comandos de identidad'
+};
+
+function lockedScreen(section, kind) {
+  const nombre = FEATURE_LABELS[section.feature] || 'esta función';
+  return kind === 'main'
+    ? card({
+      eyebrow: 'Solo en los servidores principales',
+      title: `Aquí no está ${nombre}`,
+      description: 'Esto cambia el nombre y el avatar con los que el bot publica, o le ocupa un canal permanente. Se reserva a Embers Void y Ankerie Dimension.',
+      body: `<p class="hint">En este servidor Vesper publica con el nombre y el avatar de su cuenta de Discord. Todo lo demás —mensajes, registros, moderación y comunidad— funciona igual que en cualquier otro sitio.</p>`
+    })
+    : card({
+      eyebrow: 'Plan premium',
+      title: `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} necesita plan`,
+      description: 'No es un muro para sacar dinero: vigilar redes, reproducir música y consultar tiendas obligan a estar preguntando a todas horas, y eso consume procesador y cuota de verdad.',
+      body: `
+        <div class="locked-body">
+          <p>Con el plan gratis sigues teniendo, sin límite:</p>
+          <ul class="locked-list">
+            <li>Bienvenidas, despedidas y agradecimiento por boosts</li>
+            <li>Los 27 registros, cada uno con su canal y su mención</li>
+            <li>Los 38 mensajes editables y los paquetes completos</li>
+            <li>Moderación automática, tickets, sugerencias y autorroles</li>
+          </ul>
+          <p class="hint">Para pedir el plan, habla con el propietario del bot: puede concedértelo desde su panel en un clic.</p>
+        </div>`
+    });
+}
+
 function currentSection() {
   return SECTIONS.find(section => section.id === state.section) || SECTIONS[0];
 }
@@ -541,6 +651,85 @@ function currentSection() {
 /* ---------------------------------------------------------------- */
 /* Inicio                                                            */
 /* ---------------------------------------------------------------- */
+
+// Un servidor recién añadido no necesita trece pantallas: necesita que
+// alguien le pregunte qué quiere y lo deje funcionando. Esto aparece solo
+// mientras falte lo básico, y desaparece cuando ya está montado.
+const PRIMEROS_PASOS = [
+  {
+    id: 'saludar',
+    titulo: 'Saludar a quien entra',
+    detalle: 'Un mensaje de bienvenida en el canal que elijas.',
+    icono: '✉',
+    section: 'bienvenidas',
+    listo: config => Boolean(config.general?.welcomeChannel),
+    modulo: 'welcome'
+  },
+  {
+    id: 'anotar',
+    titulo: 'Llevar un registro',
+    detalle: 'Quién entra, quién sale, qué se borra y quién modera.',
+    icono: '☰',
+    section: 'registros',
+    listo: config => Boolean(config.general?.logChannel),
+    modulo: 'logs'
+  },
+  {
+    id: 'avisar',
+    titulo: 'Avisar de directos y vídeos',
+    detalle: 'TikTok, Twitch y YouTube, en el canal que quieras.',
+    icono: '◎',
+    section: 'avisos',
+    listo: config => ['tiktok', 'twitch', 'youtube'].some(red => (config[red]?.users?.length || 0) > 0)
+  },
+  {
+    id: 'voz',
+    titulo: 'Darle una voz propia',
+    detalle: 'Elige un paquete de mensajes o escribe los tuyos.',
+    icono: '✎',
+    section: 'mensajes',
+    listo: config => Object.keys(config.embeds || {}).length > 0
+  },
+  {
+    id: 'moderar',
+    titulo: 'Moderar solo',
+    detalle: 'Filtros de enlaces, palabras y menciones.',
+    icono: '⚖',
+    section: 'moderacion',
+    listo: config => Boolean(config.features?.moderation)
+  }
+];
+
+function primerosPasos() {
+  const config = state.data.config || {};
+  return PRIMEROS_PASOS.map(paso => ({ ...paso, hecho: paso.listo(config) }))
+    .filter(paso => SECTIONS.some(section => section.id === paso.section && sectionAllowed(section)));
+}
+
+function guiaInicioCard() {
+  const pasos = primerosPasos();
+  const hechos = pasos.filter(paso => paso.hecho).length;
+  // Cuando ya está casi todo montado, esto estorba más que ayuda.
+  if (!pasos.length || hechos >= pasos.length - 1) return '';
+
+  return card({
+    eyebrow: 'Empieza por aquí',
+    title: `Pon Vesper en marcha · ${hechos} de ${pasos.length}`,
+    description: 'Elige lo que quieras que haga. No hace falta configurarlo todo, ni hacerlo en orden.',
+    body: `
+      <div class="steps">
+        ${pasos.map(paso => `
+          <button type="button" class="step${paso.hecho ? ' done' : ''}" data-goto="${escapeHtml(paso.section)}">
+            <span class="step-icon" aria-hidden="true">${paso.hecho ? '✓' : paso.icono}</span>
+            <span class="step-body">
+              <strong>${escapeHtml(paso.titulo)}</strong>
+              <small>${escapeHtml(paso.hecho ? 'Ya está listo. Puedes entrar a afinarlo.' : paso.detalle)}</small>
+            </span>
+            <span class="step-go" aria-hidden="true">→</span>
+          </button>`).join('')}
+      </div>`
+  });
+}
 
 // El inicio ya no es una vitrina de cifras: es una lista de cosas que hacer.
 // Cada problema dice qué pasa, qué consecuencia tiene y lleva de un clic a la
@@ -689,6 +878,8 @@ function renderInicio() {
       : { kind: 'ok', text: 'Todo en orden', detail: 'No hay nada que requiera tu atención.' };
 
   return `
+    ${guiaInicioCard()}
+
     <div class="headline ${titular.kind}">
       <div class="headline-main">
         <span class="headline-dot" aria-hidden="true"></span>
@@ -780,11 +971,11 @@ function renderIdentidad() {
           <span class="hint">Se usa como apodo del bot y como autor de sus mensajes.</span>
         </div>
         <div class="field">
-          <label for="profile-theme">Tema del panel</label>
+          <label for="profile-theme">Estilo del servidor</label>
           <select id="profile-theme">
             ${themeOptions.map(([value, label]) => `<option value="${value}"${profile.theme === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}
           </select>
-          <span class="hint">Identifica el estilo del servidor.</span>
+          <span class="hint">Solo es una etiqueta para reconocer el servidor. El claro y el oscuro del panel se eligen abajo a la izquierda, y son tuyos.</span>
         </div>
       </div>
       <div class="form-row">
@@ -1607,6 +1798,89 @@ function refreshMessagePreview(item) {
   wireImageFallbacks(container);
 }
 
+/* ---------------------------------------------------------------- */
+/* Paquetes de mensajes                                              */
+/* ---------------------------------------------------------------- */
+
+// Personalizar 38 mensajes a mano es una tarde entera. Un paquete los escribe
+// todos de golpe en una misma voz, y luego se retoca lo que haga falta.
+function themeCardMarkup(theme) {
+  const sample = theme.sample?.welcome || {};
+  return `
+    <button type="button" class="theme-card" data-apply-theme="${escapeHtml(theme.id)}">
+      <span class="theme-swatches" aria-hidden="true">
+        ${(theme.swatches || []).map(color => `<span data-swatch="${escapeHtml(color)}"></span>`).join('')}
+      </span>
+      <strong>${escapeHtml(theme.name)}</strong>
+      <small>${escapeHtml(theme.tagline)}</small>
+      <span class="theme-sample">${renderMarkdown(sampleValues(sample.title || ''))}</span>
+      <span class="theme-count">${theme.count} mensajes</span>
+    </button>`;
+}
+
+function themePickerCard() {
+  const themes = state.data.messageThemes || [];
+  if (!themes.length) return '';
+
+  return card({
+    eyebrow: 'De una vez',
+    title: 'Paquetes de mensajes',
+    description: 'Escriben los 38 avisos de golpe, en un mismo tono y con una misma paleta. Luego puedes retocar los que quieras uno a uno.',
+    body: `
+      <div class="theme-grid">
+        ${themes.map(themeCardMarkup).join('')}
+        <button type="button" class="theme-card plain" data-apply-theme="ninguno">
+          <span class="theme-swatches" aria-hidden="true">${['#5865F2', '#57F287', '#ED4245', '#FAA61A'].map(color => `<span data-swatch="${color}"></span>`).join('')}</span>
+          <strong>Sin paquete</strong>
+          <small>Los textos originales de Vesper, sin ninguna personalización.</small>
+          <span class="theme-sample">📥 Miembro entró</span>
+          <span class="theme-count">vuelve a lo de fábrica</span>
+        </button>
+      </div>
+      <p class="hint">Aplicar un paquete sobrescribe lo que hayas escrito en los 38 mensajes. Se puede deshacer eligiendo otro, o volviendo a «Sin paquete».</p>`
+  });
+}
+
+function bindThemePicker(root) {
+  // El panel prohíbe los atributos `style` en línea por su propia política de
+  // seguridad, así que las muestras de color se pintan desde JavaScript.
+  root.querySelectorAll('[data-swatch]').forEach(swatch => {
+    swatch.style.setProperty('--c', swatch.dataset.swatch);
+  });
+
+  root.querySelectorAll('[data-apply-theme]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const id = button.dataset.applyTheme;
+      const theme = (state.data.messageThemes || []).find(item => item.id === id);
+      const nombre = theme?.name || 'los textos originales';
+
+      if (!await confirmDialog({
+        title: id === 'ninguno' ? 'Quitar la personalización' : `Aplicar el paquete «${nombre}»`,
+        message: id === 'ninguno'
+          ? 'Los 38 mensajes volverán a su texto original y se perderá lo que hayas escrito.'
+          : `Se reescribirán los 38 mensajes con el tono de «${nombre}». Se perderá lo que hayas escrito en ellos.`,
+        confirmLabel: id === 'ninguno' ? 'Quitar' : 'Aplicar',
+        danger: true
+      })) return;
+
+      button.disabled = true;
+      try {
+        const result = await api(`/guilds/${state.guildId}/message-theme`, {
+          method: 'POST',
+          body: JSON.stringify({ theme: id })
+        });
+        state.data.config = result.config;
+        toast(id === 'ninguno' ? 'Mensajes devueltos a su texto original.' : `Paquete «${nombre}» aplicado.`, 'ok');
+        await selectGuild(state.guildId, { keepSection: true, silent: true });
+      } catch (error) {
+        toast(error.message, 'bad');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  });
+}
+
 function renderMensajes() {
   const catalog = state.data.messageCatalog || [];
   if (!catalog.length) {
@@ -1630,6 +1904,7 @@ function renderMensajes() {
       <strong>${customised} de ${total} mensajes personalizados.</strong>
       <span>Los que no toques salen exactamente como siempre. Vaciar un campo lo devuelve a su valor original, y cada mensaje puede publicarse como embed clásico o como contenedor V2.</span>
     </div>
+    ${themePickerCard()}
     ${formatGuideCard()}
     ${groups}`;
 }
@@ -1638,6 +1913,7 @@ function bindMensajes(root) {
   const items = (state.data.messageCatalog || []).flatMap(group => group.items);
   wireFormatting(root);
   wireLayoutChoice(root);
+  bindThemePicker(root);
 
   for (const item of items) {
     const form = root.querySelector(`#form-msg-${item.id}`);
@@ -2214,13 +2490,51 @@ function renderModulos() {
   const data = state.data;
   const config = data.config;
 
-  const switches = Object.entries(config.features || {}).map(([key, value]) => `
-    <label class="switch">
-      <input type="checkbox" name="${escapeHtml(key)}" ${value ? 'checked' : ''}>
-      <span class="switch-copy"><strong>${escapeHtml(moduleLabel(key))}</strong><small>${escapeHtml(moduleHint(key))}</small></span>
-    </label>`).join('');
+  const plan = data.plan || { id: 'free', locked: [], premiumFeatures: [] };
+  const switches = Object.entries(config.features || {}).map(([key, value]) => {
+    // Un módulo de pago en un servidor sin plan se enseña apagado y sin poder
+    // tocarlo, con el motivo al lado. Esconderlo confundiría más.
+    const bloqueado = plan.locked.includes(key);
+    return `
+    <label class="switch${bloqueado ? ' locked' : ''}">
+      <input type="checkbox" name="${escapeHtml(key)}" ${value && !bloqueado ? 'checked' : ''} ${bloqueado ? 'disabled' : ''}>
+      <span class="switch-copy">
+        <strong>${escapeHtml(moduleLabel(key))}${bloqueado ? ' <span class="plan-badge premium">Premium</span>' : ''}</strong>
+        <small>${escapeHtml(bloqueado ? 'Necesita plan premium: consume recursos a todas horas.' : moduleHint(key))}</small>
+      </span>
+    </label>`;
+  }).join('');
+
+  const PLAN_COPY = {
+    main: { badge: 'Principal', title: 'Servidor principal', detail: 'Lo tiene todo, incluida la identidad propia del bot y el panel dentro de Discord.' },
+    premium: { badge: 'Premium', title: 'Plan premium', detail: 'Además de lo gratis: avisos de TikTok, Twitch y YouTube, música y ofertas.' },
+    free: { badge: 'Gratis', title: 'Plan gratis', detail: 'Mensajes, registros, bienvenidas, moderación y comunidad, sin límite ni caducidad.' }
+  };
+  const copy = PLAN_COPY[plan.id] || PLAN_COPY.free;
+
+  const planCard = card({
+    eyebrow: 'Plan',
+    title: copy.title,
+    description: copy.detail,
+    body: `
+      <div class="plan-state">
+        <span class="plan-badge ${escapeHtml(plan.id)}">${escapeHtml(copy.badge)}</span>
+        ${plan.locked.length
+    ? `<p class="hint">Sin plan quedan fuera: ${escapeHtml(plan.locked.map(key => moduleLabel(key)).join(', '))}. Todo lo demás funciona igual.</p>`
+    : '<p class="hint">No hay nada bloqueado en este servidor.</p>'}
+      </div>
+      ${state.session.user.globalOwner && plan.id !== 'main' ? `
+        <div class="button-row">
+          <button class="button${plan.id === 'premium' ? ' ghost' : ''}" type="button" data-set-plan="${plan.id === 'premium' ? 'free' : 'premium'}">
+            ${plan.id === 'premium' ? 'Quitar el plan premium' : 'Conceder plan premium'}
+          </button>
+        </div>
+        <p class="hint">Solo tú ves este botón: el plan decide cuánto trabaja el bot por este servidor.</p>` : ''}`
+  });
 
   return `
+    ${planCard}
+
     ${card({
       eyebrow: 'Módulos',
       title: 'Qué hace Vesper en este servidor',
@@ -2902,10 +3216,36 @@ function bindMusica(root) {
 function bindModulos(root) {
   root.querySelector('#form-features')?.addEventListener('submit', event => {
     event.preventDefault();
+    // Los módulos bloqueados salen deshabilitados; no se mandan para no
+    // sobrescribir con `false` algo que el servidor sí tenía guardado.
     const features = Object.fromEntries(
-      [...event.currentTarget.querySelectorAll('input[type="checkbox"]')].map(input => [input.name, input.checked])
+      [...event.currentTarget.querySelectorAll('input[type="checkbox"]:not(:disabled)')].map(input => [input.name, input.checked])
     );
     saveConfig({ features }, 'Módulos actualizados.', event.submitter);
+  });
+
+  root.querySelector('[data-set-plan]')?.addEventListener('click', async event => {
+    const nuevo = event.currentTarget.dataset.setPlan;
+    const conceder = nuevo === 'premium';
+    if (!await confirmDialog({
+      title: conceder ? 'Conceder el plan premium' : 'Quitar el plan premium',
+      message: conceder
+        ? 'Este servidor podrá vigilar TikTok, Twitch y YouTube, poner música y avisar de ofertas. Todo eso consulta a todas horas y consume recursos de la máquina.'
+        : 'Se detendrán los monitores, la música y las ofertas de este servidor. La configuración se conserva por si vuelves a concederlo.',
+      confirmLabel: conceder ? 'Conceder' : 'Quitar',
+      danger: !conceder
+    })) return;
+
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await api(`/guilds/${state.guildId}/plan`, { method: 'POST', body: JSON.stringify({ plan: nuevo }) });
+      toast(conceder ? 'Plan premium concedido.' : 'Plan premium retirado.', 'ok');
+      await selectGuild(state.guildId, { keepSection: true, silent: true });
+    } catch (error) {
+      toast(error.message, 'bad');
+      button.disabled = false;
+    }
   });
 
   root.querySelector('#form-permissions')?.addEventListener('submit', event => {
@@ -3394,11 +3734,15 @@ function renderNav() {
     const tally = section.id === 'moderacion' && state.data?.cases
       ? `<span class="nav-tally">${state.data.cases.filter(item => item.status === 'active').length}</span>`
       : '';
+    // Las funciones de plan se listan igual, con un candado: esconderlas
+    // dejaría al administrador sin saber siquiera que existen.
+    const locked = sectionLocked(section);
+    const lock = locked ? '<span class="nav-lock" aria-label="Necesita plan">🔒</span>' : '';
     return `${heading}
-      <button class="nav-item" type="button" data-section="${section.id}"${state.section === section.id ? ' aria-current="page"' : ''}>
+      <button class="nav-item${locked ? ' locked' : ''}" type="button" data-section="${section.id}"${state.section === section.id ? ' aria-current="page"' : ''}>
         <span class="nav-icon" aria-hidden="true">${section.icon}</span>
         <span>${escapeHtml(section.label)}</span>
-        ${tally}
+        ${tally}${lock}
       </button>`;
   }).join('');
 
@@ -3450,11 +3794,19 @@ function renderAccount() {
   actions.push('<button class="button ghost sm" type="button" id="logout">Cerrar sesión</button>');
 
   $('#account-card').innerHTML = `
+    <div class="theme-switch" role="group" aria-label="Tema del panel">
+      ${[['auto', '◐', 'El del sistema'], ['claro', '☀', 'Claro'], ['oscuro', '☾', 'Oscuro']].map(([value, icon, label]) => `
+        <button type="button" data-theme-option="${value}" title="${escapeHtml(label)}" aria-pressed="false">
+          <span aria-hidden="true">${icon}</span><span class="sr-only">${escapeHtml(label)}</span>
+        </button>`).join('')}
+    </div>
     <div class="account-row">
       ${avatarMarkup(preferred?.avatar || preferred?.picture, name)}
       <div class="account-copy"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(detail)}</small></div>
     </div>
     <div class="account-actions">${actions.join('')}</div>`;
+
+  applyTheme();
 
   $('#logout')?.addEventListener('click', async () => {
     try {
@@ -3522,6 +3874,14 @@ function renderView() {
       description: 'Esta pantalla requiere Administrar servidor o ser propietario del bot. Puedes seguir viendo el resumen y tus propios casos.',
       body: ''
     });
+    return;
+  }
+
+  const locked = sectionLocked(section);
+  if (locked) {
+    view.innerHTML = lockedScreen(section, locked);
+    bindCommon(view);
+    updateSaveBar();
     return;
   }
 
@@ -3629,6 +3989,12 @@ function showLogin() {
 }
 
 async function boot() {
+  // El tema se aplica antes de nada, para que no haya un fogonazo blanco
+  // mientras carga si el usuario lo tiene en oscuro.
+  state.theme = storedTheme();
+  applyTheme();
+  bindTheme();
+
   try {
     const response = await fetch('/api/web/public', { headers: { Accept: 'application/json' } });
     if (!response.ok) throw new Error(`El servidor respondió ${response.status}.`);
