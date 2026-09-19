@@ -3,7 +3,7 @@ const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a
 const { createLog } = require('../../utils/logCache');
 const {memberVars } = require('../../core/EmbedCatalog');
 const { publishAlert } = require('../../core/AlertRouter');
-const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
+const { quienLoHizo } = require('../../utils/auditLog');
 
 module.exports = {
   name: Events.ChannelCreate,
@@ -20,16 +20,14 @@ module.exports = {
       [ChannelType.GuildForum]: '🧵 Foro'
     }[channel.type] || 'Desconocido';
 
-    let creator = 'Desconocido';
-    try {
-      creator = auditExecutor(await findRecentAuditEntry(channel.guild, AuditLogEvent.ChannelCreate, channel.id));
-    } catch {}
+    const creator = await quienLoHizo(channel.guild, AuditLogEvent.ChannelCreate, channel.id);
 
     await publishAlert(channel.guild, guildConfig, 'log_channel_created', {
       vars: {
         channel: `${channel}`, channelName: channel.name, type: tipo, executor: creator,
         server: channel.guild.name, memberCount: channel.guild.memberCount
-      }
-    });
+      },
+      defaults: { authorIconUrl: channel.guild.iconURL() }
+});
   }
 };

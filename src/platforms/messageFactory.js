@@ -7,7 +7,7 @@ const tiktok = require('./tiktok/embeds');
 
 // Los avisos de redes los escribe el catálogo, igual que los registros: así
 // salen como los enseña el panel y se pueden cambiar desde la web. Aquí solo
-// se aportan los datos del directo o del vídeo y la carátula.
+// se aportan los datos del directo o del video y la carátula.
 function neutralPayload({ platform, title, description, url, thumbnail, pingText, color, footer, kind, config, vars = {} }) {
   const defaults = { image: thumbnail && /^https?:\/\//i.test(thumbnail) ? thumbnail : null };
   if (color) defaults.color = color;
@@ -71,7 +71,7 @@ async function youtubeVideo(guildId, user, video, pingText = '', config = null) 
   return secondaryPayload(guildId, {
     kind: 'notify_youtube_video',
     config,
-    vars: { creator: user.channelName, title: video.title || 'Vídeo nuevo', url: video.url || '', views: video.views ?? 0 },
+    vars: { creator: user.channelName, title: video.title || 'Video nuevo', url: video.url || '', views: video.views ?? 0 },
     platform: 'YouTube',
     url: video.url,
     thumbnail: video.thumbnail,
@@ -118,7 +118,7 @@ async function tiktokVideo(guildId, data, config = null) {
   return secondaryPayload(guildId, {
     kind: 'notify_tiktok_video',
     config,
-    vars: { creator: data.nickname || `@${data.username}`, title: data.description || 'Vídeo nuevo', url: data.url || '', views: data.playCount ?? 0 },
+    vars: { creator: data.nickname || `@${data.username}`, title: data.description || 'Video nuevo', url: data.url || '', views: data.playCount ?? 0 },
     platform: 'TikTok',
     title: `Nuevo video de ${data.nickname || `@${data.username}`}`,
     description: `${data.description || 'Se publicó un nuevo video.'}\nReproducciones: ${data.playCount || 0}\nComentarios: ${data.commentCount || 0}`,

@@ -19,10 +19,12 @@ module.exports = {
         server: thread.guild.name,
         memberCount: thread.guild.memberCount,
         thread: `${thread}`,
+        threadName: thread.name,
         channel: thread.parent ? `${thread.parent}` : '',
         channelName: thread.parent?.name || '',
         owner
-      }
-    });
+      },
+      defaults: { authorIconUrl: thread.guild.iconURL() }
+});
   }
 };

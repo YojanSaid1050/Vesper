@@ -22,6 +22,8 @@ function normalizeLayout(value, fallback = 'classic') {
 }
 
 const EMBED_FIELD_LIMITS = Object.freeze({
+  // La fila de autor de Discord corta a los 256 caracteres.
+  author: 256,
   title: 240,
   message: 3000,
   footer: 200,
@@ -29,7 +31,7 @@ const EMBED_FIELD_LIMITS = Object.freeze({
 });
 
 function defaultEmbedTemplate() {
-  return { title: null, message: null, color: null, image: null, footer: null, thumbnail: true };
+  return { author: null, title: null, message: null, color: null, image: null, footer: null, thumbnail: true };
 }
 
 // Nace vacío a propósito: un tipo de mensaje sin entrada usa su diseño

@@ -73,7 +73,7 @@ module.exports = {
     // único que no se podía editar ni apagar desde el panel.
     await publishAlert(member.guild, guildConfig, member.user.bot ? 'log_bot_leave' : 'log_member_leave', {
       vars: memberVars(member),
-      defaults: { thumbnailUrl: member.user.displayAvatarURL() }
+      defaults: { authorIconUrl: member.user.displayAvatarURL() }
     });
   },
   sendGoodbye,

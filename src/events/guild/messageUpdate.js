@@ -28,7 +28,8 @@ module.exports = {
       vars: memberVars(newMessage.member || { user: newMessage.author, guild: newMessage.guild }, {
         userTag: authorTag, channel: `${oldMessage.channel}`,
         channelName: oldMessage.channel?.name || '', before, after
-      })
+      }),
+      defaults: { authorIconUrl: newMessage.author?.displayAvatarURL?.() || null }
     });
   }
 };

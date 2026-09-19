@@ -132,7 +132,7 @@ test('las variables y los validadores de la plantilla se comportan como se esper
   assert.equal(imageUrl(''), null);
 
   assert.deepEqual(defaultEmbedTemplate(), {
-    title: null, message: null, color: null, image: null, footer: null, thumbnail: true
+    author: null, title: null, message: null, color: null, image: null, footer: null, thumbnail: true
   });
 
   const resuelto = resolveEmbedTemplate({}, 'welcome', member, { title: 'original', color: 0xABCDEF });

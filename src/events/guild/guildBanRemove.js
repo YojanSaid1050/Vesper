@@ -3,7 +3,7 @@ const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a
 const {memberVars } = require('../../core/EmbedCatalog');
 const { publishAlert } = require('../../core/AlertRouter');
 const { createLog } = require('../../utils/logCache');
-const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
+const { quienLoHizo } = require('../../utils/auditLog');
 
 module.exports = {
   name: Events.GuildBanRemove,
@@ -12,14 +12,11 @@ module.exports = {
 
     const guildConfig = await getGuildConfig(ban.guild.id); // Añadir await
 
-    let executor = 'Desconocido';
-    try {
-      executor = auditExecutor(await findRecentAuditEntry(ban.guild, AuditLogEvent.MemberBanRemove, ban.user.id));
-    } catch {}
+    const executor = await quienLoHizo(ban.guild, AuditLogEvent.MemberBanRemove, ban.user.id);
 
     await publishAlert(ban.guild, guildConfig, 'log_ban_removed', {
       vars: memberVars({ user: ban.user, guild: ban.guild }, { executor }),
-      defaults: { thumbnailUrl: ban.user.displayAvatarURL() }
+      defaults: { authorIconUrl: ban.user.displayAvatarURL() }
     });
   }
 };

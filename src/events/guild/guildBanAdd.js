@@ -3,7 +3,7 @@ const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a
 const {memberVars } = require('../../core/EmbedCatalog');
 const { publishAlert } = require('../../core/AlertRouter');
 const { createLog } = require('../../utils/logCache');
-const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
+const { quienLoHizo } = require('../../utils/auditLog');
 
 module.exports = {
   name: Events.GuildBanAdd,
@@ -12,10 +12,7 @@ module.exports = {
 
     const guildConfig = await getGuildConfig(ban.guild.id); // Añadir await
 
-    let executor = 'Desconocido';
-    try {
-      executor = auditExecutor(await findRecentAuditEntry(ban.guild, AuditLogEvent.MemberBanAdd, ban.user.id));
-    } catch {}
+    const executor = await quienLoHizo(ban.guild, AuditLogEvent.MemberBanAdd, ban.user.id);
 
     // El motivo lo guarda Discord en el propio baneo; el de la auditoría puede
     // no haber llegado todavía.
@@ -23,7 +20,7 @@ module.exports = {
 
     await publishAlert(ban.guild, guildConfig, 'log_ban_added', {
       vars: memberVars({ user: ban.user, guild: ban.guild }, { executor, reason }),
-      defaults: { thumbnailUrl: ban.user.displayAvatarURL() }
+      defaults: { authorIconUrl: ban.user.displayAvatarURL() }
     });
   }
 };

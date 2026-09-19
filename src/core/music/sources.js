@@ -93,8 +93,8 @@ function run(binary, args, { timeoutMs = YTDLP_TIMEOUT_MS } = {}) {
 // yt-dlp escribe errores muy técnicos. Se traducen los habituales.
 function friendlyError(stderr) {
   const text = String(stderr || '');
-  if (/Private video|Video unavailable|This video is not available/i.test(text)) return 'Ese vídeo es privado o no está disponible.';
-  if (/Sign in to confirm|age.?restricted|confirm your age/i.test(text)) return 'Ese vídeo pide iniciar sesión o tiene restricción de edad.';
+  if (/Private video|Video unavailable|This video is not available/i.test(text)) return 'Ese video es privado o no está disponible.';
+  if (/Sign in to confirm|age.?restricted|confirm your age/i.test(text)) return 'Ese video pide iniciar sesión o tiene restricción de edad.';
   if (/Unable to connect to proxy|Tunnel connection failed|Network is unreachable|Temporary failure in name resolution/i.test(text)) {
     return 'El alojamiento no pudo conectarse a internet para buscar la canción.';
   }

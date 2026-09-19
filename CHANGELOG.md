@@ -1,5 +1,80 @@
 # Changelog
 
+## 3.5.0 — Español de Colombia, y se acabó el «Desconocido»
+
+### «Borrado por: Desconocido»
+
+Salía casi siempre, y eran dos fallos distintos a la vez:
+
+- **Discord manda el evento antes de que se pueda consultar la auditoría.** Se
+  preguntaba una sola vez, justo cuando todavía no estaba. Ahora se reintenta
+  a los 0,8 y a los 2 segundos.
+- **Al borrar un rol o un canal, Discord ya no puede resolver el objeto**, así
+  que `entry.target` llegaba vacío y la comparación fallaba siempre. Se compara
+  con `entry.targetId`, que sí viene.
+- Y si Vesper **no tiene permiso para ver la auditoría**, ahora lo dice en el
+  propio aviso («Vesper no puede ver la auditoría») en vez de dejar un
+  «Desconocido» que no explicaba qué arreglar.
+- Un mensaje que no aparece en la auditoría lo borró su propio autor —Discord
+  no registra eso—, así que el aviso lo dice en lugar de callarse.
+- Ocho pruebas nuevas reproducen cada uno de esos casos.
+
+### Español de Colombia
+
+- Fuera las formas de «vosotros»: «Ahora sois» pasa a «Ya son», «Quedáis» a
+  «Quedan».
+- Vocabulario: «vídeo» → «video», «ordenador» → «computador», «móvil» →
+  «celular», «pulsa» → «oprime», «pasa el ratón» → «déjale el cursor».
+- **Una prueba nueva revisa todo lo que lee una persona** —los 38 mensajes, los
+  tres paquetes, el panel, la portada, los comandos y el reproductor— y falla
+  si se cuela una conjugación o una palabra de España.
+- De paso, un texto que se quedó viejo: las variables ya no se copian al
+  portapapeles, se escriben donde está el cursor.
+
+## 3.4.2 — Qué pasó, dónde, y a quién
+
+Los registros toman la forma que mejor se lee de un canal de logs lleno:
+
+```
+(foto) Rol borrado · Ankerie Dimension
+Free Stuff
+Borrado por: Yojan
+ID: 1292950343436730391 · hoy a las 22:21
+```
+
+- **Arriba, qué pasó y en qué servidor.** Los 22 registros llevan esa línea.
+  Repasando un canal ya no hay que deducir de qué va cada bloque.
+- **La foto, al lado**: la del miembro cuando el aviso va de una persona, y el
+  icono del servidor cuando va de un canal, un rol o un hilo.
+- **El título es el sujeto**: a quién o a qué le pasó. El nombre del miembro,
+  el del rol, el del canal, el del hilo.
+- **La línea de arriba se edita** desde el panel como cualquier otra pieza, y
+  los paquetes Void y Limones la escriben con su propia voz («⟡ Un alma se
+  desvaneció · Embers Void»).
+- Apagar «Mostrar la imagen de perfil» quita la foto pero deja la línea: saber
+  qué pasó y dónde interesa igual.
+- Faltaban `{roleId}` en el borrado de roles y `{threadName}` en los hilos, así
+  que el nombre del hilo no se podía usar. Ya están, y la prueba que ejecuta
+  cada aviso con datos falsos los cubre.
+
+## 3.4.1 — Los registros, con cara
+
+- **Foto y nombre arriba del todo.** Cada registro de personas —entradas,
+  salidas, apodos, roles, aislamientos y baneos— abre con la foto de perfil de
+  quien lo provocó y su nombre, como la fila de autor de Discord. Se reconoce
+  a la persona antes de leer una sola línea.
+- **El ID baja al pie.** Es un dato para copiar cuando hace falta, no algo que
+  se lea cada vez. El cuerpo se queda con lo que de verdad cuenta qué pasó.
+- **Recuadros a ras.** En una misma fila, un campo sin nota debajo estiraba su
+  caja hasta el alto del más alto, y un `select` medía tres píxeles más que un
+  `input`. Las dos cosas arregladas, y tres etiquetas demasiado largas que
+  saltaban a dos líneas y descolocaban su caja, acortadas. Comprobado midiendo
+  cada recuadro de las 13 pantallas: ninguno desalineado.
+- **La entrada va siempre en oscuro**, tenga el tema que tenga el panel: la
+  ilustración de fondo no funciona con el fondo claro.
+- El campo del pie enseña como sugerencia el que trae el mensaje, así que se ve
+  qué hay sin tener que vaciarlo para averiguarlo.
+
 ## 3.4.0 — El catálogo escribe, los eventos solo aportan datos
 
 Cada aviso tenía su texto escrito dos veces: una en el evento que lo publica y

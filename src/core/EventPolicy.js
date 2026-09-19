@@ -80,7 +80,7 @@ async function mainMemberAdd(member, config) {
         await sendBrandedMessage(channel, buildMessage('log_bot_join', {
           config,
           vars: memberVars(member, { role: roleLabel }),
-          defaults: { thumbnailUrl: member.user.displayAvatarURL() }
+          defaults: { authorIconUrl: member.user.displayAvatarURL() }
     }));
       }
     }
@@ -98,7 +98,7 @@ async function mainMemberAdd(member, config) {
       await sendBrandedMessage(channel, buildMessage(member.user.bot ? 'log_bot_join' : 'log_member_join', {
         config,
         vars: memberVars(member),
-        defaults: { thumbnailUrl: member.user.displayAvatarURL() }
+        defaults: { authorIconUrl: member.user.displayAvatarURL() }
     }));
     }
   }
@@ -119,7 +119,7 @@ async function mainMemberRemove(member, config) {
       await sendBrandedMessage(channel, buildMessage(member.user.bot ? 'log_bot_leave' : 'log_member_leave', {
         config,
         vars: memberVars(member),
-        defaults: { thumbnailUrl: member.user.displayAvatarURL() }
+        defaults: { authorIconUrl: member.user.displayAvatarURL() }
     }));
     }
   }

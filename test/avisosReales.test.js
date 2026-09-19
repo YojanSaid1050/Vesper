@@ -72,7 +72,7 @@ const APORTA = {
   log_channel_deleted: { server: 'Ankerie Dimension', memberCount: 128, channel: 'general', channelName: 'general', type: 'Texto', executor: 'Yojan' },
   log_role_created: { server: 'Ankerie Dimension', memberCount: 128, role: '<@&222>', roleName: 'Miembro', roleId: '222', executor: 'Yojan' },
   log_role_deleted: { server: 'Ankerie Dimension', memberCount: 128, role: 'Miembro', roleName: 'Miembro', roleId: '222', executor: 'Yojan' },
-  log_thread_created: { server: 'Ankerie Dimension', memberCount: 128, channel: '<#333>', channelName: 'general', thread: '<#444>', owner: 'Yojan' },
+  log_thread_created: { server: 'Ankerie Dimension', memberCount: 128, channel: '<#333>', channelName: 'general', thread: '<#444>', threadName: 'dudas', owner: 'Yojan' },
   log_voice_join: { ...MIEMBRO, channel: '<#555>', channelName: 'voz-1' },
   log_voice_leave: { ...MIEMBRO, channel: '<#555>', channelName: 'voz-1' },
   log_voice_move: { ...MIEMBRO, from: '<#555>', to: '<#556>' },
@@ -196,5 +196,50 @@ test('aplicar un paquete no toca las imágenes guardadas', () => {
   const embeds = applyTheme('limones');
   for (const [kind, campos] of Object.entries(embeds)) {
     assert.ok(!('image' in campos), `${kind}: el paquete estaría borrando la imagen`);
+  }
+});
+
+// Un registro se lee de un vistazo si se reconoce a la persona antes de leer.
+// La foto y el nombre van arriba, y el ID —que es un dato de consulta, no algo
+// que se lea cada vez— baja al pie.
+test('los registros de personas llevan foto arriba y el ID en el pie', () => {
+  const DE_PERSONAS = [
+    'log_member_join', 'log_member_leave', 'log_bot_join', 'log_bot_leave',
+    'log_nickname', 'log_roles_added', 'log_roles_removed',
+    'log_timeout_on', 'log_timeout_off', 'log_ban_added', 'log_ban_removed'
+  ];
+  for (const kind of DE_PERSONAS) {
+    const embed = buildMessage(kind, {
+      config: {},
+      vars: APORTA[kind],
+      defaults: { authorIconUrl: 'https://cdn.discord/x.png' }
+    }).embeds[0];
+
+    assert.ok(embed.author?.name, `${kind}: falta la línea de arriba`);
+    assert.equal(embed.author?.icon_url, 'https://cdn.discord/x.png', `${kind}: falta la foto`);
+    assert.match(embed.footer?.text || '', /^ID: \d+$/, `${kind}: el ID no está en el pie`);
+    assert.ok(!/\bID:/.test(embed.description || ''), `${kind}: el ID sigue en el cuerpo`);
+    assert.match(embed.author.name, / · Ankerie Dimension$/, `${kind}: la línea de arriba no dice dónde pasó`);
+  }
+});
+
+// Apagar «Mostrar la imagen de perfil» quita la foto, pero no la línea: saber
+// qué pasó y dónde interesa igual.
+test('quitar la foto de perfil deja la línea de arriba', () => {
+  const embed = buildMessage('log_member_leave', {
+    config: { embeds: { log_member_leave: { thumbnail: false } } },
+    vars: APORTA.log_member_leave,
+    defaults: { authorIconUrl: 'https://cdn.discord/x.png' }
+  }).embeds[0];
+  assert.equal(embed.author.icon_url, undefined, 'la foto debería irse');
+  assert.match(embed.author.name, /Miembro salió/, 'la línea debería quedarse');
+});
+
+// La línea de arriba es lo primero que se lee, así que todos los registros la
+// llevan y todos dicen en qué servidor pasó.
+test('todos los registros dicen qué pasó y dónde', () => {
+  for (const kind of KINDS.filter(k => k.startsWith('log_'))) {
+    const linea = factoryDefaults(kind).author || '';
+    assert.match(linea, /\{server\}$/, `${kind}: la línea de arriba no acaba en el servidor`);
   }
 });

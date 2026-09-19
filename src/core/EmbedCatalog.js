@@ -200,7 +200,7 @@ const CATALOG = Object.freeze({
   log_thread_created: {
     group: 'Registro del servidor', label: 'Hilo creado',
     description: 'Cuando alguien abre un hilo.',
-    variables: [...SERVER_VARS, ...CHANNEL_VARS, ['{thread}', 'hilo creado'], ['{owner}', 'quién lo abrió']], supports: NO_THUMB
+    variables: [...SERVER_VARS, ...CHANNEL_VARS, ['{thread}', 'menciona el hilo'], ['{threadName}', 'nombre del hilo'], ['{owner}', 'quién lo abrió']], supports: NO_THUMB
   },
   log_voice_move: {
     group: 'Registro del servidor', label: 'Cambió de canal de voz',
@@ -289,65 +289,93 @@ const FACTORY = Object.freeze({
     color: '#F47FFF'
   },
 
-  // -------------------------------------------------------- Miembros
-  // En la entrada se menciona porque la persona está dentro y el enlace al
-  // perfil funciona. En la salida ya no está, así que se usa su nombre: una
-  // mención a quien se ha ido sale como un usuario desconocido.
+  // -------------------------------------------------------- Registros
+  //
+  // Forma de un registro, copiada de lo que mejor se lee en Discord:
+  //
+  //   (foto) Miembro salió · Ankerie Dimension   ← qué pasó y dónde
+  //   FreeStuff#9821                              ← a quién o a qué
+  //   Apodo que tenía: FreeStuff                  ← los detalles
+  //   ID: 672822334641537041 · hoy a las 22:21    ← para copiar
+  //
+  // La foto es la del miembro cuando el aviso va de una persona, y el icono
+  // del servidor cuando va de un canal, un rol o un hilo.
   log_member_join: {
-    title: 'Miembro entró',
-    message: 'Usuario: {user}\nNombre: {username}\nID: {userId}\nMiembros: {memberCount}',
+    author: 'Miembro entró · {server}',
+    title: '{userTag}',
+    message: 'Usuario: {user}\nYa son: {memberCount}',
+    footer: 'ID: {userId}',
     color: '#57F287'
   },
   log_member_leave: {
-    title: 'Miembro salió',
-    message: 'Usuario: {username}\nApodo: {displayName}\nID: {userId}\nMiembros: {memberCount}',
+    author: 'Miembro salió · {server}',
+    title: '{userTag}',
+    message: 'Apodo que tenía: {displayName}\nQuedan: {memberCount}',
+    footer: 'ID: {userId}',
     color: '#ED4245'
   },
   log_bot_join: {
-    title: 'Bot añadido',
-    message: 'Bot: {username}\nID: {userId}\nRol asignado: {roleName}',
+    author: 'Bot añadido · {server}',
+    title: '{userTag}',
+    message: 'Rol asignado: {roleName}',
+    footer: 'ID: {userId}',
     color: '#5865F2'
   },
   log_bot_leave: {
-    title: 'Bot retirado',
-    message: 'Bot: {username}\nID: {userId}',
+    author: 'Bot retirado · {server}',
+    title: '{userTag}',
+    footer: 'ID: {userId}',
     color: '#ED4245'
   },
   log_nickname: {
-    title: 'Apodo cambiado',
-    message: 'Usuario: {user}\nAntes: {before}\nAhora: {after}',
+    author: 'Apodo cambiado · {server}',
+    title: '{userTag}',
+    message: 'Antes: {before}\nAhora: {after}',
+    footer: 'ID: {userId}',
     color: '#00B0F4'
   },
   log_roles_added: {
-    title: 'Roles añadidos',
-    message: 'Usuario: {user}\nRoles: {roles}',
+    author: 'Roles añadidos · {server}',
+    title: '{userTag}',
+    message: 'Roles: {roles}',
+    footer: 'ID: {userId}',
     color: '#57F287'
   },
   log_roles_removed: {
-    title: 'Roles retirados',
-    message: 'Usuario: {user}\nRoles: {roles}',
+    author: 'Roles retirados · {server}',
+    title: '{userTag}',
+    message: 'Roles: {roles}',
+    footer: 'ID: {userId}',
     color: '#ED4245'
   },
 
   // ------------------------------------------------------ Moderación
   log_timeout_on: {
-    title: 'Miembro aislado',
-    message: 'Usuario: {user}\nAislado por: {executor}\nHasta: {until}\nMotivo: {reason}',
+    author: 'Miembro aislado · {server}',
+    title: '{userTag}',
+    message: 'Aislado por: {executor}\nHasta: {until}\nMotivo: {reason}',
+    footer: 'ID: {userId}',
     color: '#ED4245'
   },
   log_timeout_off: {
-    title: 'Aislamiento retirado',
-    message: 'Usuario: {user}\nRetirado por: {executor}',
+    author: 'Aislamiento retirado · {server}',
+    title: '{userTag}',
+    message: 'Retirado por: {executor}',
+    footer: 'ID: {userId}',
     color: '#57F287'
   },
   log_ban_added: {
-    title: 'Miembro baneado',
-    message: 'Usuario: {username}\nID: {userId}\nBaneado por: {executor}\nMotivo: {reason}',
+    author: 'Miembro baneado · {server}',
+    title: '{userTag}',
+    message: 'Baneado por: {executor}\nMotivo: {reason}',
+    footer: 'ID: {userId}',
     color: '#ED4245'
   },
   log_ban_removed: {
-    title: 'Baneo retirado',
-    message: 'Usuario: {username}\nID: {userId}\nRetirado por: {executor}',
+    author: 'Baneo retirado · {server}',
+    title: '{userTag}',
+    message: 'Retirado por: {executor}',
+    footer: 'ID: {userId}',
     color: '#57F287'
   },
   automod_notice: { message: '{user}, tu mensaje fue retirado: {reason}. Caso **#{case}**.' },
@@ -355,58 +383,76 @@ const FACTORY = Object.freeze({
 
   // -------------------------------------------------------- Servidor
   log_message_deleted: {
-    title: 'Mensaje borrado',
-    message: 'Autor: {userTag}\nCanal: {channel}\nBorrado por: {executor}\n\n{content}',
+    author: 'Mensaje borrado · {server}',
+    title: '{userTag}',
+    message: 'Canal: {channel}\nBorrado por: {executor}\n\n{content}',
+    footer: 'ID: {userId}',
     color: '#ED4245'
   },
   log_message_edited: {
-    title: 'Mensaje editado',
-    message: 'Autor: {userTag}\nCanal: {channel}\n\nAntes: {before}\nAhora: {after}',
+    author: 'Mensaje editado · {server}',
+    title: '{userTag}',
+    message: 'Canal: {channel}\n\nAntes: {before}\nAhora: {after}',
+    footer: 'ID: {userId}',
     color: '#FAA61A'
   },
   log_messages_purged: {
-    title: 'Mensajes purgados',
-    message: 'Canal: {channel}\nMensajes borrados: {count}',
+    author: 'Mensajes purgados · {server}',
+    title: '#{channelName}',
+    message: 'Mensajes borrados: {count}',
     color: '#FAA61A'
   },
   log_channel_created: {
-    title: 'Canal creado',
-    message: 'Canal: {channel}\nTipo: {type}\nCreado por: {executor}',
+    author: 'Canal creado · {server}',
+    title: '#{channelName}',
+    message: 'Tipo: {type}\nCreado por: {executor}',
     color: '#57F287'
   },
   log_channel_deleted: {
-    title: 'Canal borrado',
-    message: 'Canal: {channelName}\nTipo: {type}\nBorrado por: {executor}',
+    author: 'Canal borrado · {server}',
+    title: '#{channelName}',
+    message: 'Tipo: {type}\nBorrado por: {executor}',
     color: '#ED4245'
   },
   log_role_created: {
-    title: 'Rol creado',
-    message: 'Rol: {role}\nID: {roleId}\nCreado por: {executor}',
+    author: 'Rol creado · {server}',
+    title: '{roleName}',
+    message: 'Creado por: {executor}',
+    footer: 'ID: {roleId}',
     color: '#57F287'
   },
   log_role_deleted: {
-    title: 'Rol borrado',
-    message: 'Rol: {roleName}\nBorrado por: {executor}',
+    author: 'Rol borrado · {server}',
+    title: '{roleName}',
+    message: 'Borrado por: {executor}',
+    footer: 'ID: {roleId}',
     color: '#FF4D4D'
   },
   log_thread_created: {
-    title: 'Hilo creado',
-    message: 'Hilo: {thread}\nEn: {channel}\nCreado por: {owner}',
+    author: 'Hilo creado · {server}',
+    title: '{threadName}',
+    message: 'En: {channel}\nCreado por: {owner}',
     color: '#57F287'
   },
   log_voice_join: {
-    title: 'Entró a un canal de voz',
-    message: 'Usuario: {user}\nCanal: {channel}',
+    author: 'Entró a un canal de voz · {server}',
+    title: '{userTag}',
+    message: 'Canal: {channel}',
+    footer: 'ID: {userId}',
     color: '#57F287'
   },
   log_voice_leave: {
-    title: 'Salió de un canal de voz',
-    message: 'Usuario: {user}\nCanal: {channel}',
+    author: 'Salió de un canal de voz · {server}',
+    title: '{userTag}',
+    message: 'Canal: {channel}',
+    footer: 'ID: {userId}',
     color: '#ED4245'
   },
   log_voice_move: {
-    title: 'Cambió de canal de voz',
-    message: 'Usuario: {user}\nDe: {from}\nA: {to}',
+    author: 'Cambió de canal de voz · {server}',
+    title: '{userTag}',
+    message: 'De: {from}\nA: {to}',
+    footer: 'ID: {userId}',
     color: '#5865F2'
   },
 
@@ -423,7 +469,7 @@ const FACTORY = Object.freeze({
     color: '#FF0000'
   },
   notify_youtube_video: {
-    title: 'Vídeo nuevo de {creator}',
+    title: 'Video nuevo de {creator}',
     message: '**{title}**\nVisualizaciones: {views}\n\n{url}',
     color: '#FF0000'
   },
@@ -438,7 +484,7 @@ const FACTORY = Object.freeze({
     color: '#1E90FF'
   },
   notify_tiktok_video: {
-    title: 'Vídeo nuevo de {creator}',
+    title: 'Video nuevo de {creator}',
     message: '**{title}**\nReproducciones: {views}\n\n{url}',
     color: '#1E90FF'
   },
@@ -503,9 +549,11 @@ function storedTemplate(config, kind) {
 }
 
 // ¿Tiene este mensaje alguna personalización guardada?
+const CAMPOS_EDITABLES = Object.freeze(['author', 'title', 'message', 'footer', 'image', 'color', 'layout']);
+
 function isCustomised(config, kind) {
   const stored = storedTemplate(config, kind);
-  return ['title', 'message', 'footer', 'image', 'color', 'layout'].some(field => stored[field]);
+  return CAMPOS_EDITABLES.some(field => stored[field]);
 }
 
 /**
@@ -543,6 +591,11 @@ function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = 
   // administrador, así que un aviso de Twitch salía con «{creator}» literal.
   const plantillaTitulo = defaults.title ?? fabrica.title ?? null;
   const plantillaPie = defaults.footer ?? fabrica.footer ?? null;
+  // La fila de autor de un registro: «Rol borrado · Ankerie Dimension». Dice
+  // de un vistazo qué pasó y en qué servidor, que es lo que se busca cuando se
+  // repasa un canal de registro lleno.
+  const plantillaAutor = resolve(stored.author, flat) ?? defaults.authorName ?? fabrica.author ?? null;
+  const authorLine = plantillaAutor ? substitute(plantillaAutor, flat) : null;
   const title = resolve(stored.title, flat) ?? (plantillaTitulo ? substitute(plantillaTitulo, flat) : null);
   const message = resolve(stored.message);
   const footer = resolve(stored.footer, flat) ?? (plantillaPie ? substitute(plantillaPie, flat) : null);
@@ -573,12 +626,21 @@ function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = 
       fields: usableFields,
       footer,
       image,
-      color
+      color,
+      author: authorLine
     });
   }
 
   const embed = { color, timestamp: new Date().toISOString() };
   if (title) embed.title = title;
+
+  // Quién provocó el aviso, con su foto de perfil pequeña arriba del todo.
+  // Es lo que hace que un registro se lea de un vistazo: se reconoce a la
+  // persona antes de leer una sola línea.
+  if (authorLine) {
+    embed.author = { name: authorLine };
+    if (showThumbnail && defaults.authorIconUrl) embed.author.icon_url = defaults.authorIconUrl;
+  }
 
   // El administrador escribió su propio cuerpo: sustituye a los campos.
   if (body) embed.description = body;
@@ -637,6 +699,7 @@ function memberVars(member, extra = {}) {
 
 module.exports = {
   CATALOG,
+  CAMPOS_EDITABLES,
   FACTORY,
   factoryDefaults,
   KINDS,

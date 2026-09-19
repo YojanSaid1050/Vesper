@@ -627,7 +627,9 @@ test('todos los mensajes tienen con qué pintar una vista previa real', () => {
     .filter(kind => kind !== 'welcome' && kind !== 'goodbye')
     .filter(kind => {
       const factory = factoryDefaults(kind);
-      return !factory.message && !(factory.fields || []).length;
+      // Un aviso puede bastarse con la línea de arriba y el título: el bot que
+      // se va no necesita cuerpo.
+      return !factory.message && !factory.title && !factory.author && !(factory.fields || []).length;
     });
   assert.deepEqual(sinVistaPrevia, []);
 });

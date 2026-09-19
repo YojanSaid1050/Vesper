@@ -93,7 +93,7 @@ async function probarTikTok() {
     const usuario = (process.env.DIAGNOSTICO_TIKTOK || 'tiktok').trim().replace(/^@/, '');
     const cliente = getFreeTikTokClient();
     const { valor, ms } = await medir(() => cliente.fetchLatestVideo(usuario));
-    anotar('tiktok', `Último vídeo de @${usuario}`, valor ? 'ok' : 'aviso',
+    anotar('tiktok', `Último video de @${usuario}`, valor ? 'ok' : 'aviso',
       valor ? `${String(valor.title || valor.id).slice(0, 45)} en ${ms} ms` : `sin datos tras ${ms} ms`);
     await stopFreeTikTokClient();
   } catch (error) {

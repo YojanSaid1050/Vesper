@@ -263,7 +263,7 @@ class MusicService {
     return track ? withLegacyShape(track) : null;
   }
 
-  // Pone a sonar lo que toque. Si una pista falla —caducó el enlace, el vídeo
+  // Pone a sonar lo que toque. Si una pista falla —caducó el enlace, el video
   // se borró— se salta y se sigue con la siguiente en vez de dejar la sesión
   // colgada en silencio.
   async advance(guildId) {
