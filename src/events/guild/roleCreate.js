@@ -17,12 +17,7 @@ module.exports = {
       vars: {
         role: `${role}`, roleName: role.name, roleId: role.id,
         server: role.guild.name, memberCount: role.guild.memberCount
-      },
-      defaults: { title: '🎭 Rol creado', color: '#57F287' },
-      fields: [
-        { name: '🎭 Rol', value: `${role}` },
-        { name: '🆔 ID', value: role.id }
-      ]
+      }
     });
   }
 };

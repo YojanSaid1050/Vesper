@@ -28,14 +28,7 @@ module.exports = {
       vars: memberVars(newMessage.member || { user: newMessage.author, guild: newMessage.guild }, {
         userTag: authorTag, channel: `${oldMessage.channel}`,
         channelName: oldMessage.channel?.name || '', before, after
-      }),
-      defaults: { title: '✏️ Mensaje editado', color: '#FAA61A' },
-      fields: [
-        { name: '👤 Usuario', value: authorTag },
-        { name: '📍 Canal', value: `${oldMessage.channel}` },
-        { name: '📌 Antes', value: before },
-        { name: '📌 Después', value: after }
-      ]
+      })
     });
   }
 };

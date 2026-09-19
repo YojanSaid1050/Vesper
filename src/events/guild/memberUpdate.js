@@ -27,19 +27,7 @@ module.exports = {
       });
       await publishAlert(newMember.guild, guildConfig, started ? 'boost_started' : 'boost_stopped', {
         vars,
-        defaults: started
-          ? {
-            title: '💜 ¡Gracias por el boost!',
-            message: '{user} acaba de mejorar **{server}**. Ya vamos por {boostCount} boosts (nivel {boostLevel}).',
-            color: '#F47FFF',
-            thumbnailUrl: newMember.user.displayAvatarURL()
-          }
-          : {
-            title: '💔 Boost retirado',
-            description: `${newMember.user.tag} dejó de mejorar el servidor. Quedan ${newMember.guild.premiumSubscriptionCount ?? 0} boosts.`,
-            color: '#747F8D',
-            thumbnailUrl: newMember.user.displayAvatarURL()
-          }
+        defaults: { thumbnailUrl: newMember.user.displayAvatarURL() }
       });
     }
 
@@ -57,13 +45,8 @@ module.exports = {
       const after = newMember.nickname || 'Sin nickname';
       await publishAlert(newMember.guild, guildConfig, 'log_nickname', {
         vars: memberVars(newMember, { before, after }),
-        defaults: { title: '📝 Apodo cambiado', color: '#00b0f4', thumbnailUrl: newMember.user.displayAvatarURL() },
-        fields: [
-          { name: '👤 Usuario', value: newMember.user.tag },
-          { name: '📌 Antes', value: before, inline: true },
-          { name: '📌 Después', value: after, inline: true }
-        ]
-      });
+        defaults: { thumbnailUrl: newMember.user.displayAvatarURL() }
+    });
     }
 
     // Timeout changes
@@ -83,23 +66,13 @@ module.exports = {
         const until = `<t:${Math.floor(timeoutDate.getTime() / 1000)}:F>`;
         await publishAlert(newMember.guild, guildConfig, 'log_timeout_on', {
           vars: memberVars(newMember, { executor, until, reason }),
-          defaults: { title: '🔇 Miembro aislado', color: '#ED4245', thumbnailUrl: newMember.user.displayAvatarURL() },
-          fields: [
-            { name: '👤 Usuario', value: newMember.user.tag },
-            { name: '🛠️ Timeout por', value: executor },
-            { name: '📅 Hasta', value: until },
-            { name: '📝 Razón', value: reason }
-          ]
-        });
+          defaults: { thumbnailUrl: newMember.user.displayAvatarURL() }
+    });
       } else {
         await publishAlert(newMember.guild, guildConfig, 'log_timeout_off', {
           vars: memberVars(newMember, { executor }),
-          defaults: { title: '🔊 Aislamiento retirado', color: '#57F287', thumbnailUrl: newMember.user.displayAvatarURL() },
-          fields: [
-            { name: '👤 Usuario', value: newMember.user.tag },
-            { name: '🛠️ Removido por', value: executor }
-          ]
-        });
+          defaults: { thumbnailUrl: newMember.user.displayAvatarURL() }
+    });
       }
     }
 
@@ -115,25 +88,15 @@ module.exports = {
     if (addedRoles.length) {
       const roles = addedRoles.map(role => `${role}`).join(', ').slice(0, 1024);
       await publishAlert(newMember.guild, guildConfig, 'log_roles_added', {
-        vars: memberVars(newMember, { roles }),
-        defaults: { title: addedRoles.length === 1 ? '🎭 Rol añadido' : '🎭 Roles añadidos', color: '#57F287' },
-        fields: [
-          { name: '👤 Usuario', value: newMember.user.tag },
-          { name: addedRoles.length === 1 ? '🎭 Rol' : '🎭 Roles', value: roles }
-        ]
-      });
+        vars: memberVars(newMember, { roles })
+    });
     }
 
     if (removedRoles.length) {
       const roles = removedRoles.map(role => `${role}`).join(', ').slice(0, 1024);
       await publishAlert(newMember.guild, guildConfig, 'log_roles_removed', {
-        vars: memberVars(newMember, { roles }),
-        defaults: { title: removedRoles.length === 1 ? '❌ Rol retirado' : '❌ Roles retirados', color: '#ED4245' },
-        fields: [
-          { name: '👤 Usuario', value: newMember.user.tag },
-          { name: removedRoles.length === 1 ? '🎭 Rol' : '🎭 Roles', value: roles }
-        ]
-      });
+        vars: memberVars(newMember, { roles })
+    });
     }
   }
 };

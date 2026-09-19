@@ -17,17 +17,13 @@ module.exports = {
       executor = auditExecutor(await findRecentAuditEntry(ban.guild, AuditLogEvent.MemberBanAdd, ban.user.id));
     } catch {}
 
+    // El motivo lo guarda Discord en el propio baneo; el de la auditoría puede
+    // no haber llegado todavía.
+    const reason = ban.reason || 'Sin motivo';
+
     await publishAlert(ban.guild, guildConfig, 'log_ban_added', {
-      vars: memberVars({ user: ban.user, guild: ban.guild }, { executor }),
-      defaults: {
-        title: '🔨 Miembro baneado',
-        color: '#ED4245',
-        thumbnailUrl: ban.user.displayAvatarURL()
-      },
-      fields: [
-        { name: '👤 Usuario', value: ban.user.tag },
-        { name: '🛠️ Baneado por', value: executor }
-      ]
+      vars: memberVars({ user: ban.user, guild: ban.guild }, { executor, reason }),
+      defaults: { thumbnailUrl: ban.user.displayAvatarURL() }
     });
   }
 };

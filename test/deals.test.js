@@ -134,7 +134,11 @@ test('el aviso usa el formato por defecto y admite personalización', () => {
   };
 
   const base = buildPayload(offer, {}, '');
-  assert.match(base.embeds[0].title, /75% de descuento: Rebajado/);
+  // El texto sale del catálogo, que es lo mismo que enseña el panel.
+  assert.equal(base.embeds[0].title, 'Rebajado · -75%');
+  assert.match(base.embeds[0].description, /Antes: 59\.99 COP/);
+  assert.match(base.embeds[0].description, /Ahora: \*\*14\.99 COP\*\*/);
+  assert.match(base.embeds[0].description, /store\.steampowered\.com/, 'el enlace va en el cuerpo');
   assert.equal(base.embeds[0].url, offer.url, 'el embed enlaza a la tienda');
 
   const custom = buildPayload(offer, {

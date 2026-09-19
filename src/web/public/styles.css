@@ -169,11 +169,39 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 @keyframes slide { 0% { transform: translateX(-110%); } 100% { transform: translateX(300%); } }
 
+/* La entrada tiene su propio fondo: la ilustración del servidor, ya
+   difuminada en el propio archivo para no depender del filtro del navegador
+   ni penalizar a los móviles. Encima va un velo para que el texto se lea
+   igual de bien en claro que en oscuro. */
+.login-view { position: relative; isolation: isolate; overflow: hidden; }
+.login-view::before,
+.login-view::after { content: ''; position: absolute; inset: 0; z-index: -1; }
+.login-view::before {
+  background: url('/panel/assets/img/fondo-entrada.jpg') center / cover no-repeat;
+  transform: scale(1.08);
+}
+/* El velo solo baja el contraste lo justo para que se lea la tarjeta: la
+   ilustración tiene que seguir viéndose. En claro pesa más porque el texto
+   de la tarjeta es oscuro. */
+.login-view::after {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--bg) 70%, transparent),
+    color-mix(in srgb, var(--bg) 55%, transparent));
+}
+:root:not([data-theme="light"]) .login-view::after,
+:root[data-theme="dark"] .login-view::after {
+  background: radial-gradient(120% 90% at 50% 45%,
+    color-mix(in srgb, #0a0710 18%, transparent),
+    color-mix(in srgb, #0a0710 55%, transparent));
+}
+
 .login-card {
   display: grid; justify-items: center; gap: .85rem; text-align: center;
   width: min(29rem, 100%); padding: clamp(1.75rem, 5vw, 2.75rem);
   border: 1px solid var(--line); border-radius: var(--r-xl);
-  background: var(--surface); box-shadow: var(--shadow);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px) saturate(120%);
 }
 .login-card h1 { margin-top: .25rem; }
 .lead { color: var(--text-2); max-width: 24rem; }
@@ -574,6 +602,49 @@ body[data-mode="light"] .embed-divider { background: rgba(6,6,7,.1); }
 .var-list code { color: var(--accent); font-family: var(--font-mono); font-size: .74rem; }
 .var-list button { border: 0; background: none; padding: 0; color: inherit; font: inherit; cursor: pointer; }
 .var-list li:hover { border-color: var(--accent-line); }
+
+/* Fichas de variables: se pulsan para escribirlas donde está el cursor. */
+.var-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.var-chip {
+  padding: .3rem .6rem; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--surface-2); color: var(--accent);
+  font-family: var(--font-mono); font-size: .74rem; cursor: pointer;
+  transition: border-color .14s ease, background .14s ease;
+}
+.var-chip:hover { border-color: var(--accent); background: var(--accent-soft); }
+.var-chip:active { transform: translateY(1px); }
+
+/* Elegir varias cosas sin Ctrl+clic. */
+.chip-picker { display: grid; gap: .5rem; }
+.chip-list { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; min-height: 2rem; }
+.chip {
+  display: inline-flex; gap: .35rem; align-items: center;
+  padding: .28rem .35rem .28rem .65rem; border: 1px solid var(--accent-line);
+  border-radius: 999px; background: var(--accent-soft);
+  font-size: .78rem; color: var(--text-1);
+}
+.chip button {
+  display: grid; place-items: center; width: 1.1rem; height: 1.1rem;
+  padding: 0; border: 0; border-radius: 999px;
+  background: color-mix(in srgb, var(--text-1) 12%, transparent);
+  color: var(--text-2); font-size: .8rem; line-height: 1; cursor: pointer;
+}
+.chip button:hover { background: var(--bad); color: #fff; }
+.chip-empty { color: var(--text-3); font-size: .78rem; }
+.chip-add { display: flex; gap: .4rem; align-items: center; }
+.chip-add select { flex: 1; min-width: 0; }
+
+/* Lo secundario de cada mensaje, plegado: color, imagen, pie y formato. */
+.more-options { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface-2); }
+.more-options > summary {
+  padding: .6rem .85rem; color: var(--text-2); font-size: .82rem;
+  font-weight: 600; cursor: pointer; list-style: none;
+}
+.more-options > summary::-webkit-details-marker { display: none; }
+.more-options > summary::before { content: '▸ '; color: var(--text-3); }
+.more-options[open] > summary::before { content: '▾ '; }
+.more-options > *:not(summary) { padding: 0 .85rem; }
+.more-options > *:last-child { padding-bottom: .85rem; }
 
 /* ------------------------------------------------------------------ */
 /* Toast                                                               */

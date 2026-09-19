@@ -29,13 +29,7 @@ module.exports = {
       vars: {
         channel: channel.name, channelName: channel.name, type: tipo, executor,
         server: channel.guild.name, memberCount: channel.guild.memberCount
-      },
-      defaults: { title: '🗑️ Canal borrado', color: '#ED4245' },
-      fields: [
-        { name: '📌 Canal', value: channel.name },
-        { name: '📂 Tipo', value: tipo, inline: true },
-        { name: '🛠️ Eliminado por', value: executor, inline: true }
-      ]
+      }
     });
   }
 };

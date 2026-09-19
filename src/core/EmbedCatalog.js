@@ -92,7 +92,7 @@ const CATALOG = Object.freeze({
   log_bot_join: {
     group: 'Registro de miembros', label: 'Bot añadido',
     description: 'Se publica en el canal de registro de bots cuando se añade uno.',
-    variables: [...MEMBER_VARS, ['{role}', 'rol asignado automáticamente']], supports: FULL
+    variables: [...MEMBER_VARS, ['{role}', 'menciona el rol asignado'], ['{roleName}', 'nombre de ese rol']], supports: FULL
   },
   log_bot_leave: {
     group: 'Registro de miembros', label: 'Bot retirado',
@@ -129,7 +129,7 @@ const CATALOG = Object.freeze({
   log_ban_added: {
     group: 'Registro de moderación', label: 'Miembro baneado',
     description: 'Cuando alguien recibe un baneo.',
-    variables: [...MEMBER_VARS, ...ACTOR_VARS], supports: FULL
+    variables: [...MEMBER_VARS, ...ACTOR_VARS, ['{reason}', 'motivo del baneo']], supports: FULL
   },
   log_ban_removed: {
     group: 'Registro de moderación', label: 'Baneo retirado',
@@ -165,12 +165,12 @@ const CATALOG = Object.freeze({
   log_channel_created: {
     group: 'Registro del servidor', label: 'Canal creado',
     description: 'Cuando se crea un canal.',
-    variables: [...SERVER_VARS, ...CHANNEL_VARS, ...ACTOR_VARS], supports: NO_THUMB
+    variables: [...SERVER_VARS, ...CHANNEL_VARS, ...ACTOR_VARS, ['{type}', 'tipo de canal']], supports: NO_THUMB
   },
   log_channel_deleted: {
     group: 'Registro del servidor', label: 'Canal eliminado',
     description: 'Cuando se elimina un canal.',
-    variables: [...SERVER_VARS, ...CHANNEL_VARS, ...ACTOR_VARS], supports: NO_THUMB
+    variables: [...SERVER_VARS, ...CHANNEL_VARS, ...ACTOR_VARS, ['{type}', 'tipo de canal']], supports: NO_THUMB
   },
   log_role_created: {
     group: 'Registro del servidor', label: 'Rol creado',
@@ -261,136 +261,205 @@ const CATALOG = Object.freeze({
 });
 
 
-// Valores con los que sale cada mensaje si no hay nada configurado.
+// El texto con el que sale cada mensaje si nadie lo ha tocado.
 //
-// `fields` son los recuadros que el aviso publica de verdad (quién, dónde,
-// cuándo). No se usan para publicar —de eso se encargan los eventos, que
-// tienen los datos reales— sino para que el panel pueda enseñar en la vista
-// previa el mensaje tal y como va a salir, en lugar de un texto que diga «se
-// conservan los campos originales». Si cambias un campo en un evento,
-// cámbialo también aquí para que la vista previa no mienta.
+// Esto es la ÚNICA fuente: los eventos ya no escriben su propio título ni su
+// propio cuerpo, solo aportan las variables. Así la vista previa del panel no
+// puede desviarse de lo que publica el bot, que es lo que pasaba antes.
+//
+// Forma de los registros: una línea por dato, «Etiqueta: valor», sin emojis y
+// sin recuadros apilados. Ocupa la mitad y se lee de un vistazo.
 //
 // Los de bienvenida y despedida no están: dependen del servidor y los calcula
 // el backend a partir del código que los publica.
 const FACTORY = Object.freeze({
   boost_started: {
-    title: '💜 ¡Gracias por el boost!',
-    message: '{user} acaba de mejorar **{server}**. Ya vamos por {boostCount} boosts (nivel {boostLevel}).',
+    title: 'Gracias por el boost',
+    message: '{user} acaba de mejorar **{server}**.\nBoosts: {boostCount}\nNivel: {boostLevel}',
     color: '#F47FFF'
   },
   boost_stopped: {
-    title: '💔 Boost retirado',
-    message: '{userTag} dejó de mejorar el servidor. Quedan {boostCount} boosts.',
+    title: 'Boost retirado',
+    message: '{username} dejó de mejorar **{server}**.\nBoosts: {boostCount}\nNivel: {boostLevel}',
     color: '#747F8D'
   },
   boost_level: {
-    title: '🚀 Nuevo nivel de mejora',
-    message: '**{server}** alcanzó el nivel {boostLevel} con {boostCount} boosts. ¡Gracias a quienes lo hicieron posible!',
+    title: 'Nuevo nivel de mejora',
+    message: '**{server}** alcanzó el nivel {boostLevel}.\nNivel anterior: {previousLevel}\nBoosts: {boostCount}',
     color: '#F47FFF'
   },
 
+  // -------------------------------------------------------- Miembros
+  // En la entrada se menciona porque la persona está dentro y el enlace al
+  // perfil funciona. En la salida ya no está, así que se usa su nombre: una
+  // mención a quien se ha ido sale como un usuario desconocido.
   log_member_join: {
-    title: '📥 Miembro entró', color: '#57F287',
-    fields: [['👤 Usuario', '{userTag}'], ['🆔 ID', '{userId}']]
+    title: 'Miembro entró',
+    message: 'Usuario: {user}\nNombre: {username}\nID: {userId}\nMiembros: {memberCount}',
+    color: '#57F287'
   },
   log_member_leave: {
-    title: '📤 Miembro salió', color: '#ED4245',
-    fields: [['👤 Usuario', '{userTag}'], ['🆔 ID', '{userId}']]
+    title: 'Miembro salió',
+    message: 'Usuario: {username}\nApodo: {displayName}\nID: {userId}\nMiembros: {memberCount}',
+    color: '#ED4245'
   },
   log_bot_join: {
-    title: '🤖 Bot añadido', color: '#5865F2',
-    fields: [['🤖 Bot', '{userTag}'], ['🆔 ID', '{userId}'], ['🎭 Rol añadido', '{role}']]
+    title: 'Bot añadido',
+    message: 'Bot: {username}\nID: {userId}\nRol asignado: {roleName}',
+    color: '#5865F2'
   },
   log_bot_leave: {
-    title: '🤖 Bot retirado', color: '#ED4245',
-    fields: [['🤖 Bot', '{userTag}'], ['🆔 ID', '{userId}']]
+    title: 'Bot retirado',
+    message: 'Bot: {username}\nID: {userId}',
+    color: '#ED4245'
   },
   log_nickname: {
-    title: '📝 Apodo cambiado', color: '#00B0F4',
-    fields: [['👤 Usuario', '{userTag}'], ['📌 Antes', '{before}'], ['📌 Después', '{after}']]
+    title: 'Apodo cambiado',
+    message: 'Usuario: {user}\nAntes: {before}\nAhora: {after}',
+    color: '#00B0F4'
   },
   log_roles_added: {
-    title: '🎭 Roles añadidos', color: '#57F287',
-    fields: [['👤 Usuario', '{userTag}'], ['🎭 Roles', '{roles}']]
+    title: 'Roles añadidos',
+    message: 'Usuario: {user}\nRoles: {roles}',
+    color: '#57F287'
   },
   log_roles_removed: {
-    title: '❌ Roles retirados', color: '#ED4245',
-    fields: [['👤 Usuario', '{userTag}'], ['🎭 Roles', '{roles}']]
+    title: 'Roles retirados',
+    message: 'Usuario: {user}\nRoles: {roles}',
+    color: '#ED4245'
   },
 
+  // ------------------------------------------------------ Moderación
   log_timeout_on: {
-    title: '🔇 Miembro aislado', color: '#ED4245',
-    fields: [['👤 Usuario', '{userTag}'], ['🛠️ Timeout por', '{executor}'], ['📅 Hasta', '{until}'], ['📝 Razón', '{reason}']]
+    title: 'Miembro aislado',
+    message: 'Usuario: {user}\nAislado por: {executor}\nHasta: {until}\nMotivo: {reason}',
+    color: '#ED4245'
   },
   log_timeout_off: {
-    title: '🔊 Aislamiento retirado', color: '#57F287',
-    fields: [['👤 Usuario', '{userTag}'], ['🛠️ Removido por', '{executor}']]
+    title: 'Aislamiento retirado',
+    message: 'Usuario: {user}\nRetirado por: {executor}',
+    color: '#57F287'
   },
   log_ban_added: {
-    title: '🔨 Miembro baneado', color: '#ED4245',
-    fields: [['👤 Usuario', '{userTag}'], ['🛠️ Baneado por', '{executor}']]
+    title: 'Miembro baneado',
+    message: 'Usuario: {username}\nID: {userId}\nBaneado por: {executor}\nMotivo: {reason}',
+    color: '#ED4245'
   },
   log_ban_removed: {
-    title: '🔓 Baneo retirado', color: '#57F287',
-    fields: [['👤 Usuario', '{userTag}'], ['🛠️ Desbaneado por', '{executor}']]
+    title: 'Baneo retirado',
+    message: 'Usuario: {username}\nID: {userId}\nRetirado por: {executor}',
+    color: '#57F287'
   },
   automod_notice: { message: '{user}, tu mensaje fue retirado: {reason}. Caso **#{case}**.' },
   automod_dm: { message: 'Recibiste una advertencia en **{server}**.\nMotivo: {reason}\nCaso: **#{case}**' },
 
+  // -------------------------------------------------------- Servidor
   log_message_deleted: {
-    title: '🗑️ Mensaje borrado', color: '#ED4245',
-    fields: [['👤 Usuario', '{userTag}'], ['🛠️ Eliminado por', '{executor}'], ['📍 Canal', '{channel}'], ['💬 Contenido', '{content}']]
+    title: 'Mensaje borrado',
+    message: 'Autor: {userTag}\nCanal: {channel}\nBorrado por: {executor}\n\n{content}',
+    color: '#ED4245'
   },
   log_message_edited: {
-    title: '✏️ Mensaje editado', color: '#FAA61A',
-    fields: [['👤 Usuario', '{userTag}'], ['📍 Canal', '{channel}'], ['📌 Antes', '{before}'], ['📌 Después', '{after}']]
-  },
-  log_channel_created: {
-    title: '📁 Canal creado', color: '#57F287',
-    fields: [['📌 Canal', '{channel}'], ['📂 Tipo', 'Texto'], ['🛠️ Creado por', '{executor}']]
-  },
-  log_channel_deleted: {
-    title: '🗑️ Canal borrado', color: '#ED4245',
-    fields: [['📌 Canal', '{channelName}'], ['📂 Tipo', 'Texto'], ['🛠️ Eliminado por', '{executor}']]
-  },
-  log_role_created: {
-    title: '🎭 Rol creado', color: '#57F287',
-    fields: [['🎭 Rol', '{role}'], ['🆔 ID', '{roleId}']]
-  },
-  log_role_deleted: {
-    title: '❌ Rol borrado', color: '#FF4D4D',
-    fields: [['🎭 Rol', '{roleName}'], ['🛠️ Eliminado por', '{executor}']]
-  },
-  log_voice_join: {
-    title: '🔊 Entró a voz', color: '#57F287',
-    fields: [['👤 Usuario', '{userTag}'], ['🎤 Canal', '{channel}']]
-  },
-  log_voice_leave: {
-    title: '📴 Salió de voz', color: '#ED4245',
-    fields: [['👤 Usuario', '{userTag}'], ['🎤 Canal', '{channel}']]
-  },
-  log_voice_move: {
-    title: '🔄 Cambió de canal de voz', color: '#5865F2',
-    fields: [['👤 Usuario', '{userTag}'], ['⬅️ De', '{from}'], ['➡️ A', '{to}']]
+    title: 'Mensaje editado',
+    message: 'Autor: {userTag}\nCanal: {channel}\n\nAntes: {before}\nAhora: {after}',
+    color: '#FAA61A'
   },
   log_messages_purged: {
-    title: '🧹 Mensajes purgados', color: '#FAA61A',
-    fields: [['📍 Canal', '{channel}'], ['🔢 Cantidad', '{count}']]
+    title: 'Mensajes purgados',
+    message: 'Canal: {channel}\nMensajes borrados: {count}',
+    color: '#FAA61A'
+  },
+  log_channel_created: {
+    title: 'Canal creado',
+    message: 'Canal: {channel}\nTipo: {type}\nCreado por: {executor}',
+    color: '#57F287'
+  },
+  log_channel_deleted: {
+    title: 'Canal borrado',
+    message: 'Canal: {channelName}\nTipo: {type}\nBorrado por: {executor}',
+    color: '#ED4245'
+  },
+  log_role_created: {
+    title: 'Rol creado',
+    message: 'Rol: {role}\nID: {roleId}\nCreado por: {executor}',
+    color: '#57F287'
+  },
+  log_role_deleted: {
+    title: 'Rol borrado',
+    message: 'Rol: {roleName}\nBorrado por: {executor}',
+    color: '#FF4D4D'
   },
   log_thread_created: {
-    title: '🧵 Hilo creado', color: '#57F287',
-    fields: [['🧵 Hilo', '{thread}'], ['📍 En', '{channel}'], ['👤 Creado por', '{owner}']]
+    title: 'Hilo creado',
+    message: 'Hilo: {thread}\nEn: {channel}\nCreado por: {owner}',
+    color: '#57F287'
+  },
+  log_voice_join: {
+    title: 'Entró a un canal de voz',
+    message: 'Usuario: {user}\nCanal: {channel}',
+    color: '#57F287'
+  },
+  log_voice_leave: {
+    title: 'Salió de un canal de voz',
+    message: 'Usuario: {user}\nCanal: {channel}',
+    color: '#ED4245'
+  },
+  log_voice_move: {
+    title: 'Cambió de canal de voz',
+    message: 'Usuario: {user}\nDe: {from}\nA: {to}',
+    color: '#5865F2'
   },
 
-  notify_twitch_live: { title: '{creator} está en directo en Twitch', message: '**{title}**\n{url}', color: '#9146FF' },
-  notify_youtube_live: { title: '{creator} está en directo en YouTube', message: '**{title}**\n{url}', color: '#FF0000' },
-  notify_youtube_video: { title: 'Nuevo video de {creator}', message: '**{title}**\n{url}', color: '#FF0000' },
-  notify_youtube_short: { title: 'Nuevo short de {creator}', message: '**{title}**\n{url}', color: '#FF0000' },
-  notify_tiktok_live: { title: '{creator} está en directo en TikTok', message: '**{title}**\n{url}', color: '#1E90FF' },
-  notify_tiktok_video: { title: 'Nuevo video de {creator}', message: '**{title}**\n{url}', color: '#1E90FF' },
-  deal_epic_free: { title: '🎁 Gratis en Epic: {title}', message: 'Gratis hasta {endsAt}.\n{url}', color: '#2A2A2A' },
-  deal_steam_special: { title: '🏷️ {discount}% de descuento: {title}', message: 'De {originalPrice} a **{price}**.\n{url}', color: '#1B2838' },
-  deal_giveaway: { title: '🎉 {title}', message: 'Valorado en {worth}.\n{url}', color: '#57F287' }
+  // ----------------------------------------------------------- Redes
+  // Lo que importa de un aviso de redes es qué se ha publicado y dónde verlo.
+  notify_twitch_live: {
+    title: '{creator} está en directo',
+    message: '**{title}**\nCategoría: {game}\nEspectadores: {viewers}\n\n{url}',
+    color: '#9146FF'
+  },
+  notify_youtube_live: {
+    title: '{creator} está en directo',
+    message: '**{title}**\nEspectadores: {viewers}\n\n{url}',
+    color: '#FF0000'
+  },
+  notify_youtube_video: {
+    title: 'Vídeo nuevo de {creator}',
+    message: '**{title}**\nVisualizaciones: {views}\n\n{url}',
+    color: '#FF0000'
+  },
+  notify_youtube_short: {
+    title: 'Short nuevo de {creator}',
+    message: '**{title}**\nVisualizaciones: {views}\n\n{url}',
+    color: '#FF0000'
+  },
+  notify_tiktok_live: {
+    title: '{creator} está en directo',
+    message: '**{title}**\nEspectadores: {viewers}\n\n{url}',
+    color: '#1E90FF'
+  },
+  notify_tiktok_video: {
+    title: 'Vídeo nuevo de {creator}',
+    message: '**{title}**\nReproducciones: {views}\n\n{url}',
+    color: '#1E90FF'
+  },
+
+  // --------------------------------------------------------- Ofertas
+  // Precio, descuento y hasta cuándo: es lo que decide si merece la pena.
+  deal_epic_free: {
+    title: 'Gratis en Epic: {title}',
+    message: 'Precio habitual: {originalPrice}\nAhora: gratis\nTermina: {endsAt}\n\n{url}',
+    color: '#2A2A2A'
+  },
+  deal_steam_special: {
+    title: '{title} · -{discount}%',
+    message: 'Antes: {originalPrice}\nAhora: **{price}**\nTermina: {endsAt}\n\n{url}',
+    color: '#1B2838'
+  },
+  deal_giveaway: {
+    title: 'Gratis: {title}',
+    message: 'Valor habitual: {worth}\nPlataformas: {platforms}\nTermina: {endsAt}\n\n{url}',
+    color: '#57F287'
+  }
 });
 
 function factoryDefaults(kind) {
@@ -465,18 +534,27 @@ function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = 
   const layoutNow = normalizeLayout(stored.layout, defaults.layout);
   const flat = rendersMentions('title', layoutNow) ? vars : plainVars(vars);
 
-  const title = resolve(stored.title, flat) ?? defaults.title ?? null;
+  // El catálogo manda cuando el evento no trae nada propio. Los eventos solo
+  // aportan variables y la miniatura; el texto vive en un único sitio, así que
+  // lo que enseña el panel es exactamente lo que se publica.
+  const fabrica = FACTORY[kind] || {};
+  // El título y el pie del catálogo también llevan variables ({creator},
+  // {title}, {discount}…). Antes solo se sustituía lo que escribía el
+  // administrador, así que un aviso de Twitch salía con «{creator}» literal.
+  const plantillaTitulo = defaults.title ?? fabrica.title ?? null;
+  const plantillaPie = defaults.footer ?? fabrica.footer ?? null;
+  const title = resolve(stored.title, flat) ?? (plantillaTitulo ? substitute(plantillaTitulo, flat) : null);
   const message = resolve(stored.message);
-  const footer = resolve(stored.footer, flat) ?? defaults.footer ?? null;
+  const footer = resolve(stored.footer, flat) ?? (plantillaPie ? substitute(plantillaPie, flat) : null);
   const image = imageUrl(stored.image) ?? defaults.image ?? null;
-  const color = colorNumber(stored.color, colorNumber(defaults.color, 0x5865F2));
+  const color = colorNumber(stored.color, colorNumber(defaults.color ?? fabrica.color, 0x5865F2));
   const showThumbnail = stored.thumbnail === undefined || stored.thumbnail === null
     ? defaults.thumbnail !== false
     : stored.thumbnail !== false;
 
   // Mensajes que no son embed (avisos de automoderación y MD de advertencia).
   if (entry?.plainText) {
-    return { content: message ?? substitute(defaults.message || '', vars) };
+    return { content: message ?? substitute(defaults.message || fabrica.message || '', vars) };
   }
 
   // El administrador elige con qué forma sale el mensaje. Si no ha elegido
@@ -484,8 +562,8 @@ function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = 
   // nada cambia hasta que se toca el selector a propósito.
   const layout = layoutNow;
 
-  const body = message
-    ?? (defaults.description ? substitute(defaults.description, vars) : null);
+  const plantilla = defaults.description ?? defaults.message ?? fabrica.message ?? null;
+  const body = message ?? (plantilla ? substitute(plantilla, vars) : null);
   const usableFields = message ? [] : fields.filter(field => field && field.name && field.value);
 
   if (layout === 'components_v2') {

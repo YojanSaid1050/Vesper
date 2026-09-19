@@ -32,7 +32,10 @@ test('el Main conserva exactamente el constructor visual original', async () => 
 test('los satélites reciben una alerta neutral sin referencias al void', async () => {
   const result = await withMainGuild('main', () => factory.twitchLive('satellite', data, {}));
   assert.equal(result.embeds.length, 1);
-  assert.match(result.embeds[0].title, /directo en Twitch/);
+  // El título sale del catálogo, igual que en la vista previa del panel.
+  assert.equal(result.embeds[0].title, 'Canal está en directo');
+  assert.match(result.embeds[0].description, /Categoría: Juego/);
+  assert.match(result.embeds[0].description, /Espectadores: 10/);
   assert.equal(result.embeds[0].url, data.streamUrl);
   assert.doesNotMatch(JSON.stringify(result), /void|awakened|abyss/i);
 });

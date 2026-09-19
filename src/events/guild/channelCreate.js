@@ -29,13 +29,7 @@ module.exports = {
       vars: {
         channel: `${channel}`, channelName: channel.name, type: tipo, executor: creator,
         server: channel.guild.name, memberCount: channel.guild.memberCount
-      },
-      defaults: { title: '📁 Canal creado', color: '#57F287' },
-      fields: [
-        { name: '📌 Canal', value: `${channel}` },
-        { name: '📂 Tipo', value: tipo, inline: true },
-        { name: '🛠️ Creado por', value: creator, inline: true }
-      ]
+      }
     });
   }
 };

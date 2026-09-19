@@ -28,13 +28,6 @@ module.exports = {
         boostLevel: newGuild.premiumTier,
         previousLevel: oldGuild.premiumTier,
         boostCount: newGuild.premiumSubscriptionCount ?? 0
-      },
-      defaults: {
-        title: subió ? '🚀 Nuevo nivel de mejora' : '📉 El servidor bajó de nivel',
-        description: subió
-          ? `**${newGuild.name}** alcanzó el nivel ${newGuild.premiumTier} con ${newGuild.premiumSubscriptionCount ?? 0} boosts. ¡Gracias a quienes lo hicieron posible!`
-          : `**${newGuild.name}** pasó al nivel ${newGuild.premiumTier}. Quedan ${newGuild.premiumSubscriptionCount ?? 0} boosts.`,
-        color: subió ? '#F47FFF' : '#747F8D'
       }
     }));
   }
