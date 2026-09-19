@@ -13,6 +13,7 @@
   /* Acento: valores de arranque. app.js los sobreescribe con el color del
      servidor que estés configurando. */
   --accent: #9d63ff;
+  --accent-2: #f47fff;
   --accent-soft: rgba(157, 99, 255, .14);
   --accent-line: rgba(157, 99, 255, .3);
   --accent-ink: #ffffff;
@@ -40,13 +41,13 @@
   --danger: #ff6b81;
   --danger-soft: rgba(255, 107, 129, .12);
 
-  /* Forma. Radios algo menores: el panel se lee más ordenado y menos
-     «burbuja». */
+  /* Forma. Los mismos valores que la portada: el panel y la web pública
+     tienen que sentirse como una sola cosa, no como dos productos. */
   --r-sm: .4rem;
-  --r-md: .6rem;
-  --r-lg: .85rem;
-  --r-xl: 1.1rem;
-  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.32);
+  --r-md: .7rem;
+  --r-lg: 1rem;
+  --r-xl: 1.4rem;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 20px 50px rgba(0,0,0,.35);
   --shadow-sm: 0 1px 2px rgba(0,0,0,.3);
 
   /* Ritmo */
@@ -57,9 +58,18 @@
   --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
+/* El fondo de la portada, para que entrar al panel no sea un corte seco. */
+body::before {
+  content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(ellipse 50rem 26rem at 8% -12%, var(--accent-soft), transparent 70%),
+    radial-gradient(ellipse 34rem 18rem at 96% -6%, rgba(244, 127, 255, .07), transparent 70%);
+}
+
 /* Los Main temáticos con paleta clara conmutan todo el lienzo. */
 body[data-mode="light"] {
   color-scheme: light;
+  --accent-2: #f47fff;
   --bg: #f6f6f8;
   --bg-deep: #ececed;
   --surface: #ffffff;
@@ -97,7 +107,6 @@ body {
   margin: 0;
   min-height: 100dvh;
   background: var(--bg);
-  background-image: radial-gradient(ellipse 60rem 32rem at 12% -8%, var(--accent-soft), transparent 70%);
   color: var(--text);
   font-family: var(--font);
   font-size: 15px;
@@ -106,7 +115,7 @@ body {
 }
 
 h1, h2, h3, h4 { margin: 0; line-height: 1.25; font-weight: 650; letter-spacing: -.011em; }
-h1 { font-size: clamp(1.35rem, 2.4vw, 1.7rem); }
+h1 { font-size: clamp(1.4rem, 2.5vw, 1.8rem); font-weight: 800; letter-spacing: -.02em; }
 h2 { font-size: 1.05rem; }
 h3 { font-size: .92rem; }
 p { margin: 0; }
@@ -187,7 +196,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   overflow-y: auto; overscroll-behavior: contain;
 }
 
-.brand { display: flex; align-items: center; gap: .7rem; }
+.brand { display: flex; align-items: center; gap: .7rem; color: inherit; text-decoration: none; }
+.brand:hover .brand-text strong { color: var(--accent); }
 .brand-avatar {
   flex: 0 0 auto; display: grid; place-items: center; overflow: hidden;
   width: 2.4rem; height: 2.4rem; border-radius: .75rem;
@@ -208,7 +218,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .guild-switcher { display: grid; gap: .3rem; }
 .guild-option {
   display: flex; align-items: center; gap: .6rem; width: 100%;
-  padding: .5rem .6rem; border: 1px solid transparent; border-radius: var(--r-md);
+  padding: .55rem .7rem; border: 1px solid transparent; border-radius: var(--r-lg);
   background: transparent; color: var(--text-2); text-align: left; cursor: pointer;
   transition: background .14s, color .14s, border-color .14s;
 }
@@ -234,13 +244,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .nav-item {
   display: flex; align-items: center; gap: .6rem; width: 100%;
-  padding: .5rem .6rem; border: 0; border-radius: var(--r-md);
+  padding: .5rem .75rem; border: 0; border-radius: 999px;
   background: transparent; color: var(--text-2);
   font-size: .88rem; text-align: left; cursor: pointer;
   transition: background .14s, color .14s;
 }
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
-.nav-item[aria-current="page"] { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.nav-item[aria-current="page"] {
+  background: linear-gradient(100deg, var(--accent-soft), color-mix(in srgb, var(--accent-2) 8%, transparent));
+  color: var(--text); font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
 .nav-item .nav-icon { flex: 0 0 1.15rem; font-size: .95rem; text-align: center; }
 .nav-item .nav-tally {
   margin-left: auto; padding: .05rem .4rem; border-radius: 999px;
@@ -295,19 +309,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .button {
   display: inline-flex; align-items: center; gap: .4rem;
-  padding: .55rem .9rem; border: 1px solid transparent; border-radius: var(--r-md);
+  padding: .55rem 1.05rem; border: 1px solid transparent; border-radius: 999px;
   background: var(--accent); color: var(--accent-ink);
   font-size: .86rem; font-weight: 600; text-decoration: none; white-space: nowrap;
-  cursor: pointer; transition: filter .14s, background .14s, border-color .14s;
+  cursor: pointer;
+  transition: transform .12s ease, box-shadow .12s ease, background .14s, border-color .14s;
 }
-.button:hover:not(:disabled) { filter: brightness(1.08); }
+.button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px var(--accent-soft); }
 .button:disabled { opacity: .5; cursor: not-allowed; }
 .button.quiet { background: var(--surface-2); border-color: var(--line); color: var(--text); }
 .button.quiet:hover:not(:disabled) { background: var(--surface-3); }
 .button.ghost { background: transparent; border-color: var(--line-strong); color: var(--text-2); }
 .button.ghost:hover:not(:disabled) { color: var(--text); border-color: var(--accent-line); }
 .button.danger { background: var(--danger); color: #fff; }
-.button.sm { padding: .35rem .65rem; font-size: .78rem; }
+.button.sm { padding: .35rem .8rem; font-size: .78rem; }
 
 .pill {
   display: inline-flex; align-items: center; gap: .4rem;
@@ -320,9 +335,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .pill.bad { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); background: var(--danger-soft); }
 
 .card {
-  padding: 1.15rem; border: 1px solid var(--line); border-radius: var(--r-xl);
+  padding: 1.3rem; border: 1px solid var(--line-strong); border-radius: var(--r-xl);
   background: var(--surface); box-shadow: var(--shadow-sm);
+  transition: border-color .14s ease;
 }
+.card:hover { border-color: var(--accent-line); }
 .card-head {
   display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-start; justify-content: space-between;
   margin-bottom: 1rem;
@@ -521,6 +538,13 @@ body[data-mode="light"] .embed-preview { background: #fff; box-shadow: 0 0 0 1px
 .embed-text { flex: 1; min-width: 0; }
 .embed-title { margin-bottom: .3rem; color: var(--preview-ink); font-weight: 600; }
 .embed-desc { font-size: .88rem; line-height: 1.5; }
+
+/* Los recuadros del aviso, igual que los pinta Discord: nombre en negrita y
+   valor debajo. */
+.embed-fields { display: grid; gap: .5rem; margin-top: .55rem; }
+.embed-field { display: grid; gap: .1rem; }
+.embed-field-name { color: var(--preview-ink); font-weight: 600; font-size: .8rem; }
+.embed-field-value { font-size: .85rem; line-height: 1.45; overflow-wrap: anywhere; }
 .embed-thumb {
   flex: 0 0 auto; display: grid; place-items: center; overflow: hidden;
   width: 4.5rem; height: 4.5rem; border-radius: .35rem;
@@ -1142,14 +1166,15 @@ body[data-mode="light"] .md-block { background: rgba(6, 6, 7, .07); }
 /* Claro / oscuro: preferencia del usuario, no del servidor            */
 /* ------------------------------------------------------------------ */
 
+/* Vive en la barra superior: la barra lateral desaparece al elegir servidor
+   y desde ahí no había forma de cambiarlo. */
 .theme-switch {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: .2rem;
-  margin-bottom: .6rem; padding: .2rem;
-  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface-2);
+  display: flex; gap: .15rem; padding: .18rem; flex: none;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2);
 }
 .theme-switch button {
-  padding: .3rem 0; border: 0; border-radius: var(--r-sm);
-  background: none; color: var(--text-3); font-size: .9rem; cursor: pointer;
+  width: 1.8rem; height: 1.6rem; padding: 0; border: 0; border-radius: 999px;
+  background: none; color: var(--text-3); font-size: .85rem; cursor: pointer;
   transition: background .12s ease, color .12s ease;
 }
 .theme-switch button:hover { color: var(--text); }
@@ -1215,3 +1240,138 @@ body[data-mode="light"] .md-block { background: rgba(6, 6, 7, .07); }
 .plan-state { display: grid; gap: .45rem; justify-items: start; margin-bottom: .6rem; }
 .switch.locked { opacity: .6; cursor: not-allowed; }
 .switch.locked input { cursor: not-allowed; }
+
+/* ============================================================
+   Enfoque nuevo: elegir servidor, rejilla de módulos, ayuda oculta
+   ============================================================ */
+
+/* ------------------------------------------------------------------ */
+/* Elegir servidor                                                     */
+/* ------------------------------------------------------------------ */
+
+/* En el selector no hay servidor que configurar, así que no hay barra
+   lateral: la pantalla es solo la lista. */
+body[data-view="servidores"] .shell { grid-template-columns: minmax(0, 1fr); }
+body[data-view="servidores"] .sidebar,
+body[data-view="servidores"] .nav-toggle { display: none; }
+body[data-view="servidores"] .view { max-width: 60rem; margin-inline: auto; width: 100%; }
+
+.server-block { margin-bottom: 2rem; }
+.server-block h2 { margin-bottom: .8rem; font-size: 1rem; color: var(--text-2); }
+.server-grid {
+  display: grid; gap: .6rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+}
+.server-card {
+  display: grid; gap: .85rem; align-items: center; min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: .9rem 1rem; border: 1px solid var(--line-strong); border-radius: var(--r-xl);
+  background: var(--surface);
+  transition: border-color .14s ease, transform .14s ease;
+}
+.server-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.server-copy { display: grid; gap: .1rem; min-width: 0; }
+.server-copy strong { font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.server-copy small { color: var(--text-3); font-size: .78rem; }
+
+.server-avatar {
+  display: grid; place-items: center; overflow: hidden; flex: none;
+  width: 2.8rem; height: 2.8rem; border-radius: 999px;
+  background: var(--surface-3); color: var(--text-2);
+  font-size: 1.1rem; font-weight: 700;
+}
+.server-avatar.sm { width: 2rem; height: 2rem; font-size: .85rem; }
+.server-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.empty-hero {
+  display: grid; gap: .7rem; justify-items: center; text-align: center;
+  padding: clamp(2.5rem, 8vw, 5rem) 1.5rem;
+}
+.empty-icon { font-size: 2.2rem; color: var(--accent); }
+.empty-hero p { color: var(--text-2); max-width: 26rem; }
+
+/* Servidor actual en la barra lateral, con vuelta al selector. */
+.guild-current {
+  display: grid; gap: .6rem; align-items: center; width: 100%;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: .55rem .7rem; border: 1px solid var(--line-strong); border-radius: var(--r-lg);
+  background: var(--surface); color: var(--text); text-align: left; cursor: pointer;
+  transition: border-color .12s ease;
+}
+.guild-current:hover { border-color: var(--accent); }
+.guild-current-copy { display: grid; gap: .05rem; min-width: 0; }
+.guild-current-copy strong { font-size: .88rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guild-current-copy small { color: var(--text-3); font-size: .72rem; }
+.guild-current-go { color: var(--text-3); font-size: .95rem; }
+
+/* ------------------------------------------------------------------ */
+/* Rejilla de módulos                                                  */
+/* ------------------------------------------------------------------ */
+
+.module-head { margin-bottom: 1.1rem; }
+.module-head h2 { font-size: clamp(1.2rem, 2.5vw, 1.5rem); font-weight: 800; }
+.module-head p { margin-top: .25rem; color: var(--text-2); font-size: .88rem; }
+
+.module-grid {
+  display: grid; gap: .6rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+}
+.module-card {
+  display: grid; gap: .5rem; align-items: center; min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: .9rem 1rem; border: 1px solid var(--line); border-radius: var(--r-xl);
+  background: var(--surface);
+  transition: border-color .14s ease, transform .14s ease;
+}
+.module-card:hover { border-color: var(--accent-line); transform: translateY(-1px); }
+.module-card.on { border-color: var(--accent-line); background: linear-gradient(160deg, var(--surface), color-mix(in srgb, var(--surface) 92%, var(--accent))); }
+.module-card.locked { opacity: .6; }
+
+.module-open {
+  display: grid; gap: .7rem; align-items: center; min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer;
+}
+.module-icon {
+  display: grid; place-items: center; width: 2.3rem; height: 2.3rem; border-radius: var(--r-md);
+  background: var(--surface-3); font-size: 1.05rem;
+}
+.module-card.on .module-icon { background: var(--accent-soft); }
+.module-copy { display: grid; gap: .1rem; min-width: 0; }
+.module-copy strong { font-size: .92rem; }
+.module-copy small { color: var(--text-3); font-size: .77rem; line-height: 1.4; }
+.module-lock { font-size: .9rem; opacity: .7; }
+
+/* Aviso de que algo no funciona, en una línea. */
+.alert-banner {
+  display: grid; gap: .75rem; align-items: center; min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin-bottom: 1.1rem; padding: .75rem .9rem;
+  border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line-strong));
+  border-radius: var(--r-lg); background: var(--warn-soft);
+}
+.alert-banner > span[aria-hidden] {
+  display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 999px;
+  background: var(--warn); color: #1a1205; font-weight: 800; font-size: .8rem;
+}
+.alert-banner strong { display: block; font-size: .88rem; }
+.alert-banner small { display: block; color: var(--text-2); font-size: .8rem; }
+
+/* ------------------------------------------------------------------ */
+/* Ayuda escondida                                                     */
+/* ------------------------------------------------------------------ */
+
+.help {
+  width: 1.1rem; height: 1.1rem; padding: 0; margin-left: .2rem;
+  border: 1px solid var(--line-strong); border-radius: 999px;
+  background: none; color: var(--text-3);
+  font-size: .68rem; line-height: 1; cursor: pointer; vertical-align: middle;
+}
+.help:hover { border-color: var(--accent); color: var(--accent); }
+
+@media (max-width: 640px) {
+  .server-card { grid-template-columns: auto minmax(0, 1fr); }
+  .server-card .button { grid-column: 1 / -1; width: 100%; justify-content: center; }
+  .alert-banner { grid-template-columns: auto minmax(0, 1fr); }
+  .alert-banner .button { grid-column: 1 / -1; width: 100%; justify-content: center; }
+}

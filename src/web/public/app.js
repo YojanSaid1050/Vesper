@@ -29,7 +29,9 @@ const state = {
   dirty: new Set(),
   searchResults: [],
   searchIndex: 0,
-  theme: 'auto'
+  theme: 'auto',
+  invitable: [],
+  inviteUrl: null
 };
 
 const $ = selector => document.querySelector(selector);
@@ -92,7 +94,9 @@ function openDialog({ title, message, confirmLabel = 'Aceptar', cancelLabel = 'C
   $('#app-dialog-message').textContent = message || '';
   $('#app-dialog-message').hidden = !message;
   $('#app-dialog-confirm').textContent = confirmLabel;
-  $('#app-dialog-cancel').textContent = cancelLabel;
+  // Un aviso informativo no necesita «Cancelar»: solo se lee y se cierra.
+  $('#app-dialog-cancel').hidden = !cancelLabel;
+  if (cancelLabel) $('#app-dialog-cancel').textContent = cancelLabel;
   dialog.classList.toggle('danger', danger);
 
   if (input) {
@@ -279,14 +283,17 @@ function selectedValues(select) {
   return select ? [...select.selectedOptions].map(option => option.value).filter(Boolean) : [];
 }
 
-function card({ eyebrow, title, description, actions = '', body, id = '' }) {
+// `ayuda` es el texto que se esconde tras el «?». Va aparte de `description`
+// porque la descripción se escapa: si se le incrustaba el botón, el usuario
+// veía el HTML en crudo en mitad de la tarjeta.
+function card({ eyebrow, title, description, ayuda = '', actions = '', body, id = '' }) {
   return `
     <section class="card"${id ? ` id="${id}"` : ''}>
       <div class="card-head">
         <div>
           ${eyebrow ? `<p class="eyebrow">${escapeHtml(eyebrow)}</p>` : ''}
           <h2>${escapeHtml(title)}</h2>
-          ${description ? `<p>${escapeHtml(description)}</p>` : ''}
+          ${description || ayuda ? `<p>${escapeHtml(description || '')}${help(ayuda)}</p>` : ''}
         </div>
         ${actions ? `<div class="card-actions">${actions}</div>` : ''}
       </div>
@@ -310,8 +317,8 @@ const MODULES = {
   tiktok: ['Avisos de TikTok', 'Publica cuando una cuenta empieza directo o sube un video.'],
   twitch: ['Avisos de Twitch', 'Publica cuando un streamer empieza directo.'],
   youtube: ['Avisos de YouTube', 'Publica directos, videos y Shorts de los canales seguidos.'],
-  welcome: ['Mensaje de bienvenida', 'Envía el embed de bienvenida cuando alguien entra.'],
-  goodbye: ['Mensaje de despedida', 'Envía el embed de despedida cuando alguien sale.'],
+  welcome: ['Mensaje de bienvenida', 'Saluda a quien entra al servidor.'],
+  goodbye: ['Mensaje de despedida', 'Se despide de quien se va.'],
   logs: ['Registro de eventos', 'Anota entradas, salidas, ediciones, baneos y cambios de canal.'],
   boosts: ['Agradecimiento por boosts', 'Publica un mensaje cuando alguien mejora el servidor con Nitro.'],
   deals: ['Ofertas de juegos', 'Avisa de juegos gratis de Epic, rebajas de Steam y sorteos de llaves.'],
@@ -354,8 +361,8 @@ const SUGGESTION_LABELS = { open: 'Pendiente', approved: 'Aprobada', rejected: '
 
 // Render mínimo de Markdown para la vista previa. Se escapa PRIMERO y luego se
 // aplican las marcas, así nada de lo que escriba el usuario puede inyectar HTML.
-function renderMarkdown(value) {
-  return escapeHtml(value ?? '')
+function renderMarkdown(value, { mentions = true } = {}) {
+  const html = escapeHtml(value ?? '')
     .split('\n')
     .map(line => {
       if (line.startsWith('-# ')) return `<span class="md-small">${line.slice(3)}</span>`;
@@ -377,8 +384,12 @@ function renderMarkdown(value) {
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
     .replace(/\|\|([^|]+)\|\|/g, '<span class="md-spoiler">$1</span>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<span class="md-link">$1</span>')
-    .replace(/(@[\w-]+)/g, '<span class="md-mention">$1</span>');
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<span class="md-link">$1</span>');
+
+  // Discord solo convierte las menciones en el cuerpo. En el título y el pie
+  // de un embed clásico sale texto normal, así que la vista previa tampoco
+  // debe pintarlas como una mención: enseñaría algo que no va a pasar.
+  return mentions ? html.replace(/(@[\w-]+)/g, '<span class="md-mention">$1</span>') : html;
 }
 
 // Valores de ejemplo para la vista previa. Cubren todas las variables del
@@ -394,6 +405,7 @@ const SAMPLE = {
   channelName: 'general',
   role: '@Miembro',
   roleName: 'Miembro',
+  roleId: '987654321098765432',
   roles: '@Miembro, @Avisos',
   before: 'texto anterior',
   after: 'texto nuevo',
@@ -408,14 +420,33 @@ const SAMPLE = {
   url: 'https://ejemplo.com/publicacion',
   game: 'Just Chatting',
   viewers: '128',
-  views: '4.320'
+  views: '4.320',
+  count: '25',
+  thread: '#dudas',
+  owner: 'Yojan',
+  boostCount: '14',
+  boostLevel: '3',
+  previousLevel: '2',
+  discount: '75',
+  price: '4,99 €',
+  originalPrice: '19,99 €',
+  endsAt: 'el 30 de enero',
+  worth: '14,99 €',
+  platforms: 'PC, Steam',
+  store: 'Epic Games',
+  platform: 'Twitch'
 };
 
-function sampleValues(text) {
+// `plain` imita lo que hace el bot en los huecos donde Discord no convierte
+// menciones: usa el nombre en vez del enlace al perfil.
+const SAMPLE_PLAIN = { user: '@Nuevo miembro', executor: '@Yojan' };
+
+function sampleValues(text, { plain = false } = {}) {
   const guild = state.data?.guild;
   return String(text ?? '').replace(/\{(\w+)\}/g, (match, name) => {
     if (name === 'server') return guild?.name || 'tu servidor';
     if (name === 'memberCount') return formatNumber(guild?.memberCount ?? 0);
+    if (plain && Object.hasOwn(SAMPLE_PLAIN, name)) return SAMPLE_PLAIN[name];
     return Object.hasOwn(SAMPLE, name) ? SAMPLE[name] : match;
   });
 }
@@ -435,9 +466,22 @@ function messageHeaderMarkup({ name, avatar }) {
 
 function embedPreviewMarkup(values, options) {
   const { componentsV2 = false, memberAvatar = null } = options;
-  const title = sampleValues(values.title);
+  // El contenedor V2 sí convierte menciones en todas sus piezas; el embed
+  // clásico, solo en el cuerpo.
+  const title = sampleValues(values.title, { plain: !componentsV2 });
   const message = sampleValues(values.message);
-  const footer = sampleValues(values.footer);
+  const footer = sampleValues(values.footer, { plain: !componentsV2 });
+
+  // Los recuadros que publica el aviso cuando nadie ha escrito un cuerpo
+  // propio. Se pintan con datos de ejemplo para que la vista previa enseñe el
+  // mensaje tal y como va a salir, y no una nota diciendo que hay campos.
+  const fields = (values.fields || []).length
+    ? `<div class="embed-fields">${values.fields.map(([name, value]) => `
+        <div class="embed-field">
+          <span class="embed-field-name">${escapeHtml(sampleValues(name))}</span>
+          <span class="embed-field-value">${renderMarkdown(sampleValues(value))}</span>
+        </div>`).join('')}</div>`
+    : '';
 
   const thumb = !componentsV2 && values.thumbnail
     ? `<div class="embed-thumb">${memberAvatar ? `<img src="${escapeHtml(memberAvatar)}" alt="">` : '👤'}</div>`
@@ -460,9 +504,10 @@ function embedPreviewMarkup(values, options) {
     <div class="embed-preview${componentsV2 ? ' v2' : ''}">
       <div class="embed-top">
         <div class="embed-text">
-          <div class="embed-title">${renderMarkdown(title)}</div>
+          <div class="embed-title">${componentsV2 ? renderMarkdown(title) : escapeHtml(title)}</div>
           ${componentsV2 ? '<div class="embed-divider"></div>' : ''}
-          <div class="embed-desc">${renderMarkdown(message)}</div>
+          ${message ? `<div class="embed-desc">${renderMarkdown(message)}</div>` : ''}
+          ${fields}
         </div>
         ${thumb}
       </div>
@@ -493,14 +538,14 @@ function wireImageFallbacks(root) {
 // módulo de logs»: entra pensando «quiero saber quién borra mensajes».
 const SECTIONS = [
   {
-    id: 'inicio', group: 'Tu servidor', icon: '◉', label: 'Estado',
-    title: 'Estado del servidor',
-    hint: 'Qué está funcionando, qué falta y qué hay que arreglar.'
+    id: 'inicio', group: 'Tu servidor', icon: '◉', label: 'Inicio',
+    title: 'Panel del servidor',
+    hint: ''
   },
   {
     id: 'apariencia', group: 'Tu servidor', icon: '✦', label: 'Apariencia',
-    title: 'Cómo se ve Vesper',
-    hint: 'Nombre, avatar y color con los que publica en este servidor.',
+    title: 'Apariencia',
+    hint: 'Nombre, avatar y color del bot.',
     needs: 'configure',
     feature: 'profile',
     keywords: ['identidad', 'nombre', 'avatar', 'color', 'marca', 'branding', 'apodo', 'tema']
@@ -508,39 +553,39 @@ const SECTIONS = [
 
   {
     id: 'bienvenidas', group: 'Cuando pasa algo', icon: '✉', label: 'Entradas y salidas',
-    title: 'Cuando alguien entra o sale',
-    hint: 'Bienvenida, despedida y agradecimiento por los boosts.',
+    title: 'Entradas y salidas',
+    hint: 'Bienvenida, despedida y boosts.',
     needs: 'configure',
     keywords: ['bienvenida', 'despedida', 'boost', 'nitro', 'entrar', 'salir', 'saludo']
   },
   {
     id: 'registros', group: 'Cuando pasa algo', icon: '☰', label: 'Registros',
-    title: 'Qué se anota y dónde',
-    hint: 'Cada aviso por separado: se enciende, se apaga, se le cambia el canal y a quién menciona.',
+    title: 'Registros',
+    hint: 'Qué se anota y en qué canal.',
     needs: 'configure',
     keywords: ['logs', 'registro', 'auditoría', 'canal', 'avisos', 'apagar', 'encender', 'mención', 'ping']
   },
   {
     id: 'avisos', group: 'Cuando pasa algo', icon: '◎', label: 'Avisos de redes',
-    title: 'TikTok, Twitch y YouTube',
-    hint: 'Cuentas vigiladas, canales de destino y rol al que avisar.',
+    title: 'Avisos de redes',
+    hint: 'A quién vigilar y dónde avisar.',
     needs: 'social',
     feature: 'youtube',
     keywords: ['twitch', 'youtube', 'tiktok', 'directo', 'stream', 'video', 'short', 'notificación']
   },
   {
-    id: 'ofertas', group: 'Cuando pasa algo', icon: '◈', label: 'Ofertas y juegos',
-    title: 'Ofertas y juegos gratis',
-    hint: 'Avisa cuando Epic regale un juego, Steam rebaje algo o aparezca un sorteo.',
+    id: 'ofertas', group: 'Cuando pasa algo', icon: '◈', label: 'Juegos gratis',
+    title: 'Juegos gratis',
+    hint: 'Epic, Steam y sorteos.',
     needs: 'configure',
     feature: 'deals',
     keywords: ['epic', 'steam', 'gratis', 'oferta', 'rebaja', 'sorteo', 'giveaway', 'juego']
   },
 
   {
-    id: 'mensajes', group: 'Lo que dice', icon: '✎', label: 'Todos los mensajes',
-    title: 'Todos los mensajes del bot',
-    hint: 'Cada aviso, editable: texto, color, imagen, formato y tamaño de letra.',
+    id: 'mensajes', group: 'Lo que dice', icon: '✎', label: 'Mensajes',
+    title: 'Mensajes',
+    hint: 'Lo que escribe el bot.',
     needs: 'configure',
     keywords: ['embed', 'texto', 'editar', 'plantilla', 'formato', 'letra', 'símbolos', 'markdown', 'título']
   },
@@ -548,43 +593,43 @@ const SECTIONS = [
   {
     id: 'moderacion', group: 'Comunidad', icon: '⚖', label: 'Moderación',
     title: 'Moderación',
-    hint: 'Filtros automáticos, casos abiertos y sanciones.',
+    hint: 'Filtros y sanciones.',
     keywords: ['filtro', 'baneo', 'aislar', 'sanción', 'caso', 'automod', 'enlaces', 'palabras']
   },
   {
     id: 'comunidad', group: 'Comunidad', icon: '☺', label: 'Comunidad',
-    title: 'Tickets, sugerencias y roles',
-    hint: 'Soporte, buzón de sugerencias, autorroles y mensajes destacados.',
+    title: 'Comunidad',
+    hint: 'Tickets, sugerencias, autorroles y destacados.',
     needs: 'configure',
     keywords: ['ticket', 'soporte', 'sugerencia', 'autorrol', 'selfrole', 'destacado', 'starboard']
   },
   {
     id: 'musica', group: 'Comunidad', icon: '♪', label: 'Música',
-    title: 'Reproductor de música',
-    hint: 'Canales permitidos, límites de la cola y estado del motor de audio.',
+    title: 'Música',
+    hint: 'Dónde suena y quién manda.',
     needs: 'configure',
     feature: 'music',
     keywords: ['música', 'canción', 'voz', 'cola', 'volumen', 'dj', 'reproducir']
   },
 
   {
-    id: 'modulos', group: 'Ajustes', icon: '⚙', label: 'Módulos y permisos',
-    title: 'Módulos y permisos',
-    hint: 'Qué funciones están activas y qué roles pueden usarlas.',
+    id: 'modulos', group: 'Ajustes', icon: '⚙', label: 'Permisos y plan',
+    title: 'Permisos y plan',
+    hint: 'Quién puede usar qué.',
     needs: 'configure',
     keywords: ['módulo', 'activar', 'desactivar', 'permiso', 'rol', 'moderador', 'dj']
   },
   {
     id: 'resumen', group: 'Ajustes', icon: '≡', label: 'Configuración',
-    title: 'Configuración completa',
-    hint: 'Todo lo que Vesper tiene guardado de este servidor.',
+    title: 'Configuración',
+    hint: 'Todo lo guardado.',
     needs: 'configure',
     keywords: ['todo', 'exportar', 'copia', 'json', 'resumen']
   },
   {
     id: 'auditoria', group: 'Ajustes', icon: '⏱', label: 'Historial',
-    title: 'Historial de cambios',
-    hint: 'Quién cambió qué desde la web.',
+    title: 'Historial',
+    hint: 'Quién cambió qué.',
     needs: 'configure',
     keywords: ['auditoría', 'historial', 'quién', 'cambio']
   }
@@ -621,25 +666,27 @@ function lockedScreen(section, kind) {
   const nombre = FEATURE_LABELS[section.feature] || 'esta función';
   return kind === 'main'
     ? card({
-      eyebrow: 'Solo en los servidores principales',
+      eyebrow: 'No disponible aquí',
       title: `Aquí no está ${nombre}`,
-      description: 'Esto cambia el nombre y el avatar con los que el bot publica, o le ocupa un canal permanente. Se reserva a Embers Void y Ankerie Dimension.',
-      body: `<p class="hint">En este servidor Vesper publica con el nombre y el avatar de su cuenta de Discord. Todo lo demás —mensajes, registros, moderación y comunidad— funciona igual que en cualquier otro sitio.</p>`
+      description: 'Solo en los servidores principales.',
+      ayuda: 'Esta función cambia el nombre y el avatar con los que el bot publica, o le ocupa un canal permanente. Se reserva a Embers Void y Ankerie Dimension. En los demás servidores Vesper publica con el nombre y el avatar de su cuenta de Discord.',
+      body: ''
     })
     : card({
       eyebrow: 'Plan premium',
       title: `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} necesita plan`,
-      description: 'No es un muro para sacar dinero: vigilar redes, reproducir música y consultar tiendas obligan a estar preguntando a todas horas, y eso consume procesador y cuota de verdad.',
+      description: 'Disponible con el plan premium.',
+      ayuda: 'Vigilar redes, reproducir música y consultar tiendas obliga al bot a estar preguntando a todas horas. Eso consume procesador y cuota, y por eso va en el plan de pago. Todo lo que no cuesta nada tener encendido es gratis y lo seguirá siendo.',
       body: `
         <div class="locked-body">
-          <p>Con el plan gratis sigues teniendo, sin límite:</p>
+          <p>Sin plan sigues teniendo:</p>
           <ul class="locked-list">
-            <li>Bienvenidas, despedidas y agradecimiento por boosts</li>
-            <li>Los 27 registros, cada uno con su canal y su mención</li>
-            <li>Los 38 mensajes editables y los paquetes completos</li>
-            <li>Moderación automática, tickets, sugerencias y autorroles</li>
+            <li>Bienvenidas, despedidas y boosts</li>
+            <li>Registros</li>
+            <li>Moderación</li>
+            <li>Tickets, sugerencias y autorroles</li>
           </ul>
-          <p class="hint">Para pedir el plan, habla con el propietario del bot: puede concedértelo desde su panel en un clic.</p>
+          <p class="hint">Pídeselo al propietario del bot.</p>
         </div>`
     });
 }
@@ -858,82 +905,197 @@ function issueMarkup(issue) {
     </div>`;
 }
 
-function renderInicio() {
-  const data = state.data;
-  const health = state.health || data.health || {};
-  const setup = data.setup || { checks: [], percentage: 0, ready: 0, total: 0 };
-  const issues = healthIssues();
-  const graves = issues.filter(issue => issue.level === 'bad').length;
-  const avisos = issues.filter(issue => issue.level === 'warn').length;
+/* ---------------------------------------------------------------- */
+/* Elegir servidor                                                   */
+/* ---------------------------------------------------------------- */
 
-  const accounts = ['tiktok', 'twitch', 'youtube']
-    .reduce((total, platform) => total + (data.config?.[platform]?.users?.length || 0), 0);
-  const registrosActivos = (data.alerts || []).flatMap(group => group.items).filter(item => item.enabled).length;
-  const activeModules = Object.values(data.config?.features || {}).filter(Boolean).length;
+// Lo primero al entrar. Antes el panel saltaba directamente al primer
+// servidor de la lista y no había forma de añadir Vesper a uno nuevo: había
+// que salir a Discord, buscar la invitación y volver.
 
-  const titular = graves
-    ? { kind: 'bad', text: 'Hay algo roto', detail: 'Revisa lo primero de la lista.' }
-    : avisos
-      ? { kind: 'warn', text: 'Funciona, con reservas', detail: `${avisos} ${avisos === 1 ? 'cosa no está haciendo nada' : 'cosas no están haciendo nada'}.` }
-      : { kind: 'ok', text: 'Todo en orden', detail: 'No hay nada que requiera tu atención.' };
+function guildAvatarMarkup(guild, size = 'lg') {
+  const initial = escapeHtml(String(guild.name || '?').trim().slice(0, 1).toUpperCase());
+  return guild.icon
+    ? `<span class="server-avatar ${size}"><img src="${escapeHtml(guild.icon)}" alt="" loading="lazy"></span>`
+    : `<span class="server-avatar ${size}">${initial}</span>`;
+}
+
+function serverCardMarkup(guild, { invitable = false } = {}) {
+  if (invitable) {
+    return `
+      <article class="server-card">
+        ${guildAvatarMarkup(guild)}
+        <div class="server-copy">
+          <strong>${escapeHtml(guild.name)}</strong>
+          <small>Vesper todavía no está aquí</small>
+        </div>
+        <a class="button" href="${escapeHtml(inviteUrlFor(guild.id))}" target="_blank" rel="noopener">Añadir Vesper</a>
+      </article>`;
+  }
+
+  const plan = guild.tier === 'primary_main' || guild.tier === 'themed_main' ? 'principal' : null;
+  return `
+    <article class="server-card ready">
+      ${guildAvatarMarkup(guild)}
+      <div class="server-copy">
+        <strong>${escapeHtml(guild.name)}</strong>
+        <small>${formatNumber(guild.memberCount || 0)} miembros${plan ? ' · servidor principal' : ''}</small>
+      </div>
+      <button class="button" type="button" data-open-guild="${escapeHtml(guild.id)}">Configurar</button>
+    </article>`;
+}
+
+function renderServidores() {
+  const listos = state.guilds || [];
+  const porInvitar = state.invitable || [];
+
+  if (!listos.length && !porInvitar.length) {
+    return `
+      <div class="empty-hero">
+        <span class="empty-icon" aria-hidden="true">✦</span>
+        <h2>Todavía no hay nada que configurar</h2>
+        <p>Añade Vesper a un servidor donde seas administrador y aparecerá aquí.</p>
+        <a class="button big" href="${escapeHtml(inviteUrlFor())}" target="_blank" rel="noopener">Añadir a un servidor</a>
+      </div>`;
+  }
 
   return `
-    ${guiaInicioCard()}
+    ${listos.length ? `
+      <section class="server-block">
+        <h2>Tus servidores</h2>
+        <div class="server-grid">${listos.map(guild => serverCardMarkup(guild)).join('')}</div>
+      </section>` : ''}
 
-    <div class="headline ${titular.kind}">
-      <div class="headline-main">
-        <span class="headline-dot" aria-hidden="true"></span>
-        <div>
-          <strong>${escapeHtml(titular.text)}</strong>
-          <small>${escapeHtml(titular.detail)} ${escapeHtml(healthSummary(health))}</small>
+    ${porInvitar.length ? `
+      <section class="server-block">
+        <h2>Añadir a otro servidor</h2>
+        <div class="server-grid">${porInvitar.map(guild => serverCardMarkup(guild, { invitable: true })).join('')}</div>
+      </section>` : `
+      <section class="server-block">
+        <h2>¿Otro servidor?</h2>
+        <div class="server-grid">
+          <article class="server-card">
+            <span class="server-avatar lg">+</span>
+            <div class="server-copy">
+              <strong>Añadir Vesper</strong>
+              <small>A cualquier servidor donde seas administrador</small>
+            </div>
+            <a class="button" href="${escapeHtml(inviteUrlFor())}" target="_blank" rel="noopener">Añadir</a>
+          </article>
         </div>
-      </div>
-      <div class="headline-meter">
-        <div class="meter"><span data-meter="${setup.percentage}"></span></div>
-        <small>${setup.ready} de ${setup.total} ajustes listos</small>
-      </div>
+      </section>`}`;
+}
+
+function inviteUrlFor(guildId = null) {
+  const base = state.inviteUrl;
+  if (!base) return 'https://discord.com/developers/applications';
+  return guildId ? `${base}&guild_id=${encodeURIComponent(guildId)}&disable_guild_select=true` : base;
+}
+
+function bindServidores(root) {
+  root.querySelectorAll('[data-open-guild]').forEach(button => {
+    button.addEventListener('click', () => selectGuild(button.dataset.openGuild));
+  });
+}
+
+/* ---------------------------------------------------------------- */
+/* Inicio de un servidor: la rejilla de módulos                      */
+/* ---------------------------------------------------------------- */
+
+// Cada módulo es una tarjeta con su interruptor. Encender algo y entrar a
+// configurarlo son la misma pantalla, y se ve de un vistazo qué está activo.
+
+// Qué pantalla abre cada módulo, y con qué icono aparece.
+const MODULE_CARDS = [
+  { key: 'welcome', icon: '✉', section: 'bienvenidas', title: 'Bienvenidas', blurb: 'Saluda a quien entra' },
+  { key: 'goodbye', icon: '👋', section: 'bienvenidas', title: 'Despedidas', blurb: 'Se despide de quien sale' },
+  { key: 'boosts', icon: '💜', section: 'bienvenidas', title: 'Boosts', blurb: 'Da las gracias por los boosts' },
+  { key: 'logs', icon: '☰', section: 'registros', title: 'Registros', blurb: 'Anota lo que pasa en el servidor' },
+  { key: 'twitch', icon: '🟣', section: 'avisos', title: 'Twitch', blurb: 'Avisa de tus directos' },
+  { key: 'youtube', icon: '🔴', section: 'avisos', title: 'YouTube', blurb: 'Avisa de vídeos y directos' },
+  { key: 'tiktok', icon: '🎵', section: 'avisos', title: 'TikTok', blurb: 'Avisa de vídeos y directos' },
+  { key: 'deals', icon: '🎁', section: 'ofertas', title: 'Juegos gratis', blurb: 'Epic, Steam y sorteos' },
+  { key: 'moderation', icon: '⚖', section: 'moderacion', title: 'Moderación', blurb: 'Filtra enlaces y spam' },
+  { key: 'tickets', icon: '🎫', section: 'comunidad', title: 'Tickets', blurb: 'Soporte con tickets' },
+  { key: 'suggestions', icon: '💡', section: 'comunidad', title: 'Sugerencias', blurb: 'Buzón de ideas' },
+  { key: 'selfroles', icon: '🎭', section: 'comunidad', title: 'Autorroles', blurb: 'Roles que se eligen solos' },
+  { key: 'starboard', icon: '⭐', section: 'comunidad', title: 'Destacados', blurb: 'Tablón de mejores mensajes' },
+  { key: 'music', icon: '♪', section: 'musica', title: 'Música', blurb: 'Reproduce en canales de voz' }
+];
+
+function modulePlanState(key) {
+  const plan = state.data?.plan;
+  if (!plan?.locked?.includes(key)) return null;
+  return plan.mainOnlyFeatures?.includes(key) ? 'main' : 'premium';
+}
+
+function moduleCardMarkup(card) {
+  const features = state.data.config?.features || {};
+  const bloqueado = modulePlanState(card.key);
+  const activo = Boolean(features[card.key]) && !bloqueado;
+
+  return `
+    <article class="module-card${activo ? ' on' : ''}${bloqueado ? ' locked' : ''}" data-module-card="${card.key}">
+      <button class="module-open" type="button" data-goto="${escapeHtml(card.section)}">
+        <span class="module-icon" aria-hidden="true">${card.icon}</span>
+        <span class="module-copy">
+          <strong>${escapeHtml(card.title)}</strong>
+          <small>${escapeHtml(card.blurb)}</small>
+        </span>
+      </button>
+      ${bloqueado
+    ? `<span class="module-lock" title="${bloqueado === 'main' ? 'Solo en los servidores principales' : 'Disponible con premium'}">🔒</span>`
+    : `<label class="switch" title="${activo ? 'Apagar' : 'Encender'}">
+           <input type="checkbox" data-module-toggle="${card.key}" ${activo ? 'checked' : ''}>
+           <span class="switch-track" aria-hidden="true"></span>
+           <span class="sr-only">${escapeHtml(card.title)}</span>
+         </label>`}
+    </article>`;
+}
+
+function renderInicio() {
+  const data = state.data;
+  const problemas = healthIssues().filter(issue => issue.level !== 'info');
+  const activos = MODULE_CARDS.filter(card => data.config?.features?.[card.key] && !modulePlanState(card.key)).length;
+
+  return `
+    ${problemas.length ? `
+      <div class="alert-banner">
+        <span aria-hidden="true">!</span>
+        <div>
+          <strong>${escapeHtml(problemas[0].title)}</strong>
+          <small>${escapeHtml(problemas[0].detail)}</small>
+        </div>
+        ${problemas[0].action ? `<button class="button quiet sm" type="button" data-goto="${escapeHtml(problemas[0].action.section)}">${escapeHtml(problemas[0].action.label)}</button>` : ''}
+      </div>` : ''}
+
+    <div class="module-head">
+      <h2>¿Qué quieres que haga Vesper aquí?</h2>
+      <p>${activos} de ${MODULE_CARDS.length} funciones activas. Enciende lo que te interese y pulsa para configurarlo.</p>
     </div>
 
-    ${card({
-      eyebrow: issues.length ? 'Qué hacer' : 'Nada pendiente',
-      title: issues.length ? `${issues.length} ${issues.length === 1 ? 'cosa por revisar' : 'cosas por revisar'}` : 'No hay nada por revisar',
-      description: issues.length
-        ? 'Ordenadas por gravedad. Cada una lleva a la pantalla donde se arregla.'
-        : 'Los módulos activos tienen su canal, los monitores funcionan y no quedan casos abiertos.',
-      body: issues.length
-        ? `<div class="issue-list">${issues.slice(0, 12).map(issueMarkup).join('')}</div>${issues.length > 12 ? `<p class="hint">…y ${issues.length - 12} más.</p>` : ''}`
-        : emptyBlock('Todo listo', 'Vuelve por aquí si cambias algo y quieres comprobar que sigue en pie.')
-    })}
+    <div class="module-grid">${MODULE_CARDS.map(moduleCardMarkup).join('')}</div>`;
+}
 
-    <div class="stat-row">
-      <div class="stat"><span class="stat-value">${activeModules}</span><span class="stat-label">módulos activos</span></div>
-      <div class="stat"><span class="stat-value">${registrosActivos}</span><span class="stat-label">registros encendidos</span></div>
-      <div class="stat"><span class="stat-value">${accounts}</span><span class="stat-label">cuentas vigiladas</span></div>
-      <div class="stat"><span class="stat-value">${(data.cases || []).filter(item => item.status === 'active').length}</span><span class="stat-label">casos abiertos</span></div>
-    </div>
-
-    ${card({
-      eyebrow: 'Atajos',
-      title: '¿Qué quieres hacer?',
-      description: 'Lo que más se toca. También puedes buscar cualquier ajuste con Ctrl+K.',
-      body: `
-        <div class="shortcut-grid">
-          ${[
-            ['bienvenidas', '✉', 'Cambiar la bienvenida', 'El mensaje que ve alguien al entrar.'],
-            ['registros', '☰', 'Elegir qué se anota', 'Enciende o apaga cada registro por separado.'],
-            ['mensajes', '✎', 'Editar los textos', 'Todos los mensajes del bot, con vista previa.'],
-            ['avisos', '◎', 'Avisar de directos', 'TikTok, Twitch y YouTube.'],
-            ['apariencia', '✦', 'Cambiar su cara', 'Nombre, avatar y color.'],
-            ['modulos', '⚙', 'Encender funciones', 'Qué hace y qué no hace Vesper aquí.']
-          ].filter(([id]) => SECTIONS.some(section => section.id === id && sectionAllowed(section)))
-            .map(([id, icon, title, detail]) => `
-            <button class="shortcut" type="button" data-goto="${id}">
-              <span class="shortcut-icon" aria-hidden="true">${icon}</span>
-              <strong>${escapeHtml(title)}</strong>
-              <small>${escapeHtml(detail)}</small>
-            </button>`).join('')}
-        </div>`
-    })}`;
+function bindInicio(root) {
+  root.querySelectorAll('[data-module-toggle]').forEach(input => {
+    input.addEventListener('change', async () => {
+      const key = input.dataset.moduleToggle;
+      const card = root.querySelector(`[data-module-card="${key}"]`);
+      card?.classList.toggle('on', input.checked);
+      const result = await saveConfig({ features: { [key]: input.checked } }, null, null, { rerender: false });
+      if (!result) {
+        input.checked = !input.checked;
+        card?.classList.toggle('on', input.checked);
+        return;
+      }
+      const cabecera = root.querySelector('.module-head p');
+      if (cabecera) {
+        const activos = MODULE_CARDS.filter(item => state.data.config?.features?.[item.key] && !modulePlanState(item.key)).length;
+        cabecera.textContent = `${activos} de ${MODULE_CARDS.length} funciones activas. Enciende lo que te interese y pulsa para configurarlo.`;
+      }
+    });
+  });
 }
 
 function healthSummary(health) {
@@ -975,7 +1137,7 @@ function renderIdentidad() {
           <select id="profile-theme">
             ${themeOptions.map(([value, label]) => `<option value="${value}"${profile.theme === value ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}
           </select>
-          <span class="hint">Solo es una etiqueta para reconocer el servidor. El claro y el oscuro del panel se eligen abajo a la izquierda, y son tuyos.</span>
+          <span class="hint">Solo una etiqueta para reconocerlo.</span>
         </div>
       </div>
       <div class="form-row">
@@ -1029,7 +1191,8 @@ function renderIdentidad() {
     ${card({
       eyebrow: 'Vista previa',
       title: 'Así te ve un miembro',
-      description: 'Se actualiza mientras escribes. El nombre y el avatar salen del primer valor que encuentres relleno: identidad, branding y, si no, la cuenta del bot.',
+      description: 'Así te ve un miembro.',
+      ayuda: 'El nombre y el avatar salen del primer valor relleno: primero la identidad de este servidor, luego el branding y, si no hay nada, la cuenta de Discord del bot.',
       body: `
         <div class="preview-shell">
           <div class="discord-message" id="identity-preview"></div>
@@ -1047,7 +1210,8 @@ function renderIdentidad() {
     ${card({
       eyebrow: 'Branding',
       title: 'Valores de reserva',
-      description: 'Lo que usaban los comandos /setbotname, /setbotavatar y /branding. Se aplican cuando la identidad de arriba está vacía.',
+      description: 'Valores de reserva.',
+      ayuda: 'Son los que usaban los comandos /setbotname, /setbotavatar y /branding. Se aplican solo cuando la identidad de arriba está vacía.',
       body: brandingForm
     })}`;
 }
@@ -1202,8 +1366,13 @@ function fancyText(font, text) {
 }
 
 // Barra de formato que se pinta encima de cada caja de texto.
-function formatToolbar(targetId) {
-  const groups = FORMAT_TOOLS.map(group => `
+// `compact` deja solo lo que tiene sentido en una sola línea: en un título no
+// caben citas, listas ni bloques de código.
+function formatToolbar(targetId, { compact = false } = {}) {
+  const tools = compact
+    ? FORMAT_TOOLS.filter(group => group.group === 'Tamaño de la letra' || group.group === 'Estilo')
+    : FORMAT_TOOLS;
+  const groups = tools.map(group => `
     <div class="format-group" role="group" aria-label="${escapeHtml(group.group)}">
       <span class="format-group-name">${escapeHtml(group.group)}</span>
       <div class="format-buttons">
@@ -1402,7 +1571,8 @@ function formatGuideCard() {
   return card({
     eyebrow: 'Cómo escribir',
     title: 'Guía de formato',
-    description: 'Discord no tiene botones de tamaño: el tamaño se pide con símbolos al principio de la línea. Aquí están todos, con lo que hace cada uno.',
+    description: 'Cómo poner la letra más grande, negrita, listas y demás.',
+    ayuda: 'Discord no tiene botones de tamaño: se pide con símbolos al principio de la línea. La barra que hay encima de cada caja de texto los escribe por ti.',
     body: `
       <details class="guide" open>
         <summary>Ver la tabla completa de símbolos</summary>
@@ -1455,7 +1625,7 @@ function layoutChooser(idPrefix, dataAttr, kind, saved, factoryLayout) {
         ${option('classic', 'Embed clásico', 'Barra de color al lado, miniatura, campos y pie con la hora.')}
         ${option('components_v2', 'Contenedor V2', 'Bloque con borde de color y títulos grandes. El estilo de Embers Void.')}
       </div>
-      <span class="hint">Puedes cambiar de formato sin perder el texto: el mismo contenido se pinta de las dos maneras. El contenedor V2 no tiene miniatura y muestra el pie como texto pequeño.</span>
+      <span class="hint">Cambiar de formato no borra lo que escribiste.${help('El mismo contenido se pinta de las dos maneras. El contenedor V2 no tiene miniatura y muestra el pie como texto pequeño.')}</span>
     </div>`;
 }
 
@@ -1651,6 +1821,18 @@ function messageFactoryDefaults(item) {
   return item.factory || {};
 }
 
+// El texto con el que sale el mensaje hoy, escrito como se escribiría en el
+// editor. Cuando el aviso son recuadros (quién, dónde, cuándo) se traducen a
+// líneas «**Nombre**: valor», que es lo más parecido que se puede escribir a
+// mano en el cuerpo.
+function originalBody(item) {
+  const factory = messageFactoryDefaults(item);
+  if (factory.message) return factory.message;
+  const fields = factory.fields || [];
+  if (!fields.length) return '';
+  return fields.map(([name, value]) => `**${name}**: ${value}`).join('\n');
+}
+
 function messageEditorMarkup(item) {
   const saved = state.data.config.embeds?.[item.id] || {};
   const factory = messageFactoryDefaults(item);
@@ -1661,12 +1843,16 @@ function messageEditorMarkup(item) {
     ? ''
     : layoutChooser('msg', 'data-msg', item.id, saved.layout, item.defaultLayout);
 
+  // Discord no aplica formato al título de un embed clásico: sale tal cual. En
+  // el contenedor V2 sí, y por eso ahí es donde se puede agrandar la letra.
+  const classicNow = (saved.layout || item.defaultLayout) !== 'components_v2';
   const titleField = item.plainText ? '' : `
     <div class="field wide">
       <label for="msg-${item.id}-title">Título</label>
-      ${formatToolbar(`msg-${item.id}-title`)}
+      ${formatToolbar(`msg-${item.id}-title`, { compact: true })}
       <input id="msg-${item.id}-title" type="text" maxlength="240" data-msg="${item.id}"
              value="${escapeHtml(saved.title || '')}" placeholder="${escapeHtml(factory.title || 'Sin título')}">
+      <span class="hint" data-title-hint="${item.id}"${classicNow ? '' : ' hidden'}>En el embed clásico el título sale sin formato. Para agrandar la letra, cambia a Contenedor V2.</span>
     </div>`;
 
   const footerField = item.supports.footer ? `
@@ -1706,7 +1892,15 @@ function messageEditorMarkup(item) {
 
   const bodyHint = item.plainText
     ? 'Este mensaje es texto normal, no un embed.'
-    : 'Si lo dejas vacío se conservan los campos originales del aviso. Si escribes algo, sustituye el cuerpo entero.';
+    : 'Vacío = sale como ahora. Lo que escribas aquí sustituye al cuerpo entero.';
+
+  // Empezar desde cero delante de una caja vacía es lo que hace que nadie
+  // toque los mensajes. Este botón escribe el texto original en el formulario
+  // para tener una base que retocar.
+  const baseText = originalBody(item);
+  const baseButton = baseText
+    ? `<button class="button ghost" type="button" data-msg-base="${item.id}">Partir del original</button>`
+    : '';
 
   return `
     <details class="message-item"${customised ? ' open' : ''} data-message="${item.id}">
@@ -1737,6 +1931,7 @@ function messageEditorMarkup(item) {
           <ul class="var-list">${variables}</ul>
           <div class="form-actions">
             <button class="button" type="submit">Guardar</button>
+            ${baseButton}
             <button class="button ghost" type="button" data-msg-reset="${item.id}" ${customised ? '' : 'disabled'}>Restablecer</button>
             <span class="dirty-flag" hidden>Cambios sin guardar</span>
           </div>
@@ -1779,10 +1974,15 @@ function refreshMessagePreview(item) {
     return;
   }
 
+  // Si nadie ha escrito un cuerpo propio, el aviso sale con sus recuadros.
+  // En cuanto se escribe algo, ese texto los sustituye —igual que hace el
+  // bot— así que la vista previa los quita.
+  const body = values.message ?? factory.message ?? null;
   const resolved = {
     title: values.title ?? factory.title,
-    message: values.message ?? factory.message ?? '(campos originales del aviso)',
-    footer: values.footer,
+    message: body,
+    fields: body ? [] : (factory.fields || []),
+    footer: values.footer ?? factory.footer ?? null,
     image: values.image ?? factory.image ?? null,
     thumbnail: values.thumbnail !== false && item.supports.thumbnail
   };
@@ -1825,7 +2025,8 @@ function themePickerCard() {
   return card({
     eyebrow: 'De una vez',
     title: 'Paquetes de mensajes',
-    description: 'Escriben los 38 avisos de golpe, en un mismo tono y con una misma paleta. Luego puedes retocar los que quieras uno a uno.',
+    description: 'Escribe todos los mensajes de golpe, en un mismo tono.',
+    ayuda: 'Aplicar un paquete sobrescribe los 38 mensajes. Se deshace eligiendo otro o volviendo a «Sin paquete», y después puedes retocar los que quieras uno a uno.',
     body: `
       <div class="theme-grid">
         ${themes.map(themeCardMarkup).join('')}
@@ -1837,7 +2038,7 @@ function themePickerCard() {
           <span class="theme-count">vuelve a lo de fábrica</span>
         </button>
       </div>
-      <p class="hint">Aplicar un paquete sobrescribe lo que hayas escrito en los 38 mensajes. Se puede deshacer eligiendo otro, o volviendo a «Sin paquete».</p>`
+      <p class="hint">Sobrescribe los 38 mensajes. Se puede deshacer.</p>`
   });
 }
 
@@ -1895,14 +2096,14 @@ function renderMensajes() {
   const groups = catalog.map(group => card({
     eyebrow: group.group,
     title: `${group.items.length} ${group.items.length === 1 ? 'mensaje' : 'mensajes'}`,
-    description: 'Despliega cualquiera para editarlo. La vista previa se actualiza mientras escribes.',
+    description: 'Ábrelo para ver cómo queda y cambiar lo que quieras.',
     body: `<div class="message-list">${group.items.map(messageEditorMarkup).join('')}</div>`
   })).join('');
 
   return `
     <div class="callout info">
       <strong>${customised} de ${total} mensajes personalizados.</strong>
-      <span>Los que no toques salen exactamente como siempre. Vaciar un campo lo devuelve a su valor original, y cada mensaje puede publicarse como embed clásico o como contenedor V2.</span>
+      <span>Abre cualquiera y verás justo cómo queda. Los que no toques salen como ahora.</span>
     </div>
     ${themePickerCard()}
     ${formatGuideCard()}
@@ -1919,7 +2120,16 @@ function bindMensajes(root) {
     const form = root.querySelector(`#form-msg-${item.id}`);
     if (!form) continue;
 
-    const update = () => refreshMessagePreview(item);
+    const update = () => {
+      refreshMessagePreview(item);
+      const hint = root.querySelector(`[data-title-hint="${item.id}"]`);
+      if (hint) {
+        const layout = document.querySelector(`input[name="msg-${item.id}-layout"]`)
+          ? chosenLayout(`msg-${item.id}-layout`)
+          : item.defaultLayout;
+        hint.hidden = layout === 'components_v2';
+      }
+    };
     form.addEventListener('input', event => {
       if (event.target.id === `msg-${item.id}-usecolor`) {
         const picker = document.querySelector(`#msg-${item.id}-color`);
@@ -1932,6 +2142,20 @@ function bindMensajes(root) {
     form.addEventListener('submit', event => {
       event.preventDefault();
       saveConfig({ embeds: { [item.id]: messageValues(item.id) } }, `«${item.label}» guardado.`, event.submitter);
+    });
+
+    root.querySelector(`[data-msg-base="${item.id}"]`)?.addEventListener('click', () => {
+      const factory = messageFactoryDefaults(item);
+      const body = document.querySelector(`#msg-${item.id}-message`);
+      const title = document.querySelector(`#msg-${item.id}-title`);
+      if (title && !title.value.trim() && factory.title) title.value = factory.title;
+      if (body) {
+        body.value = originalBody(item);
+        body.focus();
+      }
+      update();
+      markDirty(form);
+      toast('Texto original copiado al editor. Retócalo y guarda.', 'ok');
     });
 
     root.querySelector(`[data-msg-reset="${item.id}"]`)?.addEventListener('click', async event => {
@@ -2189,7 +2413,8 @@ function renderModeracion() {
   const automod = canConfigure ? card({
     eyebrow: 'Automático',
     title: 'Filtros de mensajes',
-    description: 'Vesper revisa cada mensaje y actúa solo cuando se cumple una de estas reglas. Los administradores y los roles excluidos nunca se filtran.',
+    description: 'Qué se filtra automáticamente.',
+    ayuda: 'Vesper revisa cada mensaje y actúa solo cuando se cumple una de estas reglas. Los administradores y los roles excluidos nunca se filtran.',
     actions: `<span class="tag ${moderationOn ? 'ok' : 'warn'}">${moderationOn ? 'Módulo activo' : 'Módulo apagado'}</span>`,
     body: `
       <form id="form-automod" class="form">
@@ -2545,7 +2770,8 @@ function renderModulos() {
     ${card({
       eyebrow: 'Permisos',
       title: 'Roles autorizados',
-      description: 'Los permisos nativos de Discord (Administrador, Moderar miembros, Gestionar canales) siguen funcionando además de estos roles.',
+      description: 'Quién puede usar qué.',
+      ayuda: 'Los permisos nativos de Discord —Administrador, Moderar miembros, Gestionar canales— siguen funcionando además de estos roles.',
       body: `
         <form id="form-permissions" class="form">
           <div class="form-row">
@@ -2843,6 +3069,7 @@ function watchDirty(root) {
 function bindCommon(root) {
   watchDirty(root);
   wireImageFallbacks(root);
+  bindHelp(root);
 
   root.querySelectorAll('[data-goto]').forEach(button => {
     button.addEventListener('click', () => showSection(button.dataset.goto));
@@ -3386,7 +3613,8 @@ function renderRegistros() {
     ${card({
       eyebrow: 'Dónde caen por defecto',
       title: 'Canales generales',
-      description: 'Un aviso sin canal propio se publica aquí. Es lo más cómodo: eliges estos dos y te olvidas.',
+      description: 'Dónde va todo por defecto.',
+      ayuda: 'Un aviso que no tenga canal propio se publica aquí. Eliges estos dos y te olvidas; luego puedes mandar avisos sueltos a otro canal.',
       body: `
         <form id="form-log-channels" class="form">
           <div class="form-row">
@@ -3499,7 +3727,8 @@ function bindRegistros(root) {
 }
 
 const RENDERERS = {
-  inicio: { render: renderInicio, bind: () => {} },
+  servidores: { render: renderServidores, bind: bindServidores },
+  inicio: { render: renderInicio, bind: bindInicio },
   apariencia: { render: renderIdentidad, bind: bindIdentidad },
   registros: { render: renderRegistros, bind: bindRegistros },
   bienvenidas: { render: renderBienvenidas, bind: bindBienvenidas },
@@ -3565,158 +3794,18 @@ function bindSaveBar() {
 
 /* ---------------------------------------------------------------- */
 
-// El buscador es la respuesta a un panel con cientos de ajustes: en vez de
-// recordar en qué pantalla estaba cada cosa, se escribe y se va.
-function searchEntries() {
-  const entries = [];
 
-  for (const section of SECTIONS.filter(sectionAllowed)) {
-    entries.push({
-      kind: 'Pantalla',
-      label: section.title,
-      detail: section.hint,
-      terms: [section.label, section.title, section.hint, ...(section.keywords || [])].join(' '),
-      section: section.id
+// La explicación no desaparece: se guarda detrás de un «?» para quien la
+// quiera. A la vista solo queda el nombre del ajuste.
+function help(text) {
+  return text ? ` <button class="help" type="button" data-help="${escapeHtml(text)}" aria-label="Más información">?</button>` : '';
+}
+
+function bindHelp(root) {
+  root.querySelectorAll('[data-help]').forEach(button => {
+    button.addEventListener('click', () => {
+      openDialog({ title: 'Cómo funciona', message: button.dataset.help, confirmLabel: 'Entendido', cancelLabel: null });
     });
-  }
-
-  for (const group of state.data?.messageCatalog || []) {
-    for (const item of group.items) {
-      entries.push({
-        kind: 'Mensaje',
-        label: item.label,
-        detail: item.description,
-        terms: `${item.label} ${item.description} ${group.group} mensaje embed texto`,
-        section: 'mensajes',
-        focus: `[data-message="${item.id}"]`
-      });
-    }
-  }
-
-  for (const group of state.data?.alerts || []) {
-    for (const item of group.items) {
-      entries.push({
-        kind: 'Registro',
-        label: item.label,
-        detail: `${item.enabled ? 'Activo' : 'Apagado'} · ${group.group}`,
-        terms: `${item.label} ${group.group} registro log aviso canal mención`,
-        section: 'registros',
-        focus: `[data-alert="${item.kind}"]`
-      });
-    }
-  }
-
-  return entries;
-}
-
-// Coincidencia sencilla y tolerante: sin tildes, por palabras sueltas y en
-// cualquier orden, que es como escribe la gente cuando busca.
-function normalize(value) {
-  return String(value ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
-}
-
-function searchMatches(query) {
-  const words = normalize(query).split(/\s+/).filter(Boolean);
-  if (!words.length) return searchEntries().filter(entry => entry.kind === 'Pantalla');
-  return searchEntries()
-    .map(entry => {
-      const haystack = normalize(entry.terms);
-      if (!words.every(word => haystack.includes(word))) return null;
-      // Lo que empieza por lo escrito va primero: es casi siempre lo buscado.
-      const score = normalize(entry.label).startsWith(words[0]) ? 0 : 1;
-      return { entry, score };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.score - b.score)
-    .slice(0, 12)
-    .map(match => match.entry);
-}
-
-function renderSearchResults(query) {
-  const list = $('#search-results');
-  if (!list) return;
-  const results = searchMatches(query);
-  state.searchResults = results;
-  state.searchIndex = 0;
-
-  if (!results.length) {
-    list.innerHTML = '<li class="search-empty">No encontré nada con eso. Prueba con «bienvenida», «baneos», «twitch» o «color».</li>';
-    return;
-  }
-
-  list.innerHTML = results.map((entry, index) => `
-    <li>
-      <button type="button" class="search-hit${index === 0 ? ' active' : ''}" data-hit="${index}">
-        <span class="search-kind">${escapeHtml(entry.kind)}</span>
-        <span class="search-label">${escapeHtml(entry.label)}</span>
-        <span class="search-detail">${escapeHtml(entry.detail || '')}</span>
-      </button>
-    </li>`).join('');
-}
-
-function moveSearchSelection(delta) {
-  const hits = [...document.querySelectorAll('.search-hit')];
-  if (!hits.length) return;
-  state.searchIndex = (state.searchIndex + delta + hits.length) % hits.length;
-  hits.forEach((hit, index) => hit.classList.toggle('active', index === state.searchIndex));
-  hits[state.searchIndex].scrollIntoView({ block: 'nearest' });
-}
-
-async function runSearchHit(index) {
-  const entry = state.searchResults?.[index];
-  if (!entry) return;
-  closeSearch();
-  await showSection(entry.section);
-  if (!entry.focus) return;
-  // Se abre y se resalta lo que se buscó, para no tener que localizarlo a
-  // mano dentro de una lista larga.
-  const target = document.querySelector(entry.focus);
-  if (!target) return;
-  if (target.tagName === 'DETAILS') target.open = true;
-  target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  target.classList.add('flash');
-  setTimeout(() => target.classList.remove('flash'), 1600);
-}
-
-function openSearch() {
-  const dialog = $('#search-dialog');
-  if (!dialog || dialog.open) return;
-  const input = $('#search-input');
-  if (input) input.value = '';
-  renderSearchResults('');
-  dialog.showModal();
-  input?.focus();
-}
-
-function closeSearch() {
-  const dialog = $('#search-dialog');
-  if (dialog?.open) dialog.close();
-}
-
-function bindSearch() {
-  $('#search-open')?.addEventListener('click', openSearch);
-  $('#search-input')?.addEventListener('input', event => renderSearchResults(event.target.value));
-
-  $('#search-results')?.addEventListener('click', event => {
-    const hit = event.target.closest('[data-hit]');
-    if (hit) runSearchHit(Number(hit.dataset.hit));
-  });
-
-  $('#search-dialog')?.addEventListener('keydown', event => {
-    if (event.key === 'ArrowDown') { event.preventDefault(); moveSearchSelection(1); }
-    else if (event.key === 'ArrowUp') { event.preventDefault(); moveSearchSelection(-1); }
-    else if (event.key === 'Enter') { event.preventDefault(); runSearchHit(state.searchIndex); }
-  });
-
-  document.addEventListener('keydown', event => {
-    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-      event.preventDefault();
-      openSearch();
-    } else if (event.key === '/' && !typing && !$('#search-dialog')?.open) {
-      event.preventDefault();
-      openSearch();
-    }
   });
 }
 
@@ -3753,22 +3842,27 @@ function renderNav() {
 
 function renderGuildSwitcher() {
   const container = $('#guild-switcher');
-  if (!state.guilds.length) {
-    container.innerHTML = '<p class="hint">No hay servidores disponibles para esta cuenta.</p>';
+  const actual = state.guilds.find(guild => guild.id === state.guildId);
+
+  if (!actual) {
+    container.innerHTML = '';
     return;
   }
-  container.innerHTML = state.guilds.map(guild => `
-    <button class="guild-option" type="button" data-guild="${escapeHtml(guild.id)}" aria-pressed="${guild.id === state.guildId}">
-      ${avatarMarkup(guild.icon, guild.name, 'guild-badge')}
-      <span class="guild-option-text">
-        <strong>${escapeHtml(guild.name)}</strong>
-        <small>${escapeHtml(TIER_LABELS[guild.tier] || guild.tier)}</small>
-      </span>
-    </button>`).join('');
 
-  container.querySelectorAll('[data-guild]').forEach(button => {
-    button.addEventListener('click', () => selectGuild(button.dataset.guild));
-  });
+  // Dentro de un servidor no se listan los demás: se vuelve al selector. Una
+  // lista de servidores en la barra lateral compite con la navegación y en
+  // cuanto hay más de tres deja de caber.
+  container.innerHTML = `
+    <button class="guild-current" type="button" id="change-guild">
+      ${guildAvatarMarkup(actual, 'sm')}
+      <span class="guild-current-copy">
+        <strong>${escapeHtml(actual.name)}</strong>
+        <small>Cambiar de servidor</small>
+      </span>
+      <span class="guild-current-go" aria-hidden="true">⇄</span>
+    </button>`;
+
+  $('#change-guild')?.addEventListener('click', () => showServerPicker());
 }
 
 function renderBrand() {
@@ -3794,12 +3888,6 @@ function renderAccount() {
   actions.push('<button class="button ghost sm" type="button" id="logout">Cerrar sesión</button>');
 
   $('#account-card').innerHTML = `
-    <div class="theme-switch" role="group" aria-label="Tema del panel">
-      ${[['auto', '◐', 'El del sistema'], ['claro', '☀', 'Claro'], ['oscuro', '☾', 'Oscuro']].map(([value, icon, label]) => `
-        <button type="button" data-theme-option="${value}" title="${escapeHtml(label)}" aria-pressed="false">
-          <span aria-hidden="true">${icon}</span><span class="sr-only">${escapeHtml(label)}</span>
-        </button>`).join('')}
-    </div>
     <div class="account-row">
       ${avatarMarkup(preferred?.avatar || preferred?.picture, name)}
       <div class="account-copy"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(detail)}</small></div>
@@ -3871,7 +3959,8 @@ function renderView() {
     view.innerHTML = card({
       eyebrow: 'Acceso',
       title: 'Necesitas permisos de administración',
-      description: 'Esta pantalla requiere Administrar servidor o ser propietario del bot. Puedes seguir viendo el resumen y tus propios casos.',
+      description: 'Necesitas «Administrar servidor» para entrar aquí.',
+      ayuda: 'El permiso lo da el dueño del servidor desde los ajustes de Discord. Mientras tanto puedes ver el resumen y tus propios casos de moderación.',
       body: ''
     });
     return;
@@ -3927,6 +4016,7 @@ async function refreshStatus() {
 
 async function selectGuild(guildId, { keepSection = false, silent = false } = {}) {
   state.guildId = guildId;
+  document.body.dataset.view = 'servidor';
   if (!keepSection) state.section = 'inicio';
   state.dirty.clear();
   renderGuildSwitcher();
@@ -4019,28 +4109,38 @@ async function boot() {
 
   renderAccount();
   bindSaveBar();
-  bindSearch();
   await refreshStatus();
 
   try {
     const result = await api('/guilds');
     state.guilds = result.guilds || [];
+    state.invitable = result.invitable || [];
+    state.inviteUrl = result.inviteUrl || null;
     renderGuildSwitcher();
-    if (state.guilds.length) {
-      await selectGuild(state.guilds[0].id);
-    } else {
-      $('#view-title').textContent = 'Sin servidores';
-      $('#view-hint').textContent = '';
-      $('#view').innerHTML = card({
-        eyebrow: 'Acceso',
-        title: 'No hay servidores disponibles para esta cuenta',
-        description: 'Solo aparecen servidores aprobados en los que Vesper pueda comprobar tu membresía. Si acabas de entrar a uno, pulsa Actualizar.',
-        body: ''
-      });
-    }
+    // Siempre se empieza eligiendo servidor. Antes saltaba al primero de la
+    // lista y no había forma de ver los demás ni de añadir el bot a uno nuevo.
+    showServerPicker();
   } catch (error) {
     toast(error.message, 'bad');
   }
+}
+
+// Pantalla de elegir servidor: sin barra lateral, porque todavía no hay
+// servidor que configurar.
+function showServerPicker() {
+  state.guildId = null;
+  state.data = null;
+  state.section = 'servidores';
+  document.body.dataset.view = 'servidores';
+  $('#view-eyebrow').textContent = 'Tus servidores';
+  $('#view-title').textContent = 'Elige un servidor';
+  $('#view-hint').textContent = '';
+  const view = $('#view');
+  view.innerHTML = renderServidores();
+  bindCommon(view);
+  bindServidores(view);
+  renderNav();
+  updateSaveBar();
 }
 
 /* ---------------------------------------------------------------- */

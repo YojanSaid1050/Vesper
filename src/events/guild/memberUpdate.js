@@ -116,7 +116,7 @@ module.exports = {
       const roles = addedRoles.map(role => `${role}`).join(', ').slice(0, 1024);
       await publishAlert(newMember.guild, guildConfig, 'log_roles_added', {
         vars: memberVars(newMember, { roles }),
-        defaults: { title: addedRoles.length === 1 ? '🎭 Roles añadidos' : '🎭 Roles Added', color: '#57F287' },
+        defaults: { title: addedRoles.length === 1 ? '🎭 Rol añadido' : '🎭 Roles añadidos', color: '#57F287' },
         fields: [
           { name: '👤 Usuario', value: newMember.user.tag },
           { name: addedRoles.length === 1 ? '🎭 Rol' : '🎭 Roles', value: roles }
@@ -128,7 +128,7 @@ module.exports = {
       const roles = removedRoles.map(role => `${role}`).join(', ').slice(0, 1024);
       await publishAlert(newMember.guild, guildConfig, 'log_roles_removed', {
         vars: memberVars(newMember, { roles }),
-        defaults: { title: removedRoles.length === 1 ? '❌ Roles retirados' : '❌ Roles Removed', color: '#ED4245' },
+        defaults: { title: removedRoles.length === 1 ? '❌ Rol retirado' : '❌ Roles retirados', color: '#ED4245' },
         fields: [
           { name: '👤 Usuario', value: newMember.user.tag },
           { name: removedRoles.length === 1 ? '🎭 Rol' : '🎭 Roles', value: roles }

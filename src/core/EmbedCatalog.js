@@ -31,7 +31,7 @@ const SERVER_VARS = [
 
 const ACTOR_VARS = [['{executor}', 'quién realizó la acción']];
 const CHANNEL_VARS = [['{channel}', 'canal afectado'], ['{channelName}', 'nombre del canal']];
-const ROLE_VARS = [['{role}', 'rol afectado'], ['{roleName}', 'nombre del rol']];
+const ROLE_VARS = [['{role}', 'rol afectado'], ['{roleName}', 'nombre del rol'], ['{roleId}', 'ID del rol']];
 
 const CREATOR_VARS = [
   ['{creator}', 'nombre de la cuenta'],
@@ -261,51 +261,136 @@ const CATALOG = Object.freeze({
 });
 
 
-// Valores con los que sale cada mensaje si no hay nada configurado. Se usan
-// como marcador de posición en el editor del panel. Los de bienvenida y
-// despedida no están aquí: dependen del servidor y los calcula el backend a
-// partir del código que los publica.
+// Valores con los que sale cada mensaje si no hay nada configurado.
+//
+// `fields` son los recuadros que el aviso publica de verdad (quién, dónde,
+// cuándo). No se usan para publicar —de eso se encargan los eventos, que
+// tienen los datos reales— sino para que el panel pueda enseñar en la vista
+// previa el mensaje tal y como va a salir, en lugar de un texto que diga «se
+// conservan los campos originales». Si cambias un campo en un evento,
+// cámbialo también aquí para que la vista previa no mienta.
+//
+// Los de bienvenida y despedida no están: dependen del servidor y los calcula
+// el backend a partir del código que los publica.
 const FACTORY = Object.freeze({
   boost_started: {
     title: '💜 ¡Gracias por el boost!',
     message: '{user} acaba de mejorar **{server}**. Ya vamos por {boostCount} boosts (nivel {boostLevel}).',
     color: '#F47FFF'
   },
-  boost_stopped: { title: '💔 Boost retirado', color: '#747F8D' },
-  boost_level: { title: '🚀 Nuevo nivel de mejora', color: '#F47FFF' },
-  log_member_join: { title: '📥 Miembro entró', color: '#57F287' },
-  log_member_leave: { title: '📤 Miembro salió', color: '#ED4245' },
-  log_bot_join: { title: '🤖 Bot añadido', color: '#5865F2' },
-  log_bot_leave: { title: '🤖 Bot retirado', color: '#ED4245' },
-  log_nickname: { title: '📝 Apodo cambiado', color: '#00B0F4' },
-  log_roles_added: { title: '🎭 Roles añadidos', color: '#57F287' },
-  log_roles_removed: { title: '❌ Roles retirados', color: '#ED4245' },
-  log_timeout_on: { title: '🔇 Miembro aislado', color: '#ED4245' },
-  log_timeout_off: { title: '🔊 Aislamiento retirado', color: '#57F287' },
-  log_ban_added: { title: '🔨 Miembro baneado', color: '#ED4245' },
-  log_ban_removed: { title: '🔓 Baneo retirado', color: '#57F287' },
+  boost_stopped: {
+    title: '💔 Boost retirado',
+    message: '{userTag} dejó de mejorar el servidor. Quedan {boostCount} boosts.',
+    color: '#747F8D'
+  },
+  boost_level: {
+    title: '🚀 Nuevo nivel de mejora',
+    message: '**{server}** alcanzó el nivel {boostLevel} con {boostCount} boosts. ¡Gracias a quienes lo hicieron posible!',
+    color: '#F47FFF'
+  },
+
+  log_member_join: {
+    title: '📥 Miembro entró', color: '#57F287',
+    fields: [['👤 Usuario', '{userTag}'], ['🆔 ID', '{userId}']]
+  },
+  log_member_leave: {
+    title: '📤 Miembro salió', color: '#ED4245',
+    fields: [['👤 Usuario', '{userTag}'], ['🆔 ID', '{userId}']]
+  },
+  log_bot_join: {
+    title: '🤖 Bot añadido', color: '#5865F2',
+    fields: [['🤖 Bot', '{userTag}'], ['🆔 ID', '{userId}'], ['🎭 Rol añadido', '{role}']]
+  },
+  log_bot_leave: {
+    title: '🤖 Bot retirado', color: '#ED4245',
+    fields: [['🤖 Bot', '{userTag}'], ['🆔 ID', '{userId}']]
+  },
+  log_nickname: {
+    title: '📝 Apodo cambiado', color: '#00B0F4',
+    fields: [['👤 Usuario', '{userTag}'], ['📌 Antes', '{before}'], ['📌 Después', '{after}']]
+  },
+  log_roles_added: {
+    title: '🎭 Roles añadidos', color: '#57F287',
+    fields: [['👤 Usuario', '{userTag}'], ['🎭 Roles', '{roles}']]
+  },
+  log_roles_removed: {
+    title: '❌ Roles retirados', color: '#ED4245',
+    fields: [['👤 Usuario', '{userTag}'], ['🎭 Roles', '{roles}']]
+  },
+
+  log_timeout_on: {
+    title: '🔇 Miembro aislado', color: '#ED4245',
+    fields: [['👤 Usuario', '{userTag}'], ['🛠️ Timeout por', '{executor}'], ['📅 Hasta', '{until}'], ['📝 Razón', '{reason}']]
+  },
+  log_timeout_off: {
+    title: '🔊 Aislamiento retirado', color: '#57F287',
+    fields: [['👤 Usuario', '{userTag}'], ['🛠️ Removido por', '{executor}']]
+  },
+  log_ban_added: {
+    title: '🔨 Miembro baneado', color: '#ED4245',
+    fields: [['👤 Usuario', '{userTag}'], ['🛠️ Baneado por', '{executor}']]
+  },
+  log_ban_removed: {
+    title: '🔓 Baneo retirado', color: '#57F287',
+    fields: [['👤 Usuario', '{userTag}'], ['🛠️ Desbaneado por', '{executor}']]
+  },
   automod_notice: { message: '{user}, tu mensaje fue retirado: {reason}. Caso **#{case}**.' },
   automod_dm: { message: 'Recibiste una advertencia en **{server}**.\nMotivo: {reason}\nCaso: **#{case}**' },
-  log_message_deleted: { title: '🗑️ Mensaje borrado', color: '#ED4245' },
-  log_message_edited: { title: '✏️ Mensaje editado', color: '#FAA61A' },
-  log_channel_created: { title: '📁 Canal creado', color: '#57F287' },
-  log_channel_deleted: { title: '🗑️ Canal borrado', color: '#ED4245' },
-  log_role_created: { title: '🎭 Rol creado', color: '#57F287' },
-  log_role_deleted: { title: '❌ Rol borrado', color: '#FF4D4D' },
-  log_voice_join: { title: '🔊 Entró a voz', color: '#57F287' },
-  log_voice_leave: { title: '📴 Salió de voz', color: '#ED4245' },
-  log_voice_move: { title: '🔄 Cambió de canal de voz', color: '#5865F2' },
-  log_messages_purged: { title: '🧹 Mensajes purgados', color: '#FAA61A' },
-  log_thread_created: { title: '🧵 Hilo creado', color: '#57F287' },
-  notify_twitch_live: { title: '{creator} está en directo en Twitch', color: '#9146FF' },
-  notify_youtube_live: { title: '{creator} está en directo en YouTube', color: '#FF0000' },
-  notify_youtube_video: { title: 'Nuevo video de {creator}', color: '#FF0000' },
-  notify_youtube_short: { title: 'Nuevo short de {creator}', color: '#FF0000' },
-  notify_tiktok_live: { title: '{creator} está en directo en TikTok', color: '#1E90FF' },
-  notify_tiktok_video: { title: 'Nuevo video de {creator}', color: '#1E90FF' },
-  deal_epic_free: { title: '🎁 Gratis en Epic: {title}', color: '#2A2A2A' },
-  deal_steam_special: { title: '🏷️ {discount}% de descuento: {title}', color: '#1B2838' },
-  deal_giveaway: { title: '🎉 {title}', color: '#57F287' }
+
+  log_message_deleted: {
+    title: '🗑️ Mensaje borrado', color: '#ED4245',
+    fields: [['👤 Usuario', '{userTag}'], ['🛠️ Eliminado por', '{executor}'], ['📍 Canal', '{channel}'], ['💬 Contenido', '{content}']]
+  },
+  log_message_edited: {
+    title: '✏️ Mensaje editado', color: '#FAA61A',
+    fields: [['👤 Usuario', '{userTag}'], ['📍 Canal', '{channel}'], ['📌 Antes', '{before}'], ['📌 Después', '{after}']]
+  },
+  log_channel_created: {
+    title: '📁 Canal creado', color: '#57F287',
+    fields: [['📌 Canal', '{channel}'], ['📂 Tipo', 'Texto'], ['🛠️ Creado por', '{executor}']]
+  },
+  log_channel_deleted: {
+    title: '🗑️ Canal borrado', color: '#ED4245',
+    fields: [['📌 Canal', '{channelName}'], ['📂 Tipo', 'Texto'], ['🛠️ Eliminado por', '{executor}']]
+  },
+  log_role_created: {
+    title: '🎭 Rol creado', color: '#57F287',
+    fields: [['🎭 Rol', '{role}'], ['🆔 ID', '{roleId}']]
+  },
+  log_role_deleted: {
+    title: '❌ Rol borrado', color: '#FF4D4D',
+    fields: [['🎭 Rol', '{roleName}'], ['🛠️ Eliminado por', '{executor}']]
+  },
+  log_voice_join: {
+    title: '🔊 Entró a voz', color: '#57F287',
+    fields: [['👤 Usuario', '{userTag}'], ['🎤 Canal', '{channel}']]
+  },
+  log_voice_leave: {
+    title: '📴 Salió de voz', color: '#ED4245',
+    fields: [['👤 Usuario', '{userTag}'], ['🎤 Canal', '{channel}']]
+  },
+  log_voice_move: {
+    title: '🔄 Cambió de canal de voz', color: '#5865F2',
+    fields: [['👤 Usuario', '{userTag}'], ['⬅️ De', '{from}'], ['➡️ A', '{to}']]
+  },
+  log_messages_purged: {
+    title: '🧹 Mensajes purgados', color: '#FAA61A',
+    fields: [['📍 Canal', '{channel}'], ['🔢 Cantidad', '{count}']]
+  },
+  log_thread_created: {
+    title: '🧵 Hilo creado', color: '#57F287',
+    fields: [['🧵 Hilo', '{thread}'], ['📍 En', '{channel}'], ['👤 Creado por', '{owner}']]
+  },
+
+  notify_twitch_live: { title: '{creator} está en directo en Twitch', message: '**{title}**\n{url}', color: '#9146FF' },
+  notify_youtube_live: { title: '{creator} está en directo en YouTube', message: '**{title}**\n{url}', color: '#FF0000' },
+  notify_youtube_video: { title: 'Nuevo video de {creator}', message: '**{title}**\n{url}', color: '#FF0000' },
+  notify_youtube_short: { title: 'Nuevo short de {creator}', message: '**{title}**\n{url}', color: '#FF0000' },
+  notify_tiktok_live: { title: '{creator} está en directo en TikTok', message: '**{title}**\n{url}', color: '#1E90FF' },
+  notify_tiktok_video: { title: 'Nuevo video de {creator}', message: '**{title}**\n{url}', color: '#1E90FF' },
+  deal_epic_free: { title: '🎁 Gratis en Epic: {title}', message: 'Gratis hasta {endsAt}.\n{url}', color: '#2A2A2A' },
+  deal_steam_special: { title: '🏷️ {discount}% de descuento: {title}', message: 'De {originalPrice} a **{price}**.\n{url}', color: '#1B2838' },
+  deal_giveaway: { title: '🎉 {title}', message: 'Valorado en {worth}.\n{url}', color: '#57F287' }
 });
 
 function factoryDefaults(kind) {

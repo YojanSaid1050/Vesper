@@ -6,7 +6,7 @@ const Suggestion = require('../database/models/Suggestion');
 const WebAuditLog = require('../database/models/WebAuditLog');
 const { getGuildConfig, updateGuildSection, setGuildPlan, updateCommunitySection, addGuildListItem, removeGuildListItem } = require('../database/mongoManager');
 const { setupChecks } = require('../core/SetupService');
-const { isModuleEnabledConfig, guildTier, isAnyMainGuild, guildPlan, lockedFeatures, PREMIUM_FEATURES, MAIN_ONLY_FEATURES } = require('../config/guildPolicy');
+const { isModuleEnabledConfig, guildTier, isAnyMainGuild, guildPlan, lockedFeatures, featureAvailable, PREMIUM_FEATURES, MAIN_ONLY_FEATURES } = require('../config/guildPolicy');
 const {
   createCase,
   getCase,
@@ -32,6 +32,7 @@ const {
 } = require('./WebSessionService');
 const {
   redirectUris,
+  inviteUrl,
   discordConfigured,
   googleConfigured,
   discordAuthorizationUrl,
@@ -39,7 +40,7 @@ const {
   googleAuthorizationUrl,
   exchangeGoogleCode
 } = require('./OAuthService');
-const { isGlobalOwner, guildAccess, accessibleGuilds } = require('./WebPermissionService');
+const { isGlobalOwner, guildAccess, accessibleGuilds, invitableGuilds } = require('./WebPermissionService');
 const { sanitizeGuildPatch } = require('./configSanitizer');
 const { webAdminMode } = require('../core/CommandVisibilityService');
 const { normalizeUsername } = require('../platforms/tiktok/utils');
@@ -48,7 +49,7 @@ const { verifyChannel } = require('../platforms/youtube/utils');
 const { publishSelfRolePanel, publishTicketPanel, reviewSuggestion } = require('../core/CommunityService');
 const { catalogForPanel } = require('../core/EmbedCatalog');
 const { alertOverview } = require('../core/AlertRouter');
-const { themesForPanel, applyTheme, clearTheme } = require('../core/MessageThemes');
+const { themesForPanel, themeAllowed, applyTheme, clearTheme } = require('../core/MessageThemes');
 const { KINDS } = require('../core/EmbedCatalog');
 
 const publicDir = path.join(__dirname, 'public');
@@ -186,8 +187,8 @@ function embedDefaultsFor(guildId, guildName) {
   return {
     layout: 'classic',
     note: themed
-      ? 'Embed clásico de Discord. Puedes cambiar título, mensaje, color, imagen, pie de página y si se muestra el avatar del miembro, o pasarlo al contenedor Components V2.'
-      : 'Embed neutro para servidores satélite.',
+      ? 'Cambia el título, el texto, el color, la imagen y el pie. Lo verás justo debajo.'
+      : 'Un saludo sencillo. Cambia lo que quieras y míralo aquí mismo.',
     supportsFooter: true,
     supportsThumbnail: true,
     welcome: {
@@ -342,7 +343,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     // proveedor las rechace: es literalmente lo único que hace falta saber
     // para arreglar un «redirect_uri_mismatch».
     redirectUris: redirectUris(),
-    version: '3.2.0'
+    version: '3.3.0'
   }));
 
   app.get('/auth/discord', authLimiter, requireDashboard, async (req, res, next) => {
@@ -405,7 +406,14 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     try {
       const client = getClientOr503(getClient, res);
       if (!client) return;
-      return res.json({ guilds: await accessibleGuilds(client, req.webSession, getGuildConfig) });
+      const guilds = await accessibleGuilds(client, req.webSession, getGuildConfig);
+      return res.json({
+        guilds,
+        // Servidores donde mandas pero Vesper aún no está: se ofrecen con un
+        // botón para añadirlo, en vez de dejarte buscándolo en Discord.
+        invitable: invitableGuilds(client, req.webSession, guilds),
+        inviteUrl: inviteUrl()
+      });
     } catch (error) { return next(error); }
   });
 
@@ -475,7 +483,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
           mainOnlyFeatures: [...MAIN_ONLY_FEATURES]
         },
         alerts: access.configure ? alertOverview(config) : null,
-        messageThemes: access.configure ? themesForPanel() : null,
+        messageThemes: access.configure ? themesForPanel(guildTier(req.params.guildId)) : null,
         identity: effectiveIdentity(config, client, access.guild),
         config: access.configure ? serializedConfig(config) : null,
         channels,
@@ -519,7 +527,14 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
       if (!context) return;
       if (!context.access.configure) return res.status(403).json({ error: 'Necesitas Administrar servidor para cambiar los mensajes.' });
 
+      if (!featureAvailable('embeds', req.params.guildId, await getGuildConfig(req.params.guildId))) {
+        return res.status(403).json({ error: 'Editar los mensajes es parte del plan premium.' });
+      }
+
       const themeId = String(req.body?.theme ?? '');
+      if (themeId !== 'ninguno' && !themeAllowed(themeId, guildTier(req.params.guildId))) {
+        return res.status(403).json({ error: 'Ese paquete no está disponible en este servidor.' });
+      }
       const embeds = themeId === 'ninguno' ? clearTheme(KINDS) : applyTheme(themeId);
       if (!embeds) return res.status(400).json({ error: 'Ese paquete de mensajes no existe.' });
 

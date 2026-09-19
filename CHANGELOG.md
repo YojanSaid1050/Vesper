@@ -1,5 +1,60 @@
 # Changelog
 
+## 3.3.0 — La vista previa deja de mentir
+
+El panel enseñaba «(campos originales del aviso)» en la vista previa de casi
+todos los registros. Quien entraba a cambiar un mensaje no podía saber qué
+publicaba el bot, así que no lo tocaba.
+
+- **La vista previa enseña siempre el mensaje entero.** El catálogo ahora lleva
+  los recuadros que publica cada aviso —👤 Usuario, 🆔 ID, 📍 Canal, 📌 Antes,
+  📌 Después…— y la vista previa los pinta con datos de ejemplo. Una prueba
+  comprueba que ningún mensaje se queda sin con qué pintarse.
+- **«Partir del original»**: un botón escribe en el editor el texto con el que
+  sale el mensaje hoy, para tener una base que retocar en vez de una caja
+  vacía.
+- **Ya no quedan `{variables}` en crudo en pantalla.** Faltaban los valores de
+  ejemplo de `{boostCount}`, `{boostLevel}`, `{previousLevel}`, `{price}`,
+  `{discount}`, `{count}`, `{roleId}` y ocho más.
+- **La vista previa respeta lo que hace Discord de verdad**: en un embed
+  clásico el título sale sin formato y sin menciones, así que ahí tampoco se
+  pintan. Un aviso lo dice y explica que para agrandar la letra hay que pasar
+  al contenedor V2. La barra de formato del título pierde citas, listas y
+  bloques de código, que en una sola línea no hacen nada.
+- **Los mensajes de Ankerie Dimension, rehechos según su concepto**: cortos,
+  cercanos y con el limón en el pie en vez de en el título. La paleta pasa a
+  cielo para entradas y salidas, magenta para los boosts y limón para lo que
+  pide atención.
+- **El botón «?» se veía como HTML en crudo** en diez tarjetas del panel, en
+  mitad de la descripción. `card()` recibe ahora el texto de ayuda por su
+  cuenta.
+- **Dos títulos de registro seguían en inglés** («Roles Added», «Roles
+  Removed») cuando se añadía o quitaba más de un rol a la vez. Y el singular y
+  el plural estaban cambiados.
+- Textos del panel repasados uno a uno: fuera «embed», «Components V2» y
+  «servidores satélite» de lo que lee un usuario.
+- Comprobado en un navegador real: las 13 pantallas de los tres servidores de
+  prueba, sin HTML en crudo, sin variables sin sustituir, sin vistas previas
+  vacías, sin desbordes de 390 a 1400 px y sin errores de consola.
+
+## 3.2.1 — El panel y la portada, un solo producto
+
+En la 3.2.0 rehice la portada con el lenguaje visual nuevo, pero el interior
+del panel se quedó con el anterior: botones cuadrados frente a botones tipo
+píldora, esquinas distintas, fondos distintos. Parecían dos webs.
+
+- **Misma forma**: botones redondeados por igual en los dos sitios, y los
+  mismos radios de tarjeta, sombras y trazos.
+- **Mismo fondo**: el degradado de acento de la portada también tiñe el panel,
+  así que entrar deja de ser un corte seco.
+- **Navegación redondeada**, y el apartado en el que estás se marca con el
+  degradado de acento en vez de un bloque plano.
+- **La marca del panel lleva a la portada.** Antes, una vez dentro, no había
+  forma de volver a la web pública.
+- Comprobado en un navegador real: los dos comparten radio de botón, radio de
+  tarjeta y color de fondo, y no hay desbordes de 360 a 1400 px.
+
+
 ## 3.2.0 — Planes, portada y acceso con Google explicado
 
 ### Añadido · Planes: gratis, premium y principal

@@ -4,6 +4,7 @@ const { normalizeAllowedDomain } = require('../core/ModerationService');
 const { EMBED_FIELD_LIMITS } = require('../core/EmbedTemplateService');
 const { isKnownKind, kindInfo } = require('../core/EmbedCatalog');
 const { ROUTABLE } = require('../core/AlertRouter');
+const { featureAvailable } = require('../config/guildPolicy');
 
 class ValidationError extends Error {
   constructor(message) {
@@ -163,6 +164,9 @@ function sanitizeGuildPatch(input, guild) {
   // Editor de embeds de bienvenida y despedida. Disponible en cualquier
   // servidor: cada Main tiene su propio diseño y sus propios textos.
   if (input.embeds !== undefined) {
+    if (!featureAvailable('embeds', guild?.id)) {
+      throw new ValidationError('Editar los mensajes es parte del plan premium.');
+    }
     const source = input.embeds;
     if (!source || typeof source !== 'object' || Array.isArray(source)) throw new ValidationError('embeds no es válido.');
     const target = {};
