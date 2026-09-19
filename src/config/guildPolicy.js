@@ -39,11 +39,11 @@ const MODULE_DEFAULTS = Object.freeze({
 // propietario se lo concede desde el panel (se guarda en `plan`).
 const PLAN_FEATURES = Object.freeze({
   free: [
-    'welcome', 'goodbye', 'boosts', 'logs', 'alerts', 'embeds', 'messageThemes',
+    'welcome', 'goodbye', 'boosts', 'logs', 'alerts',
     'moderation', 'tickets', 'suggestions', 'selfroles', 'starboard'
   ],
-  // Lo que consume recursos de verdad.
-  premium: ['tiktok', 'twitch', 'youtube', 'deals', 'music'],
+  // Lo que consume recursos, y escribir los textos del bot.
+  premium: ['tiktok', 'twitch', 'youtube', 'deals', 'music', 'embeds', 'messageThemes'],
   // Lo que cambia la cara del bot o le ocupa un canal permanente.
   main: ['profile', 'discordPanel', 'brandingCommands']
 });

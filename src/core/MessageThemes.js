@@ -7,13 +7,19 @@
 // porque un servidor con la mitad de los avisos en el tono de su comunidad y
 // la otra mitad en el tono de fábrica queda peor que no haber tocado nada.
 //
-// Se aplican desde el panel y están disponibles en CUALQUIER servidor: los dos
-// Main vienen con el suyo puesto, pero un servidor nuevo puede elegir el que
-// quiera o partir de uno y retocarlo. Aplicar un paquete solo escribe en
-// `config.embeds`, así que se puede volver atrás mensaje a mensaje.
+// Cada paquete tiene DUEÑO. «Void» es la voz de Embers Void y «Limones» la de
+// Ankerie Dimension: son la identidad de esos servidores, no plantillas para
+// repartir. Ofrecérselas a cualquiera sería regalar la cara de otro.
+//
+// Para el resto hay «Estándar»: neutro, claro y sin guiños a nadie. Y editar
+// los mensajes uno a uno es parte del plan premium.
+//
+// Aplicar un paquete solo escribe en `config.embeds`, así que se puede volver
+// atrás mensaje a mensaje.
 
 const VOID = {
   id: 'void',
+  scope: 'primary_main',
   name: 'Void',
   tagline: 'Morado profundo, negro y blanco. Solemne y con ornamentos.',
   accent: '#9D63FF',
@@ -29,16 +35,20 @@ const VOID = {
 
 const LIMONES = {
   id: 'limones',
+  scope: 'themed_main',
   name: 'Limones',
-  tagline: 'Amarillo cítrico y cielo pastel. Cercano y con guiños a los limones.',
-  accent: '#F7D354',
-  swatches: ['#F7D354', '#A8DCEF', '#F8C8DC', '#FFF6D6'],
+  tagline: 'Cielo pastel, limón y magenta. Cercano, corto y con guiños a los limones.',
+  accent: '#8DDCF4',
+  swatches: ['#8DDCF4', '#F7D354', '#E3A0F0', '#FFF6D6'],
   colors: {
-    neutral: '#F7D354',
+    // El cielo es el tono de las entradas y salidas; el magenta, el de los
+    // boosts; el limón se reserva para los avisos que piden atención.
+    neutral: '#8DDCF4',
     good: '#B8E986',
     bad: '#F79E9E',
-    warn: '#FFC978',
-    dark: '#8DDCF4'
+    warn: '#F7D354',
+    dark: '#8DDCF4',
+    boost: '#E3A0F0'
   }
 };
 
@@ -163,30 +173,33 @@ const VOID_MESSAGES = {
 
 const LIMONES_MESSAGES = {
   welcome: {
-    title: '🍋 Bienvenid@ a {server} :3',
+    title: 'Bienvenid@ a {server} :3',
     message: 'Olaaa {user}, bienvenid@ a **{server}**\nespero te sientas como en casa y disfrutes!',
     footer: 'Reclama tu limón'
   },
   goodbye: {
-    title: '🍋 Hasta pronto',
-    message: 'Adiós {displayName}, gracias por haber formado parte de **{server}**.\n¡Hasta pronto! :3',
+    title: 'Hasta pronto {user}',
+    message: 'Adiós {user}, gracias por haber formado parte de **{server}**.\n¡Hasta pronto! :3',
     footer: 'Devuelve los limones'
   },
 
   boost_started: {
-    title: '🍋✨ ¡Gracias por el boost!',
-    message: '{user} acaba de exprimir un limón por **{server}** 💛\n-# Vamos por {boostCount} boosts · nivel {boostLevel}',
-    tone: 'good'
+    title: '¡Gracias por dejar tu Limón!',
+    message: '{user} acaba de mejorar **{server}**.\nYa vamos por {boostCount} boosts (nivel {boostLevel}).',
+    footer: 'Gracias por depositar tus limones',
+    tone: 'boost'
   },
   boost_stopped: {
-    title: '🍋 Se acabó el zumo',
-    message: '{displayName} retiró su boost. Quedan {boostCount}.',
-    tone: 'warn'
+    title: '¿Por qué te llevas el Limón :c ?',
+    message: '{user} retiró su mejora de **{server}**.\nQuedan {boostCount} boosts.',
+    footer: 'Un limón se despidió de la bolsa…',
+    tone: 'boost'
   },
   boost_level: {
-    title: '🍋🎉 ¡Nivel {boostLevel}!',
-    message: '**{server}** subió de nivel. La limonada está más dulce.\n-# Veníamos del nivel {previousLevel}.',
-    tone: 'good'
+    title: '¡La bolsa de Limones creció!',
+    message: '**{server}** acaba de alcanzar el nivel {boostLevel} de Discord.\nY todavía queda espacio para muchos más Limones…',
+    footer: 'Nueva bolsa desbloqueada',
+    tone: 'boost'
   },
 
   log_member_join: { title: '🍋 Alguien nuevo por aquí', tone: 'good' },
@@ -216,51 +229,108 @@ const LIMONES_MESSAGES = {
   log_voice_leave: { title: '🎧 Salió de voz', tone: 'warn' },
   log_voice_move: { title: '🎧 Cambió de canal', tone: 'neutral' },
 
-  notify_twitch_live: {
-    title: '🍋 {creator} está en directo!',
-    message: '**{title}**\n\nPásate a saludar 💛\n{url}'
+  notify_twitch_live: { title: '🍋 {creator} está en directo!', message: '**{title}**\n{url}' },
+  notify_youtube_live: { title: '🍋 {creator} está en directo!', message: '**{title}**\n{url}' },
+  notify_youtube_video: { title: '🍋 Vídeo nuevo de {creator}', message: '**{title}**\n{url}' },
+  notify_youtube_short: { title: '🍋 Short nuevo de {creator}', message: '**{title}**\n{url}' },
+  notify_tiktok_live: { title: '🍋 {creator} está en directo!', message: '**{title}**\n{url}' },
+  notify_tiktok_video: { title: '🍋 TikTok nuevo de {creator}', message: '**{title}**\n{url}' },
+
+  deal_epic_free: { title: '🎁 Gratis en Epic: {title}', message: 'Por tiempo limitado.\n{url}', tone: 'good' },
+  deal_steam_special: { title: '🏷️ {discount}% de descuento: {title}', message: 'Se queda en {price}.\n{url}', tone: 'warn' },
+  deal_giveaway: { title: '🎉 Sorteo: {title}', message: '{url}', tone: 'good' }
+};
+
+
+/* ------------------------------------------------------------------ */
+/* Estándar — el paquete para cualquier servidor                       */
+/* ------------------------------------------------------------------ */
+
+// Sin guiños a ninguna comunidad: dice lo que pasó, con claridad y en
+// castellano. Es lo que se le ofrece a un servidor que acaba de añadir el bot.
+const ESTANDAR = {
+  id: 'estandar',
+  scope: 'all',
+  name: 'Estándar',
+  tagline: 'Claro y directo, sin adornos. Va bien en cualquier servidor.',
+  accent: '#5865F2',
+  swatches: ['#5865F2', '#57F287', '#ED4245', '#FAA61A'],
+  colors: {
+    neutral: '#5865F2',
+    good: '#57F287',
+    bad: '#ED4245',
+    warn: '#FAA61A',
+    dark: '#747F8D'
+  }
+};
+
+const ESTANDAR_MESSAGES = {
+  welcome: {
+    title: '👋 Te damos la bienvenida',
+    message: 'Hola {user}, bienvenid@ a **{server}**.\nYa sois {memberCount}. Ponte cómodo.',
+    tone: 'good'
   },
-  notify_youtube_live: {
-    title: '🍋 {creator} está en directo!',
-    message: '**{title}**\n{url}'
-  },
-  notify_youtube_video: {
-    title: '🍋 Vídeo nuevo de {creator}',
-    message: '**{title}**\n{url}'
-  },
-  notify_youtube_short: {
-    title: '🍋 Short nuevo de {creator}',
-    message: '**{title}**\n{url}'
-  },
-  notify_tiktok_live: {
-    title: '🍋 {creator} está en directo!',
-    message: '**{title}**\n{url}'
-  },
-  notify_tiktok_video: {
-    title: '🍋 TikTok nuevo de {creator}',
-    message: '**{title}**\n{url}'
+  goodbye: {
+    title: '👋 Hasta pronto',
+    message: '**{displayName}** ha dejado el servidor.\nGracias por haber pasado por aquí.',
+    tone: 'dark'
   },
 
-  deal_epic_free: {
-    title: '🍋🎁 Gratis en Epic: {title}',
-    message: 'Se regala por tiempo limitado. ¡Corre!\n{url}',
+  boost_started: {
+    title: '💜 ¡Gracias por el boost!',
+    message: '{user} acaba de mejorar **{server}**.\n-# {boostCount} boosts en total · nivel {boostLevel}',
     tone: 'good'
   },
-  deal_steam_special: {
-    title: '🍋🏷️ {discount}% de descuento: {title}',
-    message: 'Se queda en {price}.\n{url}',
-    tone: 'warn'
-  },
-  deal_giveaway: {
-    title: '🍋🎉 Sorteo: {title}',
-    message: '{url}',
+  boost_stopped: { title: '💔 Boost retirado', message: '{displayName} retiró su boost. Quedan {boostCount}.', tone: 'warn' },
+  boost_level: {
+    title: '🚀 Nivel {boostLevel}',
+    message: '**{server}** subió de nivel de mejora.\n-# Antes estaba en el {previousLevel}.',
     tone: 'good'
-  }
+  },
+
+  log_member_join: { title: '📥 Miembro entró', tone: 'good' },
+  log_member_leave: { title: '📤 Miembro salió', tone: 'bad' },
+  log_bot_join: { title: '🤖 Bot añadido', tone: 'neutral' },
+  log_bot_leave: { title: '🤖 Bot retirado', tone: 'warn' },
+  log_nickname: { title: '📝 Apodo cambiado', tone: 'neutral' },
+  log_roles_added: { title: '🎭 Roles añadidos', tone: 'good' },
+  log_roles_removed: { title: '❌ Roles retirados', tone: 'bad' },
+
+  log_timeout_on: { title: '🔇 Miembro aislado', tone: 'bad' },
+  log_timeout_off: { title: '🔊 Aislamiento retirado', tone: 'good' },
+  log_ban_added: { title: '🔨 Miembro baneado', tone: 'bad' },
+  log_ban_removed: { title: '🔓 Baneo retirado', tone: 'good' },
+  automod_notice: { message: '{user}, retiré tu mensaje: {reason}. Caso **#{case}**.' },
+  automod_dm: { message: 'Recibiste una advertencia en **{server}**.\n\nMotivo: {reason}\nCaso: **#{case}**' },
+
+  log_message_deleted: { title: '🗑️ Mensaje borrado', tone: 'bad' },
+  log_message_edited: { title: '✏️ Mensaje editado', tone: 'warn' },
+  log_messages_purged: { title: '🧹 Mensajes purgados', tone: 'warn' },
+  log_channel_created: { title: '📁 Canal creado', tone: 'good' },
+  log_channel_deleted: { title: '🗑️ Canal borrado', tone: 'bad' },
+  log_role_created: { title: '🎭 Rol creado', tone: 'good' },
+  log_role_deleted: { title: '❌ Rol borrado', tone: 'bad' },
+  log_thread_created: { title: '🧵 Hilo creado', tone: 'good' },
+  log_voice_join: { title: '🔊 Entró a voz', tone: 'good' },
+  log_voice_leave: { title: '📴 Salió de voz', tone: 'warn' },
+  log_voice_move: { title: '🔄 Cambió de canal de voz', tone: 'neutral' },
+
+  notify_twitch_live: { title: '🔴 {creator} está en directo', message: '**{title}**\n{url}' },
+  notify_youtube_live: { title: '🔴 {creator} está en directo', message: '**{title}**\n{url}' },
+  notify_youtube_video: { title: '📹 Vídeo nuevo de {creator}', message: '**{title}**\n{url}' },
+  notify_youtube_short: { title: '📱 Short nuevo de {creator}', message: '**{title}**\n{url}' },
+  notify_tiktok_live: { title: '🔴 {creator} está en directo', message: '**{title}**\n{url}' },
+  notify_tiktok_video: { title: '📹 TikTok nuevo de {creator}', message: '**{title}**\n{url}' },
+
+  deal_epic_free: { title: '🎁 Gratis en Epic: {title}', message: 'Por tiempo limitado.\n{url}', tone: 'good' },
+  deal_steam_special: { title: '🏷️ {discount}% de descuento: {title}', message: 'Se queda en {price}.\n{url}', tone: 'warn' },
+  deal_giveaway: { title: '🎉 Sorteo: {title}', message: '{url}', tone: 'good' }
 };
 
 /* ------------------------------------------------------------------ */
 
 const THEMES = Object.freeze({
+  estandar: Object.freeze(pack(ESTANDAR, ESTANDAR_MESSAGES)),
   void: Object.freeze(pack(VOID, VOID_MESSAGES)),
   limones: Object.freeze(pack(LIMONES, LIMONES_MESSAGES))
 });
@@ -271,10 +341,19 @@ function getTheme(id) {
   return THEMES[id] || null;
 }
 
+// ¿Puede este servidor usar este paquete? Los temáticos son de su servidor y
+// de nadie más: son su identidad, no una plantilla que repartir.
+function themeAllowed(id, tier) {
+  const theme = THEMES[id];
+  if (!theme) return false;
+  if (theme.scope === 'all') return true;
+  return theme.scope === tier;
+}
+
 // Lo que el panel necesita para enseñar los paquetes sin mandar los 38
-// mensajes de cada uno.
-function themesForPanel() {
-  return THEME_IDS.map(id => {
+// mensajes de cada uno. `tier` decide cuáles se ofrecen.
+function themesForPanel(tier = null) {
+  return THEME_IDS.filter(id => themeAllowed(id, tier)).map(id => {
     const theme = THEMES[id];
     return {
       id: theme.id,
@@ -316,4 +395,4 @@ function clearTheme(kinds) {
   return embeds;
 }
 
-module.exports = { THEMES, THEME_IDS, getTheme, themesForPanel, applyTheme, clearTheme };
+module.exports = { THEMES, THEME_IDS, getTheme, themeAllowed, themesForPanel, applyTheme, clearTheme };

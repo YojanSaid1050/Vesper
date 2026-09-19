@@ -79,4 +79,22 @@ async function accessibleGuilds(client, session, getConfig) {
   return result.sort((a, b) => a.name.localeCompare(b.name, 'es'));
 }
 
-module.exports = { isGlobalOwner, hasConfiguredRole, guildAccess, accessibleGuilds };
+/**
+ * Los servidores donde la persona manda pero Vesper todavía no está.
+ * Son los que se ofrecen para invitarlo.
+ */
+function invitableGuilds(client, session, managed = []) {
+  const suyos = session?.discord?.guilds;
+  if (!Array.isArray(suyos)) return [];
+
+  const yaGestionados = new Set(managed.map(guild => guild.id));
+  return suyos
+    .filter(guild => !yaGestionados.has(guild.id))
+    // Si el bot ya está dentro pero la persona no pudo entrar, no es que
+    // falte invitarlo: es otra cosa, y no se ofrece como si lo fuera.
+    .filter(guild => !client?.guilds?.cache?.has(guild.id))
+    .map(guild => ({ id: guild.id, name: guild.name, icon: guild.icon, owner: guild.owner }))
+    .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+}
+
+module.exports = { isGlobalOwner, hasConfiguredRole, guildAccess, accessibleGuilds, invitableGuilds };

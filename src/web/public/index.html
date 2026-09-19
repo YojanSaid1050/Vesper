@@ -26,11 +26,11 @@
   <main id="login-view" class="login-view" hidden>
     <section class="login-card">
       <span class="mark large" aria-hidden="true">V</span>
-      <h1>Panel de Vesper</h1>
-      <p class="lead">Configura tus servidores, revisa la moderación y edita los mensajes del bot. Sin tocar código.</p>
+      <h1>Entra con Discord</h1>
+      <p class="lead">Verás los servidores donde eres administrador.</p>
       <div id="login-message" class="callout" hidden></div>
       <div id="login-actions" class="login-actions"></div>
-      <p class="fine-print">Vesper nunca ve tu contraseña. El acceso usa OAuth de Discord y vuelve a comprobar tus permisos en el servidor cada vez que abres el panel.</p>
+      <p class="fine-print">Vesper nunca ve tu contraseña.</p>
     </section>
   </main>
 
@@ -42,13 +42,15 @@
     </button>
 
     <aside id="sidebar" class="sidebar" aria-label="Navegación principal">
-      <div class="brand">
+      <!-- La marca lleva a la portada: desde el panel no había forma de
+           volver a la web pública. -->
+      <a class="brand" href="/" title="Volver a la portada">
         <span id="brand-avatar" class="brand-avatar" aria-hidden="true"></span>
         <span class="brand-text">
           <strong id="brand-name">Vesper</strong>
           <small id="brand-sub">Panel de control</small>
         </span>
-      </div>
+      </a>
 
       <div class="sidebar-block">
         <p class="sidebar-label" id="guild-switcher-label">Servidor</p>
@@ -70,11 +72,13 @@
           <p class="view-hint" id="view-hint"></p>
         </div>
         <div class="topbar-actions">
-          <button id="search-open" class="search-trigger" type="button">
-            <span aria-hidden="true">⌕</span>
-            <span class="search-trigger-text">Buscar un ajuste…</span>
-            <kbd>Ctrl</kbd><kbd>K</kbd>
-          </button>
+          <!-- El tema vive arriba porque la barra lateral desaparece al elegir
+               servidor, y desde ahí no se podía cambiar. -->
+          <div class="theme-switch" role="group" aria-label="Tema del panel">
+            <button type="button" data-theme-option="auto" title="El del sistema" aria-pressed="false">◐</button>
+            <button type="button" data-theme-option="claro" title="Claro" aria-pressed="false">☀</button>
+            <button type="button" data-theme-option="oscuro" title="Oscuro" aria-pressed="false">☾</button>
+          </div>
           <span id="status-pill" class="pill" aria-live="polite">Comprobando…</span>
           <button id="refresh-button" class="button quiet" type="button">
             <span aria-hidden="true">⟳</span> <span class="button-text">Actualizar</span>
@@ -135,19 +139,6 @@
       <form method="dialog" class="modal-actions">
         <button value="close" class="button" type="submit">Listo</button>
       </form>
-    </div>
-  </dialog>
-
-  <!-- Buscador. Con cientos de ajustes, recordar en qué pantalla está cada
-       cosa es imposible: se escribe y se va. -->
-  <dialog id="search-dialog" class="modal search" aria-label="Buscar un ajuste">
-    <div class="modal-card search-card">
-      <div class="search-field">
-        <span aria-hidden="true">⌕</span>
-        <input id="search-input" type="search" placeholder="Bienvenida, baneos, color, twitch…" autocomplete="off" spellcheck="false">
-      </div>
-      <ul id="search-results" class="search-results"></ul>
-      <p class="search-help"><kbd>↑</kbd><kbd>↓</kbd> para moverte · <kbd>Enter</kbd> para abrir · <kbd>Esc</kbd> para cerrar</p>
     </div>
   </dialog>
 

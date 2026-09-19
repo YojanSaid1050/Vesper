@@ -14,6 +14,21 @@ function cache(items) {
   return map;
 }
 
+// Editar los mensajes es de plan premium, así que las pruebas que tocan
+// `embeds` tienen que concederlo al servidor de prueba.
+const GUILD_DE_PRUEBA = '323456789012345678';
+
+function conPremium(accion) {
+  const antes = process.env.PREMIUM_GUILD_IDS;
+  process.env.PREMIUM_GUILD_IDS = GUILD_DE_PRUEBA;
+  try {
+    return accion();
+  } finally {
+    if (antes === undefined) delete process.env.PREMIUM_GUILD_IDS;
+    else process.env.PREMIUM_GUILD_IDS = antes;
+  }
+}
+
 function mockGuild(permissionList = [], memberRoles = []) {
   const textChannel = {
     id: '123456789012345678',
@@ -346,29 +361,32 @@ test('la identidad se puede editar en ambos Main pero no en un satélite', () =>
 /* ------------------------------------------------------------------ */
 
 test('el saneador acepta los dos formatos y el «el de siempre»', () => {
-  const guild = mockGuild();
-  for (const layout of ['classic', 'components_v2']) {
-    const result = sanitizeGuildPatch({ embeds: { welcome: { layout } } }, guild);
-    assert.equal(result.embeds.welcome.layout, layout);
-  }
-  for (const empty of [null, '', 'auto']) {
-    const result = sanitizeGuildPatch({ embeds: { welcome: { layout: empty } } }, guild);
-    assert.equal(result.embeds.welcome.layout, null);
-  }
+  conPremium(() => {    const guild = mockGuild();
+    for (const layout of ['classic', 'components_v2']) {
+      const result = sanitizeGuildPatch({ embeds: { welcome: { layout } } }, guild);
+      assert.equal(result.embeds.welcome.layout, layout);
+    }
+    for (const empty of [null, '', 'auto']) {
+      const result = sanitizeGuildPatch({ embeds: { welcome: { layout: empty } } }, guild);
+      assert.equal(result.embeds.welcome.layout, null);
+    }
+  });
 });
 
 test('un formato inventado se rechaza', () => {
-  assert.throws(
-    () => sanitizeGuildPatch({ embeds: { welcome: { layout: 'bonito' } } }, mockGuild()),
-    /layout no es válido/
-  );
+  conPremium(() => {    assert.throws(
+      () => sanitizeGuildPatch({ embeds: { welcome: { layout: 'bonito' } } }, mockGuild()),
+      /layout no es válido/
+    );
+  });
 });
 
 test('los mensajes de texto normal no admiten formato de embed', () => {
-  assert.throws(
-    () => sanitizeGuildPatch({ embeds: { automod_dm: { layout: 'components_v2' } } }, mockGuild()),
-    /texto normal/
-  );
+  conPremium(() => {    assert.throws(
+      () => sanitizeGuildPatch({ embeds: { automod_dm: { layout: 'components_v2' } } }, mockGuild()),
+      /texto normal/
+    );
+  });
 });
 
 /* ------------------------------------------------------------------ */
@@ -446,7 +464,7 @@ test('el panel recibe todos los avisos agrupados', () => {
 
 const { featureAvailable, MAIN_ONLY_FEATURES, PREMIUM_FEATURES, guildPlan, lockedFeatures } = require('../src/config/guildPolicy');
 const { THEMES, applyTheme, clearTheme, themesForPanel } = require('../src/core/MessageThemes');
-const { KINDS } = require('../src/core/EmbedCatalog');
+const { KINDS, factoryDefaults, kindInfo } = require('../src/core/EmbedCatalog');
 
 test('la identidad propia del bot es solo de los dos Main', () => {
   const antes = { main: process.env.MAIN_GUILD_ID, temas: process.env.THEMED_MAIN_GUILD_IDS };
@@ -463,7 +481,7 @@ test('la identidad propia del bot es solo de los dos Main', () => {
 });
 
 test('lo que no consume recursos está disponible en cualquier servidor', () => {
-  for (const feature of ['embeds', 'alerts', 'moderation', 'messageThemes', 'welcome', 'logs', 'tickets']) {
+  for (const feature of ['alerts', 'moderation', 'welcome', 'goodbye', 'logs', 'tickets', 'selfroles']) {
     assert.equal(featureAvailable(feature, '999999999999999999'), true, `${feature} no debería estar restringido`);
   }
   assert.equal(MAIN_ONLY_FEATURES.length, 3, 'la lista de exclusivas debe quedarse corta a propósito');
@@ -475,7 +493,9 @@ test('lo que consume recursos es de plan premium', () => {
     assert.equal(featureAvailable(feature, gratis), false, `${feature} debería requerir plan`);
     assert.equal(featureAvailable(feature, gratis, { plan: 'premium' }), true, `${feature} debería abrirse con plan`);
   }
-  assert.deepEqual([...PREMIUM_FEATURES].sort(), ['deals', 'music', 'tiktok', 'twitch', 'youtube']);
+  // Editar los textos del bot entra aquí: es lo que convierte a Vesper en
+  // «tu» bot, y es la razón principal por la que alguien pagaría.
+  assert.deepEqual([...PREMIUM_FEATURES].sort(), ['deals', 'embeds', 'messageThemes', 'music', 'tiktok', 'twitch', 'youtube']);
 });
 
 test('los dos Main lo tienen todo sin necesitar plan', () => {
@@ -513,7 +533,9 @@ test('un servidor gratis sabe exactamente qué le falta', () => {
   assert.ok(bloqueadas.includes('youtube'));
   assert.ok(bloqueadas.includes('music'));
   assert.ok(bloqueadas.includes('profile'));
-  assert.ok(!bloqueadas.includes('embeds'), 'los mensajes nunca se bloquean');
+  assert.ok(bloqueadas.includes('embeds'), 'editar los mensajes es premium');
+  assert.ok(!bloqueadas.includes('logs'), 'los registros nunca se bloquean');
+  assert.ok(!bloqueadas.includes('welcome'), 'la bienvenida nunca se bloquea');
 });
 
 /* ------------------------------------------------------------------ */
@@ -539,7 +561,11 @@ test('el paquete de limones conserva la voz de AnkeBot', () => {
   const limones = THEMES.limones.messages;
   assert.match(limones.welcome.footer, /Reclama tu limón/);
   assert.match(limones.goodbye.footer, /Devuelve los limones/);
-  assert.match(limones.welcome.title, /🍋/);
+  // El concepto de Ankerie Dimension: títulos cortos y sin adornos, el limón
+  // vive en el pie.
+  assert.match(limones.welcome.title, /Bienvenid@ a \{server\}/);
+  assert.ok(limones.welcome.message.length < 140, 'la bienvenida debe ser corta');
+  assert.match(limones.boost_started.footer, /limones/i);
 });
 
 test('el paquete Void mantiene el diseño original de Embers Void', () => {
@@ -548,12 +574,13 @@ test('el paquete Void mantiene el diseño original de Embers Void', () => {
 });
 
 test('aplicar un paquete devuelve algo que se puede guardar tal cual', () => {
-  const embeds = applyTheme('limones');
-  assert.equal(Object.keys(embeds).length, KINDS.length);
-  const guild = mockGuild();
-  // Pasa por el mismo saneador que usa la API, sin lanzar.
-  const result = sanitizeGuildPatch({ embeds }, guild);
-  assert.equal(Object.keys(result.embeds).length, KINDS.length);
+  conPremium(() => {    const embeds = applyTheme('limones');
+    assert.equal(Object.keys(embeds).length, KINDS.length);
+    const guild = mockGuild();
+    // Pasa por el mismo saneador que usa la API, sin lanzar.
+    const result = sanitizeGuildPatch({ embeds }, guild);
+    assert.equal(Object.keys(result.embeds).length, KINDS.length);
+  });
 });
 
 test('se puede aplicar un paquete a unos pocos mensajes', () => {
@@ -571,8 +598,17 @@ test('un paquete inventado no devuelve nada', () => {
   assert.equal(applyTheme('inventado'), null);
 });
 
+test('cada servidor solo ve los paquetes que le pertenecen', () => {
+  // «Void» es la voz de Embers Void y «Limones» la de Ankerie Dimension: son
+  // su identidad, no plantillas que repartir a cualquiera.
+  assert.deepEqual(themesForPanel('primary_main').map(t => t.id), ['estandar', 'void']);
+  assert.deepEqual(themesForPanel('themed_main').map(t => t.id), ['estandar', 'limones']);
+  assert.deepEqual(themesForPanel('external').map(t => t.id), ['estandar']);
+  assert.deepEqual(themesForPanel('satellite').map(t => t.id), ['estandar']);
+});
+
 test('el panel recibe los paquetes sin los 38 mensajes de cada uno', () => {
-  const panel = themesForPanel();
+  const panel = themesForPanel('primary_main');
   assert.equal(panel.length, 2);
   for (const theme of panel) {
     assert.ok(theme.name && theme.tagline && theme.accent);
@@ -580,4 +616,32 @@ test('el panel recibe los paquetes sin los 38 mensajes de cada uno', () => {
     assert.equal(theme.count, KINDS.length);
     assert.ok(theme.sample.welcome, 'debe traer una muestra para la vista previa');
   }
+});
+
+// El panel enseñaba «(campos originales del aviso)» en la vista previa de la
+// mayoría de los registros: el usuario no podía saber qué iba a publicar el
+// bot. Ahora el catálogo lleva los recuadros reales, así que la vista previa
+// siempre puede enseñar el mensaje entero.
+test('todos los mensajes tienen con qué pintar una vista previa real', () => {
+  const sinVistaPrevia = KINDS
+    .filter(kind => kind !== 'welcome' && kind !== 'goodbye')
+    .filter(kind => {
+      const factory = factoryDefaults(kind);
+      return !factory.message && !(factory.fields || []).length;
+    });
+  assert.deepEqual(sinVistaPrevia, []);
+});
+
+test('los recuadros del catálogo usan variables que ese mensaje admite', () => {
+  const problemas = [];
+  for (const kind of KINDS) {
+    const factory = factoryDefaults(kind);
+    const permitidas = new Set((kindInfo(kind)?.variables || []).map(([token]) => token.slice(1, -1)));
+    for (const [, value] of factory.fields || []) {
+      for (const [, name] of String(value).matchAll(/\{(\w+)\}/g)) {
+        if (!permitidas.has(name)) problemas.push(`${kind} → {${name}}`);
+      }
+    }
+  }
+  assert.deepEqual(problemas, []);
 });
