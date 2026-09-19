@@ -18,7 +18,7 @@ const browserGlobals = {
   navigator: 'readonly', fetch: 'readonly', FormData: 'readonly', Intl: 'readonly',
   setTimeout: 'readonly', clearTimeout: 'readonly', setInterval: 'readonly',
   clearInterval: 'readonly', URLSearchParams: 'readonly',
-  localStorage: 'readonly', console: 'readonly', Event: 'readonly'
+  localStorage: 'readonly', console: 'readonly', Event: 'readonly', CSS: 'readonly'
 };
 
 const rules = {

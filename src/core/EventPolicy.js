@@ -44,13 +44,8 @@ async function satelliteMemberAdd(member, config) {
     if (channel) {
       await sendBrandedMessage(channel, buildMessage(member.user.bot ? 'log_bot_join' : 'log_member_join', {
         config,
-        vars: memberVars(member),
-        defaults: {
-          title: member.user.bot ? 'Bot añadido' : 'Miembro añadido',
-          description: `${member.user.tag} (${member.id})`,
-          color: member.user.bot ? 0x5865F2 : themed ? colorNumber(config.profile?.primaryColor, 0x8DDCF4) : 0x57F287
-        }
-      }));
+        vars: memberVars(member)
+    }));
     }
   }
 }
@@ -67,13 +62,8 @@ async function satelliteMemberRemove(member, config) {
     if (channel) {
       await sendBrandedMessage(channel, buildMessage(member.user.bot ? 'log_bot_leave' : 'log_member_leave', {
         config,
-        vars: memberVars(member),
-        defaults: {
-          title: member.user.bot ? 'Bot retirado' : 'Miembro retirado',
-          description: `${member.user.tag} (${member.id})`,
-          color: themed ? colorNumber(config.profile?.secondaryColor, 0xF8C8DC) : 0xED4245
-        }
-      }));
+        vars: memberVars(member)
+    }));
     }
   }
 }
@@ -90,13 +80,8 @@ async function mainMemberAdd(member, config) {
         await sendBrandedMessage(channel, buildMessage('log_bot_join', {
           config,
           vars: memberVars(member, { role: roleLabel }),
-          defaults: { title: '🤖 Bot añadido', color: '#5865F2', thumbnailUrl: member.user.displayAvatarURL() },
-          fields: [
-            { name: '🤖 Bot', value: member.user.tag },
-            { name: '🆔 ID', value: member.id },
-            { name: '🎭 Rol añadido', value: roleLabel }
-          ]
-        }));
+          defaults: { thumbnailUrl: member.user.displayAvatarURL() }
+    }));
       }
     }
   }
@@ -113,16 +98,8 @@ async function mainMemberAdd(member, config) {
       await sendBrandedMessage(channel, buildMessage(member.user.bot ? 'log_bot_join' : 'log_member_join', {
         config,
         vars: memberVars(member),
-        defaults: {
-          title: member.user.bot ? '🤖 Bot añadido' : '📥 Miembro entró',
-          color: member.user.bot ? '#5865F2' : '#57F287',
-          thumbnailUrl: member.user.displayAvatarURL()
-        },
-        fields: [
-          { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
-          { name: '🆔 ID', value: member.id }
-        ]
-      }));
+        defaults: { thumbnailUrl: member.user.displayAvatarURL() }
+    }));
     }
   }
 }
@@ -142,16 +119,8 @@ async function mainMemberRemove(member, config) {
       await sendBrandedMessage(channel, buildMessage(member.user.bot ? 'log_bot_leave' : 'log_member_leave', {
         config,
         vars: memberVars(member),
-        defaults: {
-          title: member.user.bot ? '🤖 Bot retirado' : '📤 Miembro salió',
-          color: '#ED4245',
-          thumbnailUrl: member.user.displayAvatarURL()
-        },
-        fields: [
-          { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
-          { name: '🆔 ID', value: member.id }
-        ]
-      }));
+        defaults: { thumbnailUrl: member.user.displayAvatarURL() }
+    }));
     }
   }
 }

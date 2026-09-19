@@ -31,14 +31,7 @@ module.exports = {
       vars: memberVars(message.member || { user: message.author, guild: message.guild }, {
         userTag: authorTag, executor: deleter,
         channel: `${message.channel}`, channelName: message.channel?.name || '', content
-      }),
-      defaults: { title: '🗑️ Mensaje borrado', color: '#ED4245' },
-      fields: [
-        { name: '👤 Usuario', value: authorTag },
-        { name: '🛠️ Eliminado por', value: deleter },
-        { name: '📍 Canal', value: `${message.channel}` },
-        { name: '💬 Contenido', value: content }
-      ]
+      })
     });
   }
 };

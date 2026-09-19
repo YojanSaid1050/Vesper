@@ -1,5 +1,57 @@
 # Changelog
 
+## 3.4.0 — El catálogo escribe, los eventos solo aportan datos
+
+Cada aviso tenía su texto escrito dos veces: una en el evento que lo publica y
+otra en el catálogo que lee el panel. Por eso la vista previa y el mensaje real
+no coincidían nunca del todo. Ahora el texto vive en un solo sitio.
+
+- **Los registros salen en una línea por dato y sin emojis**: «Usuario: nombre»,
+  «ID: 123…», en vez de recuadros apilados con un icono cada uno. Ocupan la
+  mitad y se leen de un vistazo.
+- **Los eventos ya no escriben texto.** Solo aportan variables; el título, el
+  cuerpo y el color salen del catálogo. Lo que enseña el panel es, literalmente,
+  lo que publica el bot.
+- **El título y el pie del catálogo también admiten variables.** Antes solo se
+  sustituían los que escribía el administrador, así que un aviso de Twitch salía
+  con «{creator}» literal en el título.
+- **Prueba nueva**: se ejecuta cada aviso con datos falsos y falla si sobrevive
+  un solo `{hueco}` sin rellenar, en el catálogo y en los tres paquetes. Encontró
+  diez sitios donde pasaba.
+- **{user} contra {username}**: quien ya se fue del servidor no se puede
+  mencionar, así que las salidas, los baneos y los boosts retirados usan el
+  nombre. Una prueba lo vigila y el panel lo explica tras el «?».
+- **Las variables se insertan donde está el cursor.** Antes se copiaban al
+  portapapeles y había que bajar a buscar la caja y pegar.
+- **Guardar un mensaje ya no recarga la pantalla** ni te manda al principio: el
+  mensaje se queda abierto donde estabas.
+- **Se acabó el Ctrl+clic.** Los nueve menús de selección múltiple pasan a ser
+  fichas que se quitan con la «×» y un desplegable para añadir.
+- **El editor de mensajes, reordenado**: título, cuerpo, las variables como
+  fichas justo debajo, y el color, la imagen y el formato plegados.
+- **Paquete Limones en pastel** de arriba abajo, al estilo cinnamoroll: cielo
+  para lo corriente, menta para lo bueno, rosa para lo que va mal, lavanda para
+  las despedidas y rosa chicle para los boosts. Una prueba mide la luminosidad
+  de cada color y falla si alguno se sale del pastel.
+- **Aplicar un paquete no borra las imágenes** que ya hubiera configuradas, y
+  hay una prueba que lo comprueba.
+- **`npm run mensajes -- <servidor> <paquete>`**: deja los 38 mensajes escritos
+  de una vez desde el alojamiento, sin entrar al panel. Con `--probar` enseña lo
+  que haría sin guardar, y siempre lista las imágenes que conserva.
+- **Ofertas y avisos de redes con la información que importa**: precio anterior,
+  precio actual, descuento y cuándo termina; categoría, espectadores y
+  reproducciones. El juego de Epic de la semana siguiente ya no dice «Ahora:
+  gratis» cuando todavía cuesta.
+- **Fondo de la pantalla de entrada** con la ilustración del servidor,
+  difuminada en el propio archivo (39 KB) para no cargar el navegador.
+- El panel explica que el nombre del bot sí cambia por servidor —se aplica como
+  apodo— pero el avatar de la lista de miembros no: Discord no lo permite para
+  un bot. En los mensajes sí, y eso ya funcionaba.
+- Comprobado en un navegador real: las 13 pantallas de los tres servidores de
+  prueba, las 38 vistas previas sin un solo hueco sin rellenar, sin emojis en
+  los registros, sin selección múltiple a la vista, sin desbordes de 390 a
+  1400 px y sin errores de consola.
+
 ## 3.3.0 — La vista previa deja de mentir
 
 El panel enseñaba «(campos originales del aviso)» en la vista previa de casi

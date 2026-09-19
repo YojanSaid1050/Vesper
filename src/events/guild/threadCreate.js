@@ -22,13 +22,7 @@ module.exports = {
         channel: thread.parent ? `${thread.parent}` : '',
         channelName: thread.parent?.name || '',
         owner
-      },
-      defaults: { title: '🧵 Hilo creado', color: '#57F287' },
-      fields: [
-        { name: '🧵 Hilo', value: `${thread}` },
-        { name: '📍 En', value: thread.parent ? `${thread.parent}` : 'Desconocido', inline: true },
-        { name: '👤 Creado por', value: owner, inline: true }
-      ]
+      }
     });
   }
 };

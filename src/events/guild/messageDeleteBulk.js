@@ -20,12 +20,7 @@ module.exports = {
         channel: `${channel}`,
         channelName: channel?.name || '',
         count: messages.size
-      },
-      defaults: { title: '🧹 Mensajes purgados', color: '#FAA61A' },
-      fields: [
-        { name: '📍 Canal', value: `${channel}`, inline: true },
-        { name: '🔢 Cantidad', value: String(messages.size), inline: true }
-      ]
+      }
     });
   }
 };

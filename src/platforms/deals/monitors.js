@@ -85,58 +85,24 @@ function offerAppliesTo(offer, settings) {
 }
 
 function buildPayload(offer, config, pingText) {
-  const endsAt = offer.endsAt ? `<t:${Math.floor(new Date(offer.endsAt).getTime() / 1000)}:R>` : 'Sin fecha de fin';
+  // Una fecha relativa de Discord: «en 3 días», y se actualiza sola.
+  const endsAt = offer.endsAt
+    ? `<t:${Math.floor(new Date(offer.endsAt).getTime() / 1000)}:R>`
+    : 'sin fecha de cierre';
 
-  const shared = {
-    title: offer.title,
-    url: offer.url,
-    store: offer.store,
-    endsAt,
-    server: '',
-    description: String(offer.description || '').slice(0, 400)
-  };
+  const kind = offer.source === 'epic'
+    ? 'deal_epic_free'
+    : offer.source === 'steam' ? 'deal_steam_special' : 'deal_giveaway';
 
-  let kind;
-  let defaults;
-
-  if (offer.source === 'epic') {
-    kind = 'deal_epic_free';
-    defaults = {
-      title: offer.upcoming ? `🔜 Pronto gratis: ${offer.title}` : `🎁 Gratis en Epic: ${offer.title}`,
-      description: [
-        shared.description,
-        '',
-        offer.upcoming ? `Estará disponible ${endsAt === 'Sin fecha de fin' ? 'pronto' : endsAt}.` : `Puedes reclamarlo ${endsAt}.`,
-        offer.originalPrice ? `Precio normal: **${offer.originalPrice}**` : ''
-      ].filter(Boolean).join('\n'),
-      color: '#2A2A2A',
-      image: offer.image
-    };
-  } else if (offer.source === 'steam') {
-    kind = 'deal_steam_special';
-    defaults = {
-      title: `🏷️ ${offer.discount}% de descuento: ${offer.title}`,
-      description: [
-        offer.originalPrice ? `~~${offer.originalPrice}~~ → **${offer.finalPrice}**` : `Ahora **${offer.finalPrice}**`,
-        offer.endsAt ? `La oferta termina ${endsAt}.` : ''
-      ].filter(Boolean).join('\n'),
-      color: '#1B2838',
-      image: offer.image
-    };
-  } else {
-    kind = 'deal_giveaway';
-    defaults = {
-      title: `🎉 ${offer.title}`,
-      description: [
-        shared.description,
-        '',
-        offer.worth ? `Valor habitual: **${offer.worth}**` : '',
-        offer.platforms ? `Plataformas: ${offer.platforms}` : '',
-        offer.endsAt ? `Termina ${endsAt}.` : ''
-      ].filter(Boolean).join('\n'),
-      color: '#57F287',
-      image: offer.image
-    };
+  // El texto lo escribe el catálogo, no este archivo: así el aviso sale igual
+  // que en la vista previa del panel y se puede cambiar desde la web. Aquí
+  // solo se aportan los datos y la carátula del juego.
+  const defaults = { image: offer.image };
+  // El juego de la semana siguiente todavía no se puede reclamar: decir
+  // «Ahora: gratis» ahí manda a la gente a una tienda donde aún cuesta.
+  if (offer.source === 'epic' && offer.upcoming) {
+    defaults.title = `Pronto gratis en Epic: ${offer.title}`;
+    defaults.description = 'Precio habitual: {originalPrice}\nTodavía no se puede reclamar.\nEmpieza: {endsAt}\n\n{url}';
   }
 
   const payload = buildMessage(kind, {
@@ -146,11 +112,11 @@ function buildPayload(offer, config, pingText) {
       url: offer.url,
       store: offer.store,
       endsAt,
-      price: offer.finalPrice || 'Gratis',
-      originalPrice: offer.originalPrice || '',
+      price: offer.finalPrice || 'gratis',
+      originalPrice: offer.originalPrice || 'sin precio publicado',
       discount: offer.discount ?? 100,
-      worth: offer.worth || '',
-      platforms: offer.platforms || offer.store
+      worth: offer.worth || 'sin precio publicado',
+      platforms: offer.platforms || offer.store || 'varias tiendas'
     },
     defaults
   });

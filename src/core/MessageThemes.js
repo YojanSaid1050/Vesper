@@ -37,18 +37,19 @@ const LIMONES = {
   id: 'limones',
   scope: 'themed_main',
   name: 'Limones',
-  tagline: 'Cielo pastel, limón y magenta. Cercano, corto y con guiños a los limones.',
-  accent: '#8DDCF4',
-  swatches: ['#8DDCF4', '#F7D354', '#E3A0F0', '#FFF6D6'],
+  tagline: 'Pastel de principio a fin: cielo, menta, mantequilla y rosa. Cercano y sin adornos.',
+  accent: '#A8DCEF',
+  swatches: ['#A8DCEF', '#C7EBD6', '#FBE0A2', '#F8C8DC'],
   colors: {
-    // El cielo es el tono de las entradas y salidas; el magenta, el de los
-    // boosts; el limón se reserva para los avisos que piden atención.
-    neutral: '#8DDCF4',
-    good: '#B8E986',
-    bad: '#F79E9E',
-    warn: '#F7D354',
-    dark: '#8DDCF4',
-    boost: '#E3A0F0'
+    // Toda la paleta es pastel, sin un solo color saturado: el cielo para lo
+    // corriente, la menta para lo bueno, el rosa para lo que va mal y la
+    // lavanda para las despedidas.
+    neutral: '#A8DCEF',
+    good: '#C7EBD6',
+    bad: '#F8B8C4',
+    warn: '#FBE0A2',
+    dark: '#C9BDEF',
+    boost: '#F8C8DC'
   }
 };
 
@@ -73,6 +74,8 @@ function pack(theme, messages) {
 /* ------------------------------------------------------------------ */
 
 const VOID_MESSAGES = {
+  // La bienvenida y la despedida son el diseño original de Embers Void: la
+  // tipografía, los ornamentos y el GIF no se tocan.
   welcome: {
     title: '# ⛧°. ⋆༺ 𝐴 𝑛𝑒𝑤 𝑤𝑎𝑛𝑑𝑒𝑟𝑒𝑟 ℎ𝑎𝑠 𝑎𝑟𝑟𝑖𝑣𝑒𝑑 ༻⋆. °⛧',
     message: '### 𝑾𝒆𝒍𝒄𝒐𝒎𝒆 𝒕𝒐 {server}, {user}!\n\n༺𓆩~~𝐿𝑒𝑡 𝑡ℎ𝑒 𝑣𝑜𝑖𝑑 𝑔𝑢𝑖𝑑𝑒 𝑦𝑜𝑢𝑟 𝑝𝑎𝑡ℎ.~~𓆪༻'
@@ -84,20 +87,25 @@ const VOID_MESSAGES = {
 
   boost_started: {
     title: '⛧ Una llama más en el vacío',
-    message: '{user} ha alimentado el vacío.\n-# {boostCount} brasas encendidas · nivel {boostLevel}',
+    message: '{user} ha alimentado el vacío.\n\nBrasas encendidas: {boostCount}\nNivel: {boostLevel}',
+    footer: 'Que arda mucho tiempo',
     tone: 'good'
   },
   boost_stopped: {
     title: '☾ Una brasa se apagó',
-    message: '{displayName} retiró su llama. Quedan {boostCount}.',
+    message: '{username} retiró su llama.\n\nBrasas encendidas: {boostCount}\nNivel: {boostLevel}',
+    footer: 'El vacío se enfría un poco',
     tone: 'dark'
   },
   boost_level: {
     title: '⛧ El vacío se ensancha',
-    message: '**{server}** alcanzó el nivel **{boostLevel}**.\n-# Antes estaba en el {previousLevel}.',
+    message: '**{server}** alcanzó el nivel {boostLevel}.\n\nNivel anterior: {previousLevel}\nBrasas encendidas: {boostCount}',
+    footer: 'Un umbral más adentro',
     tone: 'good'
   },
 
+  // Los registros conservan los ornamentos de Embers Void en el encabezado,
+  // pero el cuerpo es el de fábrica: una línea por dato, sin recuadros.
   log_member_join: { title: '⟡ Un alma cruzó el umbral', tone: 'good' },
   log_member_leave: { title: '⟡ Un alma se desvaneció', tone: 'dark' },
   log_bot_join: { title: '⚙ Un autómata despertó', tone: 'neutral' },
@@ -127,42 +135,51 @@ const VOID_MESSAGES = {
 
   notify_twitch_live: {
     title: '⛧ {creator} está en directo',
-    message: '**{title}**\n\n༺ El vacío escucha. ༻\n{url}'
+    message: '**{title}**\n\nJugando a: {game}\nEspectadores: {viewers}\n\n{url}',
+    footer: '༺ El vacío escucha ༻'
   },
   notify_youtube_live: {
     title: '⛧ {creator} está en directo',
-    message: '**{title}**\n{url}'
+    message: '**{title}**\n\nEspectadores: {viewers}\n\n{url}',
+    footer: '༺ El vacío escucha ༻'
   },
   notify_youtube_video: {
     title: '☾ {creator} dejó algo nuevo',
-    message: '**{title}**\n{url}'
+    message: '**{title}**\n\nVisualizaciones: {views}\n\n{url}',
+    footer: '༺ Un eco más ༻'
   },
   notify_youtube_short: {
     title: '☾ Un destello de {creator}',
-    message: '**{title}**\n{url}'
+    message: '**{title}**\n\nVisualizaciones: {views}\n\n{url}',
+    footer: '༺ Un eco más ༻'
   },
   notify_tiktok_live: {
     title: '⛧ {creator} está en directo',
-    message: '**{title}**\n{url}'
+    message: '**{title}**\n\nEspectadores: {viewers}\n\n{url}',
+    footer: '༺ El vacío escucha ༻'
   },
   notify_tiktok_video: {
     title: '☾ {creator} dejó algo nuevo',
-    message: '**{title}**\n{url}'
+    message: '**{title}**\n\nReproducciones: {views}\n\n{url}',
+    footer: '༺ Un eco más ༻'
   },
 
   deal_epic_free: {
     title: '⟡ Ofrenda gratuita: {title}',
-    message: 'Epic lo regala. Reclámalo antes de que el vacío lo reclame.\n{url}',
+    message: 'Precio habitual: {originalPrice}\nAhora: **gratis**\nTermina: {endsAt}\n\n{url}',
+    footer: 'Reclámalo antes de que el vacío lo reclame',
     tone: 'good'
   },
   deal_steam_special: {
-    title: '⟡ {discount}% menos: {title}',
-    message: '**{title}** cae a {price}.\n{url}',
+    title: '⟡ {title} · -{discount}%',
+    message: 'Antes: {originalPrice}\nAhora: **{price}**\nTermina: {endsAt}\n\n{url}',
+    footer: 'Oferta de Steam',
     tone: 'warn'
   },
   deal_giveaway: {
-    title: '⟡ Un sorteo se abrió',
-    message: '**{title}**\n{url}',
+    title: '⟡ Un sorteo se abrió: {title}',
+    message: 'Valor habitual: {worth}\nPlataformas: {platforms}\nTermina: {endsAt}\n\n{url}',
+    footer: 'Sorteo o llave gratis',
     tone: 'good'
   }
 };
@@ -178,9 +195,10 @@ const LIMONES_MESSAGES = {
     footer: 'Reclama tu limón'
   },
   goodbye: {
-    title: 'Hasta pronto {user}',
-    message: 'Adiós {user}, gracias por haber formado parte de **{server}**.\n¡Hasta pronto! :3',
-    footer: 'Devuelve los limones'
+    title: 'Hasta pronto {displayName}',
+    message: 'Adiós {username}, gracias por haber formado parte de **{server}**.\n¡Hasta pronto! :3',
+    footer: 'Devuelve los limones',
+    tone: 'dark'
   },
 
   boost_started: {
@@ -191,54 +209,97 @@ const LIMONES_MESSAGES = {
   },
   boost_stopped: {
     title: '¿Por qué te llevas el Limón :c ?',
-    message: '{user} retiró su mejora de **{server}**.\nQuedan {boostCount} boosts.',
+    message: '{username} retiró su mejora de **{server}**.\nQuedan {boostCount} boosts (nivel {boostLevel}).',
     footer: 'Un limón se despidió de la bolsa…',
     tone: 'boost'
   },
   boost_level: {
     title: '¡La bolsa de Limones creció!',
-    message: '**{server}** acaba de alcanzar el nivel {boostLevel} de Discord.\nY todavía queda espacio para muchos más Limones…',
+    message: '**{server}** acaba de alcanzar el nivel {boostLevel} de Discord.\nVeníamos del nivel {previousLevel}, con {boostCount} boosts.\n\nY todavía queda espacio para muchos más Limones…',
     footer: 'Nueva bolsa desbloqueada',
     tone: 'boost'
   },
 
-  log_member_join: { title: '🍋 Alguien nuevo por aquí', tone: 'good' },
-  log_member_leave: { title: '🍋 Alguien se fue', tone: 'warn' },
-  log_bot_join: { title: '🤖 Un bot se unió', tone: 'neutral' },
-  log_bot_leave: { title: '🤖 Un bot se fue', tone: 'warn' },
-  log_nickname: { title: '✏️ Cambio de nombre', tone: 'neutral' },
-  log_roles_added: { title: '🎀 Roles nuevos', tone: 'good' },
-  log_roles_removed: { title: '🎀 Roles retirados', tone: 'bad' },
+  // Los registros llevan el mismo cuerpo que trae el bot de fábrica: una
+  // línea por dato y sin adornos. Aquí solo cambia el color y el encabezado.
+  log_member_join: { title: 'Entró alguien nuevo', tone: 'good' },
+  log_member_leave: { title: 'Se fue alguien', tone: 'dark' },
+  log_bot_join: { title: 'Bot añadido', tone: 'neutral' },
+  log_bot_leave: { title: 'Bot retirado', tone: 'dark' },
+  log_nickname: { title: 'Cambio de apodo', tone: 'neutral' },
+  log_roles_added: { title: 'Roles añadidos', tone: 'good' },
+  log_roles_removed: { title: 'Roles retirados', tone: 'bad' },
 
-  log_timeout_on: { title: '🤐 A pensar un rato', tone: 'bad' },
-  log_timeout_off: { title: '💬 Ya puede hablar', tone: 'good' },
-  log_ban_added: { title: '🚫 Sin limones para ti', tone: 'bad' },
-  log_ban_removed: { title: '🍋 Baneo levantado', tone: 'good' },
-  automod_notice: { message: '{user}, quité tu mensaje: {reason}. Caso **#{case}** 🍋' },
-  automod_dm: { message: '🍋 Te llevaste una advertencia en **{server}**.\n\nMotivo: {reason}\nCaso: **#{case}**' },
+  log_timeout_on: { title: 'A pensar un rato', tone: 'bad' },
+  log_timeout_off: { title: 'Ya puede hablar', tone: 'good' },
+  log_ban_added: { title: 'Sin limones para ti', tone: 'bad' },
+  log_ban_removed: { title: 'Baneo levantado', tone: 'good' },
+  automod_notice: { message: '{user}, quité tu mensaje: {reason}. Caso **#{case}**' },
+  automod_dm: { message: 'Te llevaste una advertencia en **{server}**.\n\nMotivo: {reason}\nCaso: **#{case}**' },
 
-  log_message_deleted: { title: '🗑️ Mensaje borrado', tone: 'bad' },
-  log_message_edited: { title: '✏️ Mensaje editado', tone: 'warn' },
-  log_messages_purged: { title: '🧹 Limpieza general', tone: 'warn' },
-  log_channel_created: { title: '📁 Canal nuevo', tone: 'good' },
-  log_channel_deleted: { title: '📁 Canal borrado', tone: 'bad' },
-  log_role_created: { title: '🎀 Rol nuevo', tone: 'good' },
-  log_role_deleted: { title: '🎀 Rol borrado', tone: 'bad' },
-  log_thread_created: { title: '🧵 Hilo nuevo', tone: 'good' },
-  log_voice_join: { title: '🎧 Entró a voz', tone: 'good' },
-  log_voice_leave: { title: '🎧 Salió de voz', tone: 'warn' },
-  log_voice_move: { title: '🎧 Cambió de canal', tone: 'neutral' },
+  log_message_deleted: { title: 'Mensaje borrado', tone: 'bad' },
+  log_message_edited: { title: 'Mensaje editado', tone: 'warn' },
+  log_messages_purged: { title: 'Limpieza general', tone: 'warn' },
+  log_channel_created: { title: 'Canal nuevo', tone: 'good' },
+  log_channel_deleted: { title: 'Canal borrado', tone: 'bad' },
+  log_role_created: { title: 'Rol nuevo', tone: 'good' },
+  log_role_deleted: { title: 'Rol borrado', tone: 'bad' },
+  log_thread_created: { title: 'Hilo nuevo', tone: 'good' },
+  log_voice_join: { title: 'Entró a un canal de voz', tone: 'good' },
+  log_voice_leave: { title: 'Salió de un canal de voz', tone: 'dark' },
+  log_voice_move: { title: 'Cambió de canal de voz', tone: 'neutral' },
 
-  notify_twitch_live: { title: '🍋 {creator} está en directo!', message: '**{title}**\n{url}' },
-  notify_youtube_live: { title: '🍋 {creator} está en directo!', message: '**{title}**\n{url}' },
-  notify_youtube_video: { title: '🍋 Vídeo nuevo de {creator}', message: '**{title}**\n{url}' },
-  notify_youtube_short: { title: '🍋 Short nuevo de {creator}', message: '**{title}**\n{url}' },
-  notify_tiktok_live: { title: '🍋 {creator} está en directo!', message: '**{title}**\n{url}' },
-  notify_tiktok_video: { title: '🍋 TikTok nuevo de {creator}', message: '**{title}**\n{url}' },
+  // En un aviso de redes lo que importa es qué han publicado y dónde verlo.
+  notify_twitch_live: {
+    title: '{creator} está en directo',
+    message: '**{title}**\n\nJugando a: {game}\nViéndolo ahora: {viewers}\n\n{url}',
+    footer: 'Pásate a saludar'
+  },
+  notify_youtube_live: {
+    title: '{creator} está en directo',
+    message: '**{title}**\n\nViéndolo ahora: {viewers}\n\n{url}',
+    footer: 'Pásate a saludar'
+  },
+  notify_youtube_video: {
+    title: 'Vídeo nuevo de {creator}',
+    message: '**{title}**\n\nVisualizaciones: {views}\n\n{url}',
+    footer: 'Dale un vistazo'
+  },
+  notify_youtube_short: {
+    title: 'Short nuevo de {creator}',
+    message: '**{title}**\n\nVisualizaciones: {views}\n\n{url}',
+    footer: 'Dale un vistazo'
+  },
+  notify_tiktok_live: {
+    title: '{creator} está en directo',
+    message: '**{title}**\n\nViéndolo ahora: {viewers}\n\n{url}',
+    footer: 'Pásate a saludar'
+  },
+  notify_tiktok_video: {
+    title: 'TikTok nuevo de {creator}',
+    message: '**{title}**\n\nReproducciones: {views}\n\n{url}',
+    footer: 'Dale un vistazo'
+  },
 
-  deal_epic_free: { title: '🎁 Gratis en Epic: {title}', message: 'Por tiempo limitado.\n{url}', tone: 'good' },
-  deal_steam_special: { title: '🏷️ {discount}% de descuento: {title}', message: 'Se queda en {price}.\n{url}', tone: 'warn' },
-  deal_giveaway: { title: '🎉 Sorteo: {title}', message: '{url}', tone: 'good' }
+  // Y en una oferta, cuánto cuesta y hasta cuándo.
+  deal_epic_free: {
+    title: 'Gratis en Epic: {title}',
+    message: 'Precio habitual: {originalPrice}\nAhora: **gratis**\nTermina: {endsAt}\n\n{url}',
+    footer: 'Reclámalo antes de que se acabe',
+    tone: 'good'
+  },
+  deal_steam_special: {
+    title: '{title} · -{discount}%',
+    message: 'Antes: {originalPrice}\nAhora: **{price}**\nTermina: {endsAt}\n\n{url}',
+    footer: 'Oferta de Steam',
+    tone: 'warn'
+  },
+  deal_giveaway: {
+    title: 'Gratis: {title}',
+    message: 'Valor habitual: {worth}\nPlataformas: {platforms}\nTermina: {endsAt}\n\n{url}',
+    footer: 'Sorteo o llave gratis',
+    tone: 'good'
+  }
 };
 
 
@@ -266,66 +327,101 @@ const ESTANDAR = {
 
 const ESTANDAR_MESSAGES = {
   welcome: {
-    title: '👋 Te damos la bienvenida',
+    title: 'Te damos la bienvenida',
     message: 'Hola {user}, bienvenid@ a **{server}**.\nYa sois {memberCount}. Ponte cómodo.',
     tone: 'good'
   },
   goodbye: {
-    title: '👋 Hasta pronto',
+    title: 'Hasta pronto',
     message: '**{displayName}** ha dejado el servidor.\nGracias por haber pasado por aquí.',
     tone: 'dark'
   },
 
   boost_started: {
-    title: '💜 ¡Gracias por el boost!',
-    message: '{user} acaba de mejorar **{server}**.\n-# {boostCount} boosts en total · nivel {boostLevel}',
+    title: 'Gracias por el boost',
+    message: '{user} acaba de mejorar **{server}**.\n\nBoosts: {boostCount}\nNivel: {boostLevel}',
     tone: 'good'
   },
-  boost_stopped: { title: '💔 Boost retirado', message: '{displayName} retiró su boost. Quedan {boostCount}.', tone: 'warn' },
+  boost_stopped: {
+    title: 'Boost retirado',
+    message: '{username} dejó de mejorar **{server}**.\n\nBoosts: {boostCount}\nNivel: {boostLevel}',
+    tone: 'warn'
+  },
   boost_level: {
-    title: '🚀 Nivel {boostLevel}',
-    message: '**{server}** subió de nivel de mejora.\n-# Antes estaba en el {previousLevel}.',
+    title: 'Nivel {boostLevel}',
+    message: '**{server}** subió de nivel de mejora.\n\nNivel anterior: {previousLevel}\nBoosts: {boostCount}',
     tone: 'good'
   },
 
-  log_member_join: { title: '📥 Miembro entró', tone: 'good' },
-  log_member_leave: { title: '📤 Miembro salió', tone: 'bad' },
-  log_bot_join: { title: '🤖 Bot añadido', tone: 'neutral' },
-  log_bot_leave: { title: '🤖 Bot retirado', tone: 'warn' },
-  log_nickname: { title: '📝 Apodo cambiado', tone: 'neutral' },
-  log_roles_added: { title: '🎭 Roles añadidos', tone: 'good' },
-  log_roles_removed: { title: '❌ Roles retirados', tone: 'bad' },
+  log_member_join: { title: 'Miembro entró', tone: 'good' },
+  log_member_leave: { title: 'Miembro salió', tone: 'bad' },
+  log_bot_join: { title: 'Bot añadido', tone: 'neutral' },
+  log_bot_leave: { title: 'Bot retirado', tone: 'warn' },
+  log_nickname: { title: 'Apodo cambiado', tone: 'neutral' },
+  log_roles_added: { title: 'Roles añadidos', tone: 'good' },
+  log_roles_removed: { title: 'Roles retirados', tone: 'bad' },
 
-  log_timeout_on: { title: '🔇 Miembro aislado', tone: 'bad' },
-  log_timeout_off: { title: '🔊 Aislamiento retirado', tone: 'good' },
-  log_ban_added: { title: '🔨 Miembro baneado', tone: 'bad' },
-  log_ban_removed: { title: '🔓 Baneo retirado', tone: 'good' },
+  log_timeout_on: { title: 'Miembro aislado', tone: 'bad' },
+  log_timeout_off: { title: 'Aislamiento retirado', tone: 'good' },
+  log_ban_added: { title: 'Miembro baneado', tone: 'bad' },
+  log_ban_removed: { title: 'Baneo retirado', tone: 'good' },
   automod_notice: { message: '{user}, retiré tu mensaje: {reason}. Caso **#{case}**.' },
   automod_dm: { message: 'Recibiste una advertencia en **{server}**.\n\nMotivo: {reason}\nCaso: **#{case}**' },
 
-  log_message_deleted: { title: '🗑️ Mensaje borrado', tone: 'bad' },
-  log_message_edited: { title: '✏️ Mensaje editado', tone: 'warn' },
-  log_messages_purged: { title: '🧹 Mensajes purgados', tone: 'warn' },
-  log_channel_created: { title: '📁 Canal creado', tone: 'good' },
-  log_channel_deleted: { title: '🗑️ Canal borrado', tone: 'bad' },
-  log_role_created: { title: '🎭 Rol creado', tone: 'good' },
-  log_role_deleted: { title: '❌ Rol borrado', tone: 'bad' },
-  log_thread_created: { title: '🧵 Hilo creado', tone: 'good' },
-  log_voice_join: { title: '🔊 Entró a voz', tone: 'good' },
-  log_voice_leave: { title: '📴 Salió de voz', tone: 'warn' },
-  log_voice_move: { title: '🔄 Cambió de canal de voz', tone: 'neutral' },
+  log_message_deleted: { title: 'Mensaje borrado', tone: 'bad' },
+  log_message_edited: { title: 'Mensaje editado', tone: 'warn' },
+  log_messages_purged: { title: 'Mensajes purgados', tone: 'warn' },
+  log_channel_created: { title: 'Canal creado', tone: 'good' },
+  log_channel_deleted: { title: 'Canal borrado', tone: 'bad' },
+  log_role_created: { title: 'Rol creado', tone: 'good' },
+  log_role_deleted: { title: 'Rol borrado', tone: 'bad' },
+  log_thread_created: { title: 'Hilo creado', tone: 'good' },
+  log_voice_join: { title: 'Entró a un canal de voz', tone: 'good' },
+  log_voice_leave: { title: 'Salió de un canal de voz', tone: 'warn' },
+  log_voice_move: { title: 'Cambió de canal de voz', tone: 'neutral' },
 
-  notify_twitch_live: { title: '🔴 {creator} está en directo', message: '**{title}**\n{url}' },
-  notify_youtube_live: { title: '🔴 {creator} está en directo', message: '**{title}**\n{url}' },
-  notify_youtube_video: { title: '📹 Vídeo nuevo de {creator}', message: '**{title}**\n{url}' },
-  notify_youtube_short: { title: '📱 Short nuevo de {creator}', message: '**{title}**\n{url}' },
-  notify_tiktok_live: { title: '🔴 {creator} está en directo', message: '**{title}**\n{url}' },
-  notify_tiktok_video: { title: '📹 TikTok nuevo de {creator}', message: '**{title}**\n{url}' },
+  notify_twitch_live: {
+    title: '{creator} está en directo',
+    message: '**{title}**\n\nJugando a: {game}\nEspectadores: {viewers}\n\n{url}'
+  },
+  notify_youtube_live: {
+    title: '{creator} está en directo',
+    message: '**{title}**\n\nEspectadores: {viewers}\n\n{url}'
+  },
+  notify_youtube_video: {
+    title: 'Vídeo nuevo de {creator}',
+    message: '**{title}**\n\nVisualizaciones: {views}\n\n{url}'
+  },
+  notify_youtube_short: {
+    title: 'Short nuevo de {creator}',
+    message: '**{title}**\n\nVisualizaciones: {views}\n\n{url}'
+  },
+  notify_tiktok_live: {
+    title: '{creator} está en directo',
+    message: '**{title}**\n\nEspectadores: {viewers}\n\n{url}'
+  },
+  notify_tiktok_video: {
+    title: 'TikTok nuevo de {creator}',
+    message: '**{title}**\n\nReproducciones: {views}\n\n{url}'
+  },
 
-  deal_epic_free: { title: '🎁 Gratis en Epic: {title}', message: 'Por tiempo limitado.\n{url}', tone: 'good' },
-  deal_steam_special: { title: '🏷️ {discount}% de descuento: {title}', message: 'Se queda en {price}.\n{url}', tone: 'warn' },
-  deal_giveaway: { title: '🎉 Sorteo: {title}', message: '{url}', tone: 'good' }
+  deal_epic_free: {
+    title: 'Gratis en Epic: {title}',
+    message: 'Precio habitual: {originalPrice}\nAhora: **gratis**\nTermina: {endsAt}\n\n{url}',
+    tone: 'good'
+  },
+  deal_steam_special: {
+    title: '{title} · -{discount}%',
+    message: 'Antes: {originalPrice}\nAhora: **{price}**\nTermina: {endsAt}\n\n{url}',
+    tone: 'warn'
+  },
+  deal_giveaway: {
+    title: 'Gratis: {title}',
+    message: 'Valor habitual: {worth}\nPlataformas: {platforms}\nTermina: {endsAt}\n\n{url}',
+    tone: 'good'
+  }
 };
+
 
 /* ------------------------------------------------------------------ */
 

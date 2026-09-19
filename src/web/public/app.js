@@ -279,6 +279,66 @@ function multiOptions(items, selected = []) {
     .join('');
 }
 
+// Elegir varias cosas sin Ctrl+clic. Se ven como fichas que se quitan con la
+// «×» y se añaden desde un desplegable. Por debajo mantiene el mismo
+// <select multiple> de antes, oculto, así que todo lo que leía sus valores
+// sigue leyéndolos igual.
+function multiPicker(id, items, selected = [], { addLabel = 'Añadir', empty = 'Ninguno todavía.' } = {}) {
+  return `
+    <div class="chip-picker" data-picker="${escapeHtml(id)}" data-empty="${escapeHtml(empty)}">
+      <div class="chip-list" data-picker-list></div>
+      <div class="chip-add">
+        <select data-picker-add aria-label="${escapeHtml(addLabel)}"></select>
+        <button class="button quiet sm" type="button" data-picker-button>${escapeHtml(addLabel)}</button>
+      </div>
+      <select id="${escapeHtml(id)}" multiple hidden tabindex="-1" aria-hidden="true">${multiOptions(items, selected)}</select>
+    </div>`;
+}
+
+function bindMultiPickers(root) {
+  root.querySelectorAll('[data-picker]').forEach(picker => {
+    const store = picker.querySelector('select[multiple]');
+    const list = picker.querySelector('[data-picker-list]');
+    const add = picker.querySelector('[data-picker-add]');
+    const button = picker.querySelector('[data-picker-button]');
+    if (!store || !list || !add) return;
+
+    const pintar = () => {
+      const puestos = [...store.options].filter(option => option.selected);
+      const libres = [...store.options].filter(option => !option.selected);
+
+      list.innerHTML = puestos.length
+        ? puestos.map(option => `
+            <span class="chip">${escapeHtml(option.textContent)}
+              <button type="button" data-picker-remove="${escapeHtml(option.value)}" aria-label="Quitar ${escapeHtml(option.textContent)}">×</button>
+            </span>`).join('')
+        : `<span class="chip-empty">${escapeHtml(picker.dataset.empty || '')}</span>`;
+
+      add.innerHTML = libres.map(option =>
+        `<option value="${escapeHtml(option.value)}">${escapeHtml(option.textContent)}</option>`).join('');
+      const sinNada = libres.length === 0;
+      add.disabled = sinNada;
+      if (button) button.disabled = sinNada;
+      if (sinNada) add.innerHTML = '<option>No queda ninguno por añadir</option>';
+
+      list.querySelectorAll('[data-picker-remove]').forEach(quitar => {
+        quitar.addEventListener('click', () => cambiar(quitar.dataset.pickerRemove, false));
+      });
+    };
+
+    const cambiar = (valor, puesto) => {
+      const option = [...store.options].find(candidate => candidate.value === valor);
+      if (!option) return;
+      option.selected = puesto;
+      store.dispatchEvent(new Event('change', { bubbles: true }));
+      pintar();
+    };
+
+    button?.addEventListener('click', () => { if (add.value) cambiar(add.value, true); });
+    pintar();
+  });
+}
+
 function selectedValues(select) {
   return select ? [...select.selectedOptions].map(option => option.value).filter(Boolean) : [];
 }
@@ -422,6 +482,7 @@ const SAMPLE = {
   viewers: '128',
   views: '4.320',
   count: '25',
+  type: 'Texto',
   thread: '#dudas',
   owner: 'Yojan',
   boostCount: '14',
@@ -1203,7 +1264,8 @@ function renderIdentidad() {
     ${card({
       eyebrow: 'Identidad',
       title: `Identidad en ${data.guild.name}`,
-      description: 'Estos valores solo afectan a este servidor. Cada Main mantiene la suya.',
+      description: 'Solo afecta a este servidor. En los demás, Vesper sigue igual.',
+      ayuda: 'El nombre se aplica de verdad: Vesper se cambia el apodo en este servidor, así que en la lista de miembros aparece como lo pongas aquí. La imagen solo cambia en los mensajes que publica, porque Discord no deja que un bot tenga un avatar distinto en cada servidor: el de la lista de miembros es el de su cuenta y es el mismo en todas partes.',
       body: identityForm
     })}
 
@@ -1833,6 +1895,40 @@ function originalBody(item) {
   return fields.map(([name, value]) => `**${name}**: ${value}`).join('\n');
 }
 
+// La última caja de texto que tuvo el foco dentro de este formulario. El
+// navegador quita el foco al pulsar el botón, así que se apunta antes.
+let ultimoCampo = null;
+
+function recordarCampo(root) {
+  root.querySelectorAll('input[type="text"], input[type="url"], textarea').forEach(campo => {
+    campo.addEventListener('focus', () => { ultimoCampo = campo; });
+  });
+}
+
+function campoEnFoco(boton) {
+  const formulario = boton.closest('form') || boton.closest('.message-item') || document;
+  if (ultimoCampo && formulario.contains(ultimoCampo)) return ultimoCampo;
+  return formulario.querySelector('textarea') || formulario.querySelector('input[type="text"]');
+}
+
+// Lo poco que cambia al guardar un mensaje: la etiqueta «Personalizado» y el
+// botón de restablecer. Antes se repintaba la sección entera para esto.
+function marcarMensajeGuardado(root, item) {
+  const guardado = state.data.config.embeds?.[item.id] || {};
+  const personalizado = ['title', 'message', 'footer', 'image', 'color', 'layout']
+    .some(campo => guardado[campo]);
+  const bloque = root.querySelector(`[data-message="${item.id}"]`);
+  const etiqueta = bloque?.querySelector('summary .tag');
+  if (etiqueta) {
+    etiqueta.textContent = personalizado ? 'Personalizado' : 'Original';
+    etiqueta.classList.toggle('accent', personalizado);
+  }
+  const restablecer = root.querySelector(`[data-msg-reset="${item.id}"]`);
+  if (restablecer) restablecer.disabled = !personalizado;
+  const bandera = root.querySelector(`#form-msg-${item.id} .dirty-flag`);
+  if (bandera) bandera.hidden = true;
+}
+
 function messageEditorMarkup(item) {
   const saved = state.data.config.embeds?.[item.id] || {};
   const factory = messageFactoryDefaults(item);
@@ -1887,8 +1983,12 @@ function messageEditorMarkup(item) {
       <span>Mostrar la imagen de perfil</span>
     </label>` : '';
 
+  // Fichas en vez de una lista larga: se pulsan y se escriben donde tengas el
+  // cursor, así que ya no hay que copiar arriba y bajar a pegar.
   const variables = (item.variables || []).map(([token, description]) =>
-    `<li><button type="button" data-variable="${escapeHtml(token)}"><code>${escapeHtml(token)}</code></button> · ${escapeHtml(description)}</li>`).join('');
+    `<button type="button" class="var-chip" data-variable="${escapeHtml(token)}"
+             data-variable-target="msg-${item.id}-message"
+             title="${escapeHtml(description)}">${escapeHtml(token)}</button>`).join('');
 
   const bodyHint = item.plainText
     ? 'Este mensaje es texto normal, no un embed.'
@@ -1913,7 +2013,6 @@ function messageEditorMarkup(item) {
       </summary>
       <div class="editor-layout">
         <form id="form-msg-${item.id}" class="form">
-          ${layoutField}
           ${titleField}
           <div class="field wide">
             <label for="msg-${item.id}-message">${item.plainText ? 'Mensaje' : 'Cuerpo del mensaje'}</label>
@@ -1922,13 +2021,25 @@ function messageEditorMarkup(item) {
                       placeholder="${escapeHtml(factory.message || '')}">${escapeHtml(saved.message || '')}</textarea>
             <span class="hint">${escapeHtml(bodyHint)}</span>
           </div>
-          <div class="form-row">
-            ${colorField}
-            ${footerField}
-            ${imageField}
-            ${thumbField ? `<div class="field">${thumbField}</div>` : ''}
-          </div>
-          <ul class="var-list">${variables}</ul>
+
+          ${variables ? `
+          <div class="field wide">
+            <span class="field-label">Datos que puedes meter${help('Pulsa uno y se escribe donde tengas el cursor. Pasa el ratón por encima para ver qué pone cada uno. {user} pone una mención con enlace al perfil; {username} y {displayName} ponen el nombre a secas, y son los que hay que usar con quien ya no está en el servidor, porque a esa persona Discord ya no la puede mencionar.')}</span>
+            <div class="var-chips">${variables}</div>
+          </div>` : ''}
+
+          ${layoutField || colorField || footerField || imageField || thumbField ? `
+          <details class="more-options" data-panel="opciones-${item.id}">
+            <summary>Color, imagen y formato</summary>
+            ${layoutField}
+            <div class="form-row">
+              ${colorField}
+              ${footerField}
+              ${imageField}
+              ${thumbField ? `<div class="field">${thumbField}</div>` : ''}
+            </div>
+          </details>` : ''}
+
           <div class="form-actions">
             <button class="button" type="submit">Guardar</button>
             ${baseButton}
@@ -2139,9 +2250,17 @@ function bindMensajes(root) {
     });
     form.addEventListener('change', update);
 
-    form.addEventListener('submit', event => {
+    form.addEventListener('submit', async event => {
       event.preventDefault();
-      saveConfig({ embeds: { [item.id]: messageValues(item.id) } }, `«${item.label}» guardado.`, event.submitter);
+      const guardado = await saveConfig(
+        { embeds: { [item.id]: messageValues(item.id) } },
+        `«${item.label}» guardado.`,
+        event.submitter,
+        { rerender: false }
+      );
+      // Sin repintar la sección: se actualiza a mano lo poco que cambia, así
+      // el mensaje se queda abierto y la página no salta al principio.
+      if (guardado) marcarMensajeGuardado(root, item);
     });
 
     root.querySelector(`[data-msg-base="${item.id}"]`)?.addEventListener('click', () => {
@@ -2179,13 +2298,17 @@ function bindMensajes(root) {
   }
 
   root.querySelectorAll('[data-variable]').forEach(button => {
-    button.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(button.dataset.variable);
-        toast(`${button.dataset.variable} copiado.`, 'ok');
-      } catch {
-        toast(`Copia manualmente: ${button.dataset.variable}`, 'bad');
+    // Antes copiaba al portapapeles y había que ir a buscar la caja y pegar.
+    // Ahora se escribe donde tengas el cursor; si no hay ninguno, en el cuerpo.
+    button.addEventListener('click', () => {
+      const destino = campoEnFoco(button) || root.querySelector(`#${CSS.escape(button.dataset.variableTarget || '')}`);
+      if (!destino) {
+        toast('Pon el cursor en un cuadro de texto y vuelve a pulsar.', 'bad');
+        return;
       }
+      applyFormat(destino, { insert: button.dataset.variable });
+      destino.focus();
+      destino.dispatchEvent(new Event('input', { bubbles: true }));
     });
   });
 }
@@ -2344,10 +2467,7 @@ function renderOfertas() {
             </div>
             <div class="field wide">
               <label for="deals-platforms">Tiendas de los sorteos</label>
-              <select id="deals-platforms" multiple>
-                ${GIVEAWAY_PLATFORMS.map(([value, label]) => `<option value="${value}"${chosen.has(value) ? ' selected' : ''}>${escapeHtml(label)}</option>`).join('')}
-              </select>
-              <span class="hint">Mantén Ctrl o Cmd para elegir varias.</span>
+              ${multiPicker('deals-platforms', GIVEAWAY_PLATFORMS.map(([value, label]) => ({ id: value, name: label })), [...chosen], { addLabel: 'Añadir tienda', empty: 'Todas las tiendas.' })}
             </div>
           </div>
           ${formActions('Guardar ofertas')}
@@ -2454,12 +2574,11 @@ function renderModeracion() {
         <div class="form-row">
           <div class="field">
             <label for="automod-exempt-channels">Canales excluidos</label>
-            <select id="automod-exempt-channels" multiple>${multiOptions(data.channels, config.moderation?.exemptChannels)}</select>
+            ${multiPicker('automod-exempt-channels', data.channels, config.moderation?.exemptChannels, { addLabel: 'Añadir canal', empty: 'Se revisan todos los canales.' })}
           </div>
           <div class="field">
             <label for="automod-exempt-roles">Roles excluidos</label>
-            <select id="automod-exempt-roles" multiple>${multiOptions(data.roles, config.moderation?.exemptRoles)}</select>
-            <span class="hint">Mantén Ctrl o Cmd para elegir varios.</span>
+            ${multiPicker('automod-exempt-roles', data.roles, config.moderation?.exemptRoles, { addLabel: 'Añadir rol', empty: 'Se revisa a todo el mundo.' })}
           </div>
         </div>
         ${formActions('Guardar filtros')}
@@ -2575,7 +2694,7 @@ function renderComunidad() {
             </div>
             <div class="field wide">
               <label for="ticket-staff">Roles de soporte</label>
-              <select id="ticket-staff" multiple>${multiOptions(data.roles, community.tickets?.staffRoles)}</select>
+              ${multiPicker('ticket-staff', data.roles, community.tickets?.staffRoles, { addLabel: 'Añadir rol', empty: 'Sin roles de soporte.' })}
             </div>
           </div>
           ${formActions('Guardar tickets')}
@@ -2618,7 +2737,7 @@ function renderComunidad() {
             </div>
             <div class="field">
               <label for="selfroles-roles">Roles disponibles</label>
-              <select id="selfroles-roles" multiple>${multiOptions(data.assignableRoles || [], (community.selfRoles?.roles || []).map(item => item.roleId))}</select>
+              ${multiPicker('selfroles-roles', data.assignableRoles || [], (community.selfRoles?.roles || []).map(item => item.roleId), { addLabel: 'Añadir rol', empty: 'Sin roles que puedan elegirse.' })}
             </div>
           </div>
           ${formActions('Guardar autorroles')}
@@ -2647,7 +2766,7 @@ function renderComunidad() {
             </div>
             <div class="field">
               <label for="starboard-ignored">Canales ignorados</label>
-              <select id="starboard-ignored" multiple>${multiOptions(data.channels, community.starboard?.ignoredChannels)}</select>
+              ${multiPicker('starboard-ignored', data.channels, community.starboard?.ignoredChannels, { addLabel: 'Añadir canal', empty: 'No se ignora ningún canal.' })}
             </div>
           </div>
           ${formActions('Guardar destacados')}
@@ -2777,17 +2896,17 @@ function renderModulos() {
           <div class="form-row">
             <div class="field">
               <label for="roles-social">Gestión de redes</label>
-              <select id="roles-social" multiple>${multiOptions(data.roles, config.permissions?.socialManagerRoles)}</select>
+              ${multiPicker('roles-social', data.roles, config.permissions?.socialManagerRoles, { addLabel: 'Añadir rol', empty: 'Solo los administradores.' })}
               <span class="hint">Pueden añadir y quitar cuentas vigiladas.</span>
             </div>
             <div class="field">
               <label for="roles-moderator">Moderación</label>
-              <select id="roles-moderator" multiple>${multiOptions(data.roles, config.permissions?.moderatorRoles)}</select>
+              ${multiPicker('roles-moderator', data.roles, config.permissions?.moderatorRoles, { addLabel: 'Añadir rol', empty: 'Solo los administradores.' })}
               <span class="hint">Pueden advertir, aislar y gestionar casos.</span>
             </div>
             <div class="field">
               <label for="roles-dj">DJ de música</label>
-              <select id="roles-dj" multiple>${multiOptions(data.roles, config.permissions?.musicDjRoles)}</select>
+              ${multiPicker('roles-dj', data.roles, config.permissions?.musicDjRoles, { addLabel: 'Añadir rol', empty: 'Solo los administradores.' })}
               <span class="hint">Pueden saltar, parar y cambiar el volumen.</span>
             </div>
           </div>
@@ -3068,6 +3187,8 @@ function watchDirty(root) {
 
 function bindCommon(root) {
   watchDirty(root);
+  recordarCampo(root);
+  bindMultiPickers(root);
   wireImageFallbacks(root);
   bindHelp(root);
 
@@ -3974,10 +4095,23 @@ function renderView() {
     return;
   }
 
+  // Volver a pintar dejaba la página en lo alto y cerraba todo lo desplegado.
+  // Se guarda dónde estabas y qué tenías abierto para devolverlo tal cual.
+  const desplazamiento = window.scrollY;
+  const desplegados = [...view.querySelectorAll('details[open]')]
+    .map(d => d.dataset.message || d.dataset.panel || d.id).filter(Boolean);
+
   const renderer = RENDERERS[section.id];
   view.innerHTML = renderer.render();
   bindCommon(view);
   renderer.bind(view);
+
+  for (const clave of desplegados) {
+    const destino = view.querySelector(`details[data-message="${clave}"], details[data-panel="${clave}"], details#${CSS.escape(clave)}`);
+    if (destino) destino.open = true;
+  }
+  if (desplazamiento > 0) window.scrollTo({ top: desplazamiento });
+
   // Al cambiar de pantalla, lo pendiente de la anterior ya no está en el DOM.
   updateSaveBar();
 }

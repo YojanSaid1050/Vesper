@@ -76,13 +76,8 @@ module.exports = {
 
       await publishAlert(member.guild, guildConfig, 'log_bot_join', {
         vars: memberVars(member, { role: botRole ? `${botRole}` : 'ninguno', roleName: botRole?.name || 'ninguno' }),
-        defaults: { title: '🤖 Bot añadido', color: '#5865F2', thumbnailUrl: member.user.displayAvatarURL() },
-        fields: [
-          { name: '🤖 Bot', value: member.user.tag },
-          { name: '🆔 ID', value: member.id },
-          { name: '🎭 Rol añadido', value: botRole ? `<@&${general.botRole}>` : 'No configurado' }
-        ]
-      });
+        defaults: { thumbnailUrl: member.user.displayAvatarURL() }
+    });
     }
 
     const welcomeChannel = resolveChannel(member.guild, guildConfig, 'welcome');
@@ -92,15 +87,7 @@ module.exports = {
 
     await publishAlert(member.guild, guildConfig, member.user.bot ? 'log_bot_join' : 'log_member_join', {
       vars: memberVars(member),
-      defaults: {
-        title: member.user.bot ? '🤖 Bot añadido' : '📥 Miembro entró',
-        color: member.user.bot ? '#5865F2' : '#57F287',
-        thumbnailUrl: member.user.displayAvatarURL()
-      },
-      fields: [
-        { name: member.user.bot ? '🤖 Bot' : '👤 Usuario', value: member.user.tag },
-        { name: '🆔 ID', value: member.id }
-      ]
+      defaults: { thumbnailUrl: member.user.displayAvatarURL() }
     });
   },
   sendWelcome,

@@ -19,15 +19,7 @@ module.exports = {
 
     await publishAlert(ban.guild, guildConfig, 'log_ban_removed', {
       vars: memberVars({ user: ban.user, guild: ban.guild }, { executor }),
-      defaults: {
-        title: '🔓 Baneo retirado',
-        color: '#57F287',
-        thumbnailUrl: ban.user.displayAvatarURL()
-      },
-      fields: [
-        { name: '👤 Usuario', value: ban.user.tag },
-        { name: '🛠️ Desbaneado por', value: executor }
-      ]
+      defaults: { thumbnailUrl: ban.user.displayAvatarURL() }
     });
   }
 };

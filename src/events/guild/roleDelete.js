@@ -21,12 +21,7 @@ module.exports = {
       vars: {
         role: role.name, roleName: role.name, executor,
         server: role.guild.name, memberCount: role.guild.memberCount
-      },
-      defaults: { title: '❌ Rol borrado', color: '#ff4d4d' },
-      fields: [
-        { name: '🎭 Rol', value: role.name },
-        { name: '🛠️ Eliminado por', value: executor }
-      ]
+      }
     });
   }
 };
