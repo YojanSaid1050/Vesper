@@ -60,6 +60,7 @@ function pack(theme, messages) {
   const resolved = {};
   for (const [kind, entry] of Object.entries(messages)) {
     resolved[kind] = {
+      author: entry.author ?? null,
       title: entry.title ?? null,
       message: entry.message ?? null,
       footer: entry.footer ?? null,
@@ -106,32 +107,32 @@ const VOID_MESSAGES = {
 
   // Los registros conservan los ornamentos de Embers Void en el encabezado,
   // pero el cuerpo es el de fábrica: una línea por dato, sin recuadros.
-  log_member_join: { title: '⟡ Un alma cruzó el umbral', tone: 'good' },
-  log_member_leave: { title: '⟡ Un alma se desvaneció', tone: 'dark' },
-  log_bot_join: { title: '⚙ Un autómata despertó', tone: 'neutral' },
-  log_bot_leave: { title: '⚙ Un autómata se apagó', tone: 'dark' },
-  log_nickname: { title: '⟡ Otro nombre en la penumbra', tone: 'warn' },
-  log_roles_added: { title: '✦ Marcas concedidas', tone: 'good' },
-  log_roles_removed: { title: '✦ Marcas retiradas', tone: 'bad' },
+  log_member_join: { author: '⟡ Un alma cruzó el umbral · {server}', tone: 'good' },
+  log_member_leave: { author: '⟡ Un alma se desvaneció · {server}', tone: 'dark' },
+  log_bot_join: { author: '⚙ Un autómata despertó · {server}', tone: 'neutral' },
+  log_bot_leave: { author: '⚙ Un autómata se apagó · {server}', tone: 'dark' },
+  log_nickname: { author: '⟡ Otro nombre en la penumbra · {server}', tone: 'warn' },
+  log_roles_added: { author: '✦ Marcas concedidas · {server}', tone: 'good' },
+  log_roles_removed: { author: '✦ Marcas retiradas · {server}', tone: 'bad' },
 
-  log_timeout_on: { title: '⛧ Silenciado por el vacío', tone: 'bad' },
-  log_timeout_off: { title: '⛧ La voz regresa', tone: 'good' },
-  log_ban_added: { title: '⸸ Desterrado', tone: 'bad' },
-  log_ban_removed: { title: '⸸ Destierro levantado', tone: 'good' },
+  log_timeout_on: { author: '⛧ Silenciado por el vacío · {server}', tone: 'bad' },
+  log_timeout_off: { author: '⛧ La voz regresa · {server}', tone: 'good' },
+  log_ban_added: { author: '⸸ Desterrado · {server}', tone: 'bad' },
+  log_ban_removed: { author: '⸸ Destierro levantado · {server}', tone: 'good' },
   automod_notice: { message: '{user}, el vacío se quedó con tu mensaje: {reason}. Caso **#{case}**.' },
   automod_dm: { message: '⛧ Una advertencia en **{server}**.\n\nMotivo: {reason}\nCaso: **#{case}**' },
 
-  log_message_deleted: { title: '☾ Un mensaje se disolvió', tone: 'bad' },
-  log_message_edited: { title: '☾ Un mensaje cambió de forma', tone: 'warn' },
-  log_messages_purged: { title: '☾ Purga en la penumbra', tone: 'warn' },
-  log_channel_created: { title: '⟡ Se abrió un pasaje', tone: 'good' },
-  log_channel_deleted: { title: '⟡ Un pasaje se cerró', tone: 'bad' },
-  log_role_created: { title: '✦ Nueva marca forjada', tone: 'good' },
-  log_role_deleted: { title: '✦ Una marca se deshizo', tone: 'bad' },
-  log_thread_created: { title: '⟡ Un hilo en la penumbra', tone: 'good' },
-  log_voice_join: { title: '♪ Una voz en el vacío', tone: 'good' },
-  log_voice_leave: { title: '♪ La voz se apagó', tone: 'dark' },
-  log_voice_move: { title: '♪ La voz cambió de eco', tone: 'neutral' },
+  log_message_deleted: { author: '☾ Un mensaje se disolvió · {server}', tone: 'bad' },
+  log_message_edited: { author: '☾ Un mensaje cambió de forma · {server}', tone: 'warn' },
+  log_messages_purged: { author: '☾ Purga en la penumbra · {server}', tone: 'warn' },
+  log_channel_created: { author: '⟡ Se abrió un pasaje · {server}', tone: 'good' },
+  log_channel_deleted: { author: '⟡ Un pasaje se cerró · {server}', tone: 'bad' },
+  log_role_created: { author: '✦ Nueva marca forjada · {server}', tone: 'good' },
+  log_role_deleted: { author: '✦ Una marca se deshizo · {server}', tone: 'bad' },
+  log_thread_created: { author: '⟡ Un hilo en la penumbra · {server}', tone: 'good' },
+  log_voice_join: { author: '♪ Una voz en el vacío · {server}', tone: 'good' },
+  log_voice_leave: { author: '♪ La voz se apagó · {server}', tone: 'dark' },
+  log_voice_move: { author: '♪ La voz cambió de eco · {server}', tone: 'neutral' },
 
   notify_twitch_live: {
     title: '⛧ {creator} está en directo',
@@ -222,32 +223,32 @@ const LIMONES_MESSAGES = {
 
   // Los registros llevan el mismo cuerpo que trae el bot de fábrica: una
   // línea por dato y sin adornos. Aquí solo cambia el color y el encabezado.
-  log_member_join: { title: 'Entró alguien nuevo', tone: 'good' },
-  log_member_leave: { title: 'Se fue alguien', tone: 'dark' },
-  log_bot_join: { title: 'Bot añadido', tone: 'neutral' },
-  log_bot_leave: { title: 'Bot retirado', tone: 'dark' },
-  log_nickname: { title: 'Cambio de apodo', tone: 'neutral' },
-  log_roles_added: { title: 'Roles añadidos', tone: 'good' },
-  log_roles_removed: { title: 'Roles retirados', tone: 'bad' },
+  log_member_join: { author: 'Entró alguien nuevo · {server}', tone: 'good' },
+  log_member_leave: { author: 'Se fue alguien · {server}', tone: 'dark' },
+  log_bot_join: { author: 'Bot añadido · {server}', tone: 'neutral' },
+  log_bot_leave: { author: 'Bot retirado · {server}', tone: 'dark' },
+  log_nickname: { author: 'Cambio de apodo · {server}', tone: 'neutral' },
+  log_roles_added: { author: 'Roles añadidos · {server}', tone: 'good' },
+  log_roles_removed: { author: 'Roles retirados · {server}', tone: 'bad' },
 
-  log_timeout_on: { title: 'A pensar un rato', tone: 'bad' },
-  log_timeout_off: { title: 'Ya puede hablar', tone: 'good' },
-  log_ban_added: { title: 'Sin limones para ti', tone: 'bad' },
-  log_ban_removed: { title: 'Baneo levantado', tone: 'good' },
+  log_timeout_on: { author: 'A pensar un rato · {server}', tone: 'bad' },
+  log_timeout_off: { author: 'Ya puede hablar · {server}', tone: 'good' },
+  log_ban_added: { author: 'Sin limones para ti · {server}', tone: 'bad' },
+  log_ban_removed: { author: 'Baneo levantado · {server}', tone: 'good' },
   automod_notice: { message: '{user}, quité tu mensaje: {reason}. Caso **#{case}**' },
   automod_dm: { message: 'Te llevaste una advertencia en **{server}**.\n\nMotivo: {reason}\nCaso: **#{case}**' },
 
-  log_message_deleted: { title: 'Mensaje borrado', tone: 'bad' },
-  log_message_edited: { title: 'Mensaje editado', tone: 'warn' },
-  log_messages_purged: { title: 'Limpieza general', tone: 'warn' },
-  log_channel_created: { title: 'Canal nuevo', tone: 'good' },
-  log_channel_deleted: { title: 'Canal borrado', tone: 'bad' },
-  log_role_created: { title: 'Rol nuevo', tone: 'good' },
-  log_role_deleted: { title: 'Rol borrado', tone: 'bad' },
-  log_thread_created: { title: 'Hilo nuevo', tone: 'good' },
-  log_voice_join: { title: 'Entró a un canal de voz', tone: 'good' },
-  log_voice_leave: { title: 'Salió de un canal de voz', tone: 'dark' },
-  log_voice_move: { title: 'Cambió de canal de voz', tone: 'neutral' },
+  log_message_deleted: { author: 'Mensaje borrado · {server}', tone: 'bad' },
+  log_message_edited: { author: 'Mensaje editado · {server}', tone: 'warn' },
+  log_messages_purged: { author: 'Limpieza general · {server}', tone: 'warn' },
+  log_channel_created: { author: 'Canal nuevo · {server}', tone: 'good' },
+  log_channel_deleted: { author: 'Canal borrado · {server}', tone: 'bad' },
+  log_role_created: { author: 'Rol nuevo · {server}', tone: 'good' },
+  log_role_deleted: { author: 'Rol borrado · {server}', tone: 'bad' },
+  log_thread_created: { author: 'Hilo nuevo · {server}', tone: 'good' },
+  log_voice_join: { author: 'Entró a un canal de voz · {server}', tone: 'good' },
+  log_voice_leave: { author: 'Salió de un canal de voz · {server}', tone: 'dark' },
+  log_voice_move: { author: 'Cambió de canal de voz · {server}', tone: 'neutral' },
 
   // En un aviso de redes lo que importa es qué han publicado y dónde verlo.
   notify_twitch_live: {
@@ -261,7 +262,7 @@ const LIMONES_MESSAGES = {
     footer: 'Pásate a saludar'
   },
   notify_youtube_video: {
-    title: 'Vídeo nuevo de {creator}',
+    title: 'Video nuevo de {creator}',
     message: '**{title}**\n\nVisualizaciones: {views}\n\n{url}',
     footer: 'Dale un vistazo'
   },
@@ -328,7 +329,7 @@ const ESTANDAR = {
 const ESTANDAR_MESSAGES = {
   welcome: {
     title: 'Te damos la bienvenida',
-    message: 'Hola {user}, bienvenid@ a **{server}**.\nYa sois {memberCount}. Ponte cómodo.',
+    message: 'Hola {user}, bienvenid@ a **{server}**.\nYa son {memberCount}. Ponte cómodo.',
     tone: 'good'
   },
   goodbye: {
@@ -353,32 +354,32 @@ const ESTANDAR_MESSAGES = {
     tone: 'good'
   },
 
-  log_member_join: { title: 'Miembro entró', tone: 'good' },
-  log_member_leave: { title: 'Miembro salió', tone: 'bad' },
-  log_bot_join: { title: 'Bot añadido', tone: 'neutral' },
-  log_bot_leave: { title: 'Bot retirado', tone: 'warn' },
-  log_nickname: { title: 'Apodo cambiado', tone: 'neutral' },
-  log_roles_added: { title: 'Roles añadidos', tone: 'good' },
-  log_roles_removed: { title: 'Roles retirados', tone: 'bad' },
+  log_member_join: { author: 'Miembro entró · {server}', tone: 'good' },
+  log_member_leave: { author: 'Miembro salió · {server}', tone: 'bad' },
+  log_bot_join: { author: 'Bot añadido · {server}', tone: 'neutral' },
+  log_bot_leave: { author: 'Bot retirado · {server}', tone: 'warn' },
+  log_nickname: { author: 'Apodo cambiado · {server}', tone: 'neutral' },
+  log_roles_added: { author: 'Roles añadidos · {server}', tone: 'good' },
+  log_roles_removed: { author: 'Roles retirados · {server}', tone: 'bad' },
 
-  log_timeout_on: { title: 'Miembro aislado', tone: 'bad' },
-  log_timeout_off: { title: 'Aislamiento retirado', tone: 'good' },
-  log_ban_added: { title: 'Miembro baneado', tone: 'bad' },
-  log_ban_removed: { title: 'Baneo retirado', tone: 'good' },
+  log_timeout_on: { author: 'Miembro aislado · {server}', tone: 'bad' },
+  log_timeout_off: { author: 'Aislamiento retirado · {server}', tone: 'good' },
+  log_ban_added: { author: 'Miembro baneado · {server}', tone: 'bad' },
+  log_ban_removed: { author: 'Baneo retirado · {server}', tone: 'good' },
   automod_notice: { message: '{user}, retiré tu mensaje: {reason}. Caso **#{case}**.' },
   automod_dm: { message: 'Recibiste una advertencia en **{server}**.\n\nMotivo: {reason}\nCaso: **#{case}**' },
 
-  log_message_deleted: { title: 'Mensaje borrado', tone: 'bad' },
-  log_message_edited: { title: 'Mensaje editado', tone: 'warn' },
-  log_messages_purged: { title: 'Mensajes purgados', tone: 'warn' },
-  log_channel_created: { title: 'Canal creado', tone: 'good' },
-  log_channel_deleted: { title: 'Canal borrado', tone: 'bad' },
-  log_role_created: { title: 'Rol creado', tone: 'good' },
-  log_role_deleted: { title: 'Rol borrado', tone: 'bad' },
-  log_thread_created: { title: 'Hilo creado', tone: 'good' },
-  log_voice_join: { title: 'Entró a un canal de voz', tone: 'good' },
-  log_voice_leave: { title: 'Salió de un canal de voz', tone: 'warn' },
-  log_voice_move: { title: 'Cambió de canal de voz', tone: 'neutral' },
+  log_message_deleted: { author: 'Mensaje borrado · {server}', tone: 'bad' },
+  log_message_edited: { author: 'Mensaje editado · {server}', tone: 'warn' },
+  log_messages_purged: { author: 'Mensajes purgados · {server}', tone: 'warn' },
+  log_channel_created: { author: 'Canal creado · {server}', tone: 'good' },
+  log_channel_deleted: { author: 'Canal borrado · {server}', tone: 'bad' },
+  log_role_created: { author: 'Rol creado · {server}', tone: 'good' },
+  log_role_deleted: { author: 'Rol borrado · {server}', tone: 'bad' },
+  log_thread_created: { author: 'Hilo creado · {server}', tone: 'good' },
+  log_voice_join: { author: 'Entró a un canal de voz · {server}', tone: 'good' },
+  log_voice_leave: { author: 'Salió de un canal de voz · {server}', tone: 'warn' },
+  log_voice_move: { author: 'Cambió de canal de voz · {server}', tone: 'neutral' },
 
   notify_twitch_live: {
     title: '{creator} está en directo',
@@ -389,7 +390,7 @@ const ESTANDAR_MESSAGES = {
     message: '**{title}**\n\nEspectadores: {viewers}\n\n{url}'
   },
   notify_youtube_video: {
-    title: 'Vídeo nuevo de {creator}',
+    title: 'Video nuevo de {creator}',
     message: '**{title}**\n\nVisualizaciones: {views}\n\n{url}'
   },
   notify_youtube_short: {

@@ -343,7 +343,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     // proveedor las rechace: es literalmente lo único que hace falta saber
     // para arreglar un «redirect_uri_mismatch».
     redirectUris: redirectUris(),
-    version: '3.4.0'
+    version: '3.5.0'
   }));
 
   app.get('/auth/discord', authLimiter, requireDashboard, async (req, res, next) => {

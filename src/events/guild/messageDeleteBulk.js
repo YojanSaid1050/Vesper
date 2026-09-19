@@ -20,7 +20,8 @@ module.exports = {
         channel: `${channel}`,
         channelName: channel?.name || '',
         count: messages.size
-      }
-    });
+      },
+      defaults: { authorIconUrl: guild.iconURL() }
+});
   }
 };

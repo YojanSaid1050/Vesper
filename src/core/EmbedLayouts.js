@@ -22,8 +22,11 @@ const IS_COMPONENTS_V2 = 32768;
 /**
  * Contenedor Components V2 a partir de las piezas ya resueltas.
  */
-function containerPayload({ title, message, fields = [], footer, image, color } = {}) {
+function containerPayload({ title, message, fields = [], footer, image, color, author } = {}) {
   const parts = [];
+  // El contenedor V2 no tiene fila de autor: su equivalente es una línea
+  // pequeña encima del título.
+  if (author) parts.push({ type: TEXT, content: `-# ${author}` });
   if (title) parts.push({ type: TEXT, content: title });
   if (title && (message || fields.length)) parts.push({ type: SEPARATOR, spacing: 1 });
   if (message) parts.push({ type: TEXT, content: message });

@@ -30,8 +30,9 @@ module.exports = {
     if (!oldState.channelId && newState.channelId) {
       if (!createVoiceLog(`join-${member.id}-${newState.channelId}`)) return;
       await publishAlert(newState.guild, guildConfig, 'log_voice_join', {
-        vars: memberVars(member, { channel: `${newState.channel}`, channelName: newState.channel?.name || '' })
-    });
+        vars: memberVars(member, { channel: `${newState.channel}`, channelName: newState.channel?.name || '' }),
+        defaults: { authorIconUrl: member.user.displayAvatarURL() }
+      });
       return;
     }
 
@@ -39,8 +40,9 @@ module.exports = {
     if (oldState.channelId && !newState.channelId) {
       if (!createVoiceLog(`leave-${member.id}-${oldState.channelId}`)) return;
       await publishAlert(newState.guild, guildConfig, 'log_voice_leave', {
-        vars: memberVars(member, { channel: `${oldState.channel}`, channelName: oldState.channel?.name || '' })
-    });
+        vars: memberVars(member, { channel: `${oldState.channel}`, channelName: oldState.channel?.name || '' }),
+        defaults: { authorIconUrl: member.user.displayAvatarURL() }
+      });
       return;
     }
 
@@ -48,8 +50,9 @@ module.exports = {
     if (oldState.channelId && newState.channelId && oldState.channelId !== newState.channelId) {
       if (!createVoiceLog(`move-${member.id}-${oldState.channelId}-${newState.channelId}`)) return;
       await publishAlert(newState.guild, guildConfig, 'log_voice_move', {
-        vars: memberVars(member, { from: `${oldState.channel}`, to: `${newState.channel}` })
-    });
+        vars: memberVars(member, { from: `${oldState.channel}`, to: `${newState.channel}` }),
+        defaults: { authorIconUrl: member.user.displayAvatarURL() }
+      });
     }
   }
 };

@@ -178,7 +178,7 @@ function sanitizeGuildPatch(input, guild) {
       const block = source[kind];
       if (!block || typeof block !== 'object' || Array.isArray(block)) throw new ValidationError(`embeds.${kind} no es válido.`);
       const result = {};
-      for (const field of ['title', 'message', 'footer']) {
+      for (const field of ['author', 'title', 'message', 'footer']) {
         if (block[field] === undefined) continue;
         result[field] = optionalText(block[field], EMBED_FIELD_LIMITS[field], `embeds.${kind}.${field}`);
       }

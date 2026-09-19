@@ -180,19 +180,13 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: url('/panel/assets/img/fondo-entrada.jpg') center / cover no-repeat;
   transform: scale(1.08);
 }
-/* El velo solo baja el contraste lo justo para que se lea la tarjeta: la
-   ilustración tiene que seguir viéndose. En claro pesa más porque el texto
-   de la tarjeta es oscuro. */
+/* El velo baja el contraste lo justo para que se lea la tarjeta: la
+   ilustración tiene que seguir viéndose. La entrada va siempre en oscuro, así
+   que no hay una segunda versión que cuadrar. */
 .login-view::after {
-  background: linear-gradient(180deg,
-    color-mix(in srgb, var(--bg) 70%, transparent),
-    color-mix(in srgb, var(--bg) 55%, transparent));
-}
-:root:not([data-theme="light"]) .login-view::after,
-:root[data-theme="dark"] .login-view::after {
   background: radial-gradient(120% 90% at 50% 45%,
-    color-mix(in srgb, #0a0710 18%, transparent),
-    color-mix(in srgb, #0a0710 55%, transparent));
+    rgba(10, 7, 16, .18),
+    rgba(10, 7, 16, .55));
 }
 
 .login-card {
@@ -411,7 +405,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .form { display: grid; gap: .9rem; }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .9rem; }
-.field { display: grid; gap: .3rem; min-width: 0; }
+.field { display: grid; gap: .3rem; min-width: 0; align-content: start; }
 .field > label, .field-label { font-size: .82rem; font-weight: 600; }
 .field .hint { color: var(--text-3); font-size: .76rem; }
 .field.wide { grid-column: 1 / -1; }
@@ -425,6 +419,22 @@ input[type="text"], input[type="url"], input[type="number"], input[type="search"
 input:hover, select:hover, textarea:hover { border-color: var(--accent-line); }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); background: var(--surface); }
 input::placeholder, textarea::placeholder { color: var(--text-3); }
+/* Un <select> mide tres píxeles más que un <input> por su alto intrínseco, y
+   puestos uno al lado del otro en la misma fila se nota. Se les fija el mismo
+   alto de línea y el mismo mínimo para que queden a ras. */
+input[type="text"], input[type="url"], input[type="number"], input[type="search"], select:not([multiple]) {
+  min-height: 2.5rem; line-height: 1.35;
+}
+/* Con `appearance: none` desaparece la flecha del navegador, así que se
+   dibuja una: sin ella un desplegable parece una caja de texto. */
+select:not([multiple]) {
+  appearance: none; padding-right: 2.1rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5l5-5' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .75rem center;
+  background-size: .7rem;
+}
+
 textarea { min-height: 7rem; resize: vertical; line-height: 1.6; }
 select[multiple] { min-height: 8rem; padding: .35rem; }
 select[multiple] option { padding: .3rem .45rem; border-radius: var(--r-sm); }
@@ -564,6 +574,11 @@ body[data-mode="light"] .preview-shell { background: #f2f3f5; color: #2e3338; --
 body[data-mode="light"] .embed-preview { background: #fff; box-shadow: 0 0 0 1px rgba(6,6,7,.08); }
 .embed-top { display: flex; gap: 1rem; align-items: flex-start; }
 .embed-text { flex: 1; min-width: 0; }
+/* Fila de autor del embed: foto pequeña y nombre, encima del título. */
+.embed-author { display: flex; gap: .4rem; align-items: center; margin-bottom: .35rem; font-size: .8rem; font-weight: 600; color: var(--preview-ink); }
+.embed-author img { width: 1.25rem; height: 1.25rem; border-radius: 999px; object-fit: cover; }
+.embed-author-dot { width: 1.25rem; height: 1.25rem; border-radius: 999px; background: var(--surface-3); }
+
 .embed-title { margin-bottom: .3rem; color: var(--preview-ink); font-weight: 600; }
 .embed-desc { font-size: .88rem; line-height: 1.5; }
 

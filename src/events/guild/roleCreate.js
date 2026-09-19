@@ -17,7 +17,8 @@ module.exports = {
       vars: {
         role: `${role}`, roleName: role.name, roleId: role.id,
         server: role.guild.name, memberCount: role.guild.memberCount
-      }
-    });
+      },
+      defaults: { authorIconUrl: role.guild.iconURL() }
+});
   }
 };

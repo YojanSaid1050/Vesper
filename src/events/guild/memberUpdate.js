@@ -27,7 +27,7 @@ module.exports = {
       });
       await publishAlert(newMember.guild, guildConfig, started ? 'boost_started' : 'boost_stopped', {
         vars,
-        defaults: { thumbnailUrl: newMember.user.displayAvatarURL() }
+        defaults: { authorIconUrl: newMember.user.displayAvatarURL() }
       });
     }
 
@@ -45,33 +45,27 @@ module.exports = {
       const after = newMember.nickname || 'Sin nickname';
       await publishAlert(newMember.guild, guildConfig, 'log_nickname', {
         vars: memberVars(newMember, { before, after }),
-        defaults: { thumbnailUrl: newMember.user.displayAvatarURL() }
+        defaults: { authorIconUrl: newMember.user.displayAvatarURL() }
     });
     }
 
     // Timeout changes
     if (oldMember.communicationDisabledUntilTimestamp !== newMember.communicationDisabledUntilTimestamp) {
-      let executor = 'Desconocido';
-      let reason = 'Sin razón';
-      try {
-        const timeoutLog = await findRecentAuditEntry(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
-        if (timeoutLog) {
-          executor = auditExecutor(timeoutLog);
-          reason = timeoutLog.reason || 'Sin razón';
-        }
-      } catch {}
+      const timeoutLog = await findRecentAuditEntry(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
+      const executor = auditExecutor(timeoutLog);
+      const reason = timeoutLog?.reason || 'Sin motivo';
 
       if (newMember.communicationDisabledUntilTimestamp) {
         const timeoutDate = new Date(newMember.communicationDisabledUntilTimestamp);
         const until = `<t:${Math.floor(timeoutDate.getTime() / 1000)}:F>`;
         await publishAlert(newMember.guild, guildConfig, 'log_timeout_on', {
           vars: memberVars(newMember, { executor, until, reason }),
-          defaults: { thumbnailUrl: newMember.user.displayAvatarURL() }
+          defaults: { authorIconUrl: newMember.user.displayAvatarURL() }
     });
       } else {
         await publishAlert(newMember.guild, guildConfig, 'log_timeout_off', {
           vars: memberVars(newMember, { executor }),
-          defaults: { thumbnailUrl: newMember.user.displayAvatarURL() }
+          defaults: { authorIconUrl: newMember.user.displayAvatarURL() }
     });
       }
     }

@@ -76,7 +76,7 @@ module.exports = {
 
       await publishAlert(member.guild, guildConfig, 'log_bot_join', {
         vars: memberVars(member, { role: botRole ? `${botRole}` : 'ninguno', roleName: botRole?.name || 'ninguno' }),
-        defaults: { thumbnailUrl: member.user.displayAvatarURL() }
+        defaults: { authorIconUrl: member.user.displayAvatarURL() }
     });
     }
 
@@ -87,7 +87,7 @@ module.exports = {
 
     await publishAlert(member.guild, guildConfig, member.user.bot ? 'log_bot_join' : 'log_member_join', {
       vars: memberVars(member),
-      defaults: { thumbnailUrl: member.user.displayAvatarURL() }
+      defaults: { authorIconUrl: member.user.displayAvatarURL() }
     });
   },
   sendWelcome,

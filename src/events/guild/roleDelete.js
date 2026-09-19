@@ -3,7 +3,7 @@ const { Events, EmbedBuilder, AuditLogEvent } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado
 const { createLog } = require('../../utils/logCache');
 const { publishAlert } = require('../../core/AlertRouter');
-const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
+const { quienLoHizo } = require('../../utils/auditLog');
 
 module.exports = {
   name: Events.GuildRoleDelete,
@@ -12,16 +12,14 @@ module.exports = {
 
     const guildConfig = await getGuildConfig(role.guild.id); // Añadir await
 
-    let executor = 'Desconocido';
-    try {
-      executor = auditExecutor(await findRecentAuditEntry(role.guild, AuditLogEvent.RoleDelete, role.id));
-    } catch {}
+    const executor = await quienLoHizo(role.guild, AuditLogEvent.RoleDelete, role.id);
 
     await publishAlert(role.guild, guildConfig, 'log_role_deleted', {
       vars: {
-        role: role.name, roleName: role.name, executor,
+        role: role.name, roleName: role.name, roleId: role.id, executor,
         server: role.guild.name, memberCount: role.guild.memberCount
-      }
-    });
+      },
+      defaults: { authorIconUrl: role.guild.iconURL() }
+});
   }
 };

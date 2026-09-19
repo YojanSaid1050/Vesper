@@ -207,6 +207,10 @@ function systemPrefersLight() {
 }
 
 function effectiveMode() {
+  // La pantalla de entrada va siempre en oscuro: tiene su propia ilustración
+  // de fondo y en claro no hay forma de que quede bien. El tema que elija cada
+  // uno empieza a contar una vez dentro.
+  if (!document.querySelector('#login-view')?.hidden) return 'dark';
   if (state.theme === 'claro') return 'light';
   if (state.theme === 'oscuro') return 'dark';
   return systemPrefersLight() ? 'light' : 'dark';
@@ -484,6 +488,7 @@ const SAMPLE = {
   count: '25',
   type: 'Texto',
   thread: '#dudas',
+  threadName: 'dudas',
   owner: 'Yojan',
   boostCount: '14',
   boostLevel: '3',
@@ -544,8 +549,18 @@ function embedPreviewMarkup(values, options) {
         </div>`).join('')}</div>`
     : '';
 
-  const thumb = !componentsV2 && values.thumbnail
+  const thumb = !componentsV2 && values.thumbnail && values.showThumb
     ? `<div class="embed-thumb">${memberAvatar ? `<img src="${escapeHtml(memberAvatar)}" alt="">` : '👤'}</div>`
+    : '';
+
+  // La fila de autor: foto pequeña y nombre de quien provocó el aviso. Es lo
+  // primero que se ve en Discord, así que también va primero aquí.
+  const author = values.author
+    ? (componentsV2
+      ? `<div class="embed-subtext">${escapeHtml(sampleValues(values.author, { plain: true }))}</div>`
+      : `<div class="embed-author">${memberAvatar
+        ? `<img src="${escapeHtml(memberAvatar)}" alt="">`
+        : '<span class="embed-author-dot" aria-hidden="true"></span>'}<span>${escapeHtml(sampleValues(values.author, { plain: true }))}</span></div>`)
     : '';
 
   const image = values.image
@@ -565,6 +580,7 @@ function embedPreviewMarkup(values, options) {
     <div class="embed-preview${componentsV2 ? ' v2' : ''}">
       <div class="embed-top">
         <div class="embed-text">
+          ${author}
           <div class="embed-title">${componentsV2 ? renderMarkdown(title) : escapeHtml(title)}</div>
           ${componentsV2 ? '<div class="embed-divider"></div>' : ''}
           ${message ? `<div class="embed-desc">${renderMarkdown(message)}</div>` : ''}
@@ -784,7 +800,7 @@ const PRIMEROS_PASOS = [
   },
   {
     id: 'avisar',
-    titulo: 'Avisar de directos y vídeos',
+    titulo: 'Avisar de directos y videos',
     detalle: 'TikTok, Twitch y YouTube, en el canal que quieras.',
     icono: '◎',
     section: 'avisos',
@@ -1073,8 +1089,8 @@ const MODULE_CARDS = [
   { key: 'boosts', icon: '💜', section: 'bienvenidas', title: 'Boosts', blurb: 'Da las gracias por los boosts' },
   { key: 'logs', icon: '☰', section: 'registros', title: 'Registros', blurb: 'Anota lo que pasa en el servidor' },
   { key: 'twitch', icon: '🟣', section: 'avisos', title: 'Twitch', blurb: 'Avisa de tus directos' },
-  { key: 'youtube', icon: '🔴', section: 'avisos', title: 'YouTube', blurb: 'Avisa de vídeos y directos' },
-  { key: 'tiktok', icon: '🎵', section: 'avisos', title: 'TikTok', blurb: 'Avisa de vídeos y directos' },
+  { key: 'youtube', icon: '🔴', section: 'avisos', title: 'YouTube', blurb: 'Avisa de videos y directos' },
+  { key: 'tiktok', icon: '🎵', section: 'avisos', title: 'TikTok', blurb: 'Avisa de videos y directos' },
   { key: 'deals', icon: '🎁', section: 'ofertas', title: 'Juegos gratis', blurb: 'Epic, Steam y sorteos' },
   { key: 'moderation', icon: '⚖', section: 'moderacion', title: 'Moderación', blurb: 'Filtra enlaces y spam' },
   { key: 'tickets', icon: '🎫', section: 'comunidad', title: 'Tickets', blurb: 'Soporte con tickets' },
@@ -1132,7 +1148,7 @@ function renderInicio() {
 
     <div class="module-head">
       <h2>¿Qué quieres que haga Vesper aquí?</h2>
-      <p>${activos} de ${MODULE_CARDS.length} funciones activas. Enciende lo que te interese y pulsa para configurarlo.</p>
+      <p>${activos} de ${MODULE_CARDS.length} funciones activas. Enciende lo que te interese y oprime para configurarlo.</p>
     </div>
 
     <div class="module-grid">${MODULE_CARDS.map(moduleCardMarkup).join('')}</div>`;
@@ -1153,7 +1169,7 @@ function bindInicio(root) {
       const cabecera = root.querySelector('.module-head p');
       if (cabecera) {
         const activos = MODULE_CARDS.filter(item => state.data.config?.features?.[item.key] && !modulePlanState(item.key)).length;
-        cabecera.textContent = `${activos} de ${MODULE_CARDS.length} funciones activas. Enciende lo que te interese y pulsa para configurarlo.`;
+        cabecera.textContent = `${activos} de ${MODULE_CARDS.length} funciones activas. Enciende lo que te interese y oprime para configurarlo.`;
       }
     });
   });
@@ -1348,7 +1364,7 @@ const FORMAT_TOOLS = [
       { label: 'I', wrap: '*', title: 'Cursiva' },
       { label: 'U', wrap: '__', title: 'Subrayado' },
       { label: 'S', wrap: '~~', title: 'Tachado' },
-      { label: '◼', wrap: '||', title: 'Spoiler: hay que pulsar para verlo' }
+      { label: '◼', wrap: '||', title: 'Spoiler: hay que oprimir para verlo' }
     ]
   },
   {
@@ -1384,7 +1400,7 @@ const SYMBOL_SETS = [
 ];
 
 // Alfabetos decorativos de Unicode. No son una fuente distinta: son letras de
-// verdad, así que se ven igual en móvil y en ordenador y se pueden copiar.
+// verdad, así que se ven igual en el celular y en el computador y se pueden copiar.
 const FANCY_EXCEPTIONS = {
   italic: { h: 'ℎ' },
   script: {
@@ -1588,7 +1604,7 @@ const FORMAT_GUIDE = [
     ['***Texto***', 'Negrita y cursiva a la vez.'],
     ['__Texto__', 'Subrayado.'],
     ['~~Texto~~', 'Tachado.'],
-    ['||Texto||', 'Spoiler: sale tapado hasta que alguien lo pulsa.']
+    ['||Texto||', 'Spoiler: sale tapado hasta que alguien lo oprime.']
   ] },
   { group: 'Bloques y listas', rows: [
     ['> Texto', 'Cita: una barra vertical a la izquierda.'],
@@ -1650,7 +1666,7 @@ function formatGuideCard() {
           </div>
           <div class="guide-block">
             <h4>Adornos y letras decorativas</h4>
-            <p class="hint">Las letras raras de los diseños del servidor (𝐴 𝑛𝑒𝑤 𝑤𝑎𝑛𝑑𝑒𝑟𝑒𝑟, 𝑾𝒆𝒍𝒄𝒐𝒎𝒆…) no son una fuente: son caracteres de Unicode. Pulsa «Símbolos y letras…» encima de cualquier caja de texto para elegirlos e insertarlos donde tengas el cursor.</p>
+            <p class="hint">Las letras raras de los diseños del servidor (𝐴 𝑛𝑒𝑤 𝑤𝑎𝑛𝑑𝑒𝑟𝑒𝑟, 𝑾𝒆𝒍𝒄𝒐𝒎𝒆…) no son una fuente: son caracteres de Unicode. Oprime «Símbolos y letras…» encima de cualquier caja de texto para elegirlos e insertarlos donde tengas el cursor.</p>
           </div>
         </div>
       </details>`
@@ -1862,7 +1878,7 @@ function renderBienvenidas() {
     ${card({
       eyebrow: 'Variables',
       title: 'Variables disponibles',
-      description: `${defaults.note || ''} Pulsa una variable para copiarla.`,
+      description: `${defaults.note || ''} Oprime una para escribirla donde tengas el cursor.`,
       body: `<ul class="var-list">${variables}</ul>`
     })}
 
@@ -1896,7 +1912,7 @@ function originalBody(item) {
 }
 
 // La última caja de texto que tuvo el foco dentro de este formulario. El
-// navegador quita el foco al pulsar el botón, así que se apunta antes.
+// navegador quita el foco al oprimir el botón, así que se apunta antes.
 let ultimoCampo = null;
 
 function recordarCampo(root) {
@@ -1915,7 +1931,7 @@ function campoEnFoco(boton) {
 // botón de restablecer. Antes se repintaba la sección entera para esto.
 function marcarMensajeGuardado(root, item) {
   const guardado = state.data.config.embeds?.[item.id] || {};
-  const personalizado = ['title', 'message', 'footer', 'image', 'color', 'layout']
+  const personalizado = ['author', 'title', 'message', 'footer', 'image', 'color', 'layout']
     .some(campo => guardado[campo]);
   const bloque = root.querySelector(`[data-message="${item.id}"]`);
   const etiqueta = bloque?.querySelector('summary .tag');
@@ -1933,7 +1949,7 @@ function messageEditorMarkup(item) {
   const saved = state.data.config.embeds?.[item.id] || {};
   const factory = messageFactoryDefaults(item);
   const hasColor = Boolean(saved.color);
-  const customised = ['title', 'message', 'footer', 'image', 'color', 'layout'].some(field => saved[field]);
+  const customised = ['author', 'title', 'message', 'footer', 'image', 'color', 'layout'].some(field => saved[field]);
 
   const layoutField = item.plainText
     ? ''
@@ -1942,6 +1958,15 @@ function messageEditorMarkup(item) {
   // Discord no aplica formato al título de un embed clásico: sale tal cual. En
   // el contenedor V2 sí, y por eso ahí es donde se puede agrandar la letra.
   const classicNow = (saved.layout || item.defaultLayout) !== 'components_v2';
+  // La línea de arriba de un registro: «Rol borrado · Ankerie Dimension».
+  const authorField = item.plainText || !factory.author ? '' : `
+    <div class="field wide">
+      <label for="msg-${item.id}-author">Línea de arriba</label>
+      <input id="msg-${item.id}-author" type="text" maxlength="250" data-msg="${item.id}"
+             value="${escapeHtml(saved.author || '')}" placeholder="${escapeHtml(factory.author)}">
+      <span class="hint">Qué pasó y dónde. Sale en pequeño, junto a la foto.</span>
+    </div>`;
+
   const titleField = item.plainText ? '' : `
     <div class="field wide">
       <label for="msg-${item.id}-title">Título</label>
@@ -1954,7 +1979,8 @@ function messageEditorMarkup(item) {
   const footerField = item.supports.footer ? `
     <div class="field">
       <label for="msg-${item.id}-footer">Pie de página</label>
-      <input id="msg-${item.id}-footer" type="text" maxlength="200" data-msg="${item.id}" value="${escapeHtml(saved.footer || '')}">
+      <input id="msg-${item.id}-footer" type="text" maxlength="200" data-msg="${item.id}"
+             value="${escapeHtml(saved.footer || '')}" placeholder="${escapeHtml(factory.footer || 'Sin pie')}">
     </div>` : '';
 
   const imageField = item.supports.image ? `
@@ -2013,6 +2039,7 @@ function messageEditorMarkup(item) {
       </summary>
       <div class="editor-layout">
         <form id="form-msg-${item.id}" class="form">
+          ${authorField}
           ${titleField}
           <div class="field wide">
             <label for="msg-${item.id}-message">${item.plainText ? 'Mensaje' : 'Cuerpo del mensaje'}</label>
@@ -2024,7 +2051,7 @@ function messageEditorMarkup(item) {
 
           ${variables ? `
           <div class="field wide">
-            <span class="field-label">Datos que puedes meter${help('Pulsa uno y se escribe donde tengas el cursor. Pasa el ratón por encima para ver qué pone cada uno. {user} pone una mención con enlace al perfil; {username} y {displayName} ponen el nombre a secas, y son los que hay que usar con quien ya no está en el servidor, porque a esa persona Discord ya no la puede mencionar.')}</span>
+            <span class="field-label">Datos que puedes meter${help('Oprime uno y se escribe donde tengas el cursor. Déjale el cursor encima para ver qué pone cada uno. {user} pone una mención con enlace al perfil; {username} y {displayName} ponen el nombre a secas, y son los que hay que usar con quien ya no está en el servidor, porque a esa persona Discord ya no la puede mencionar.')}</span>
             <div class="var-chips">${variables}</div>
           </div>` : ''}
 
@@ -2061,6 +2088,7 @@ function messageValues(id) {
   const thumbnail = document.querySelector(`#msg-${id}-thumbnail`);
   const colorInput = document.querySelector(`#msg-${id}-color`);
   const values = {
+    author: read('author').trim() || null,
     title: read('title').trim() || null,
     message: read('message').trim() || null,
     footer: read('footer').trim() || null,
@@ -2095,7 +2123,9 @@ function refreshMessagePreview(item) {
     fields: body ? [] : (factory.fields || []),
     footer: values.footer ?? factory.footer ?? null,
     image: values.image ?? factory.image ?? null,
-    thumbnail: values.thumbnail !== false && item.supports.thumbnail
+    thumbnail: values.thumbnail !== false && item.supports.thumbnail,
+    author: values.author ?? factory.author ?? null,
+    showThumb: false
   };
   const color = values.color || factory.color || '#5865F2';
 
@@ -2201,7 +2231,7 @@ function renderMensajes() {
 
   const total = catalog.reduce((sum, group) => sum + group.items.length, 0);
   const customised = catalog.reduce((sum, group) =>
-    sum + group.items.filter(item => ['title', 'message', 'footer', 'image', 'color', 'layout']
+    sum + group.items.filter(item => ['author', 'title', 'message', 'footer', 'image', 'color', 'layout']
       .some(field => state.data.config.embeds?.[item.id]?.[field])).length, 0);
 
   const groups = catalog.map(group => card({
@@ -2285,7 +2315,7 @@ function bindMensajes(root) {
         danger: true
       })) return;
       saveConfig(
-        { embeds: { [item.id]: { title: null, message: null, footer: null, image: null, color: null, layout: null, thumbnail: true } } },
+        { embeds: { [item.id]: { author: null, title: null, message: null, footer: null, image: null, color: null, layout: null, thumbnail: true } } },
         `«${item.label}» restablecido.`,
         event.currentTarget
       );
@@ -2303,7 +2333,7 @@ function bindMensajes(root) {
     button.addEventListener('click', () => {
       const destino = campoEnFoco(button) || root.querySelector(`#${CSS.escape(button.dataset.variableTarget || '')}`);
       if (!destino) {
-        toast('Pon el cursor en un cuadro de texto y vuelve a pulsar.', 'bad');
+        toast('Pon el cursor en un cuadro de texto y vuelve a oprimir.', 'bad');
         return;
       }
       applyFormat(destino, { insert: button.dataset.variable });
@@ -2462,7 +2492,7 @@ function renderOfertas() {
 
           <div class="form-row">
             <div class="field">
-              <label for="deals-discount">Descuento mínimo de Steam (%)</label>
+              <label for="deals-discount">Descuento mínimo (%)</label>
               <input id="deals-discount" type="number" min="10" max="95" value="${Number(deals.minDiscount ?? 50)}">
             </div>
             <div class="field wide">
@@ -2786,9 +2816,9 @@ function renderMusica() {
   const limits = [
     ['defaultVolume', 'Volumen por defecto', 1, 100, 'Con el que empieza cada sesión.'],
     ['maxQueue', 'Máximo de canciones en cola', 1, 500, ''],
-    ['maxPerUser', 'Canciones pendientes por usuario', 1, 25, 'Evita que una persona ocupe toda la cola.'],
+    ['maxPerUser', 'Máximo por persona', 1, 25, 'Canciones en cola que puede tener cada uno.'],
     ['maxTrackMinutes', 'Duración máxima por pista', 1, 180, ''],
-    ['idleSeconds', 'Segundos de inactividad antes de salir', 30, 3600, 'Vesper abandona el canal si se queda solo.']
+    ['idleSeconds', 'Salir tras (segundos)', 30, 3600, 'Cuánto espera Vesper si se queda solo en el canal.']
   ];
 
   return `
@@ -3821,7 +3851,7 @@ function bindRegistros(root) {
     } }, 'Canales de registro actualizados.', event.submitter);
   });
 
-  // Cada fila guarda sola, sin botón: es una sola casilla y obligar a pulsar
+  // Cada fila guarda sola, sin botón: es una sola casilla y obligar a oprimir
   // «Guardar» después sobra.
   root.querySelectorAll('.alert-row').forEach(bindAlertRow);
 
@@ -4183,6 +4213,7 @@ function showLogin() {
   $('#boot-view').hidden = true;
   $('#app-view').hidden = true;
   $('#login-view').hidden = false;
+  applyTheme();
 
   const params = new URLSearchParams(location.search);
   const message = $('#login-message');
@@ -4239,6 +4270,7 @@ async function boot() {
   history.replaceState({}, '', '/panel');
   $('#boot-view').hidden = true;
   $('#login-view').hidden = true;
+  applyTheme();
   $('#app-view').hidden = false;
 
   renderAccount();
