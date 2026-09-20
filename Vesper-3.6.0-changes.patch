@@ -1,0 +1,1870 @@
+diff --git a/.env.example b/.env.example
+new file mode 100644
+index 0000000..3171fa1
+--- /dev/null
++++ b/.env.example
+@@ -0,0 +1,85 @@
++# ---------------------------------------------------------------------------
++# Vesper 3.6.0 · plantilla de configuración
++# Copia este archivo como .env solo para desarrollo local. En Render configura
++# los valores sensibles desde Environment; nunca subas tokens o contraseñas.
++# ---------------------------------------------------------------------------
++
++# Discord (obligatorio)
++TOKEN=
++CLIENT_ID=
++MAIN_GUILD_ID=
++
++# Servidores autorizados
++APPROVED_GUILD_IDS=
++THEMED_MAIN_GUILD_IDS=
++THEMED_MAIN_DEFAULT_NAME=AnkeBot
++ALLOW_UNLISTED_GUILDS=false
++
++# Propietarios y roles globales (IDs separados por coma)
++BOT_OWNER_IDS=
++SOCIAL_MANAGER_ROLE_IDS=
++MODERATOR_ROLE_IDS=
++MUSIC_DJ_ROLE_IDS=
++
++# Base de datos (obligatorio)
++MONGODB_URI=
++GUILD_CONFIG_CACHE_MS=30000
++
++# Registro de comandos
++USE_GUILD_COMMANDS=false
++REGISTER_COMMANDS=true
++
++# Panel web
++PORT=3000
++WEB_DASHBOARD_ENABLED=true
++WEB_ADMIN_MODE=false
++WEB_BASE_URL=http://localhost:3000
++WEB_SESSION_SECRET=
++WEB_SESSION_HOURS=24
++WEB_AUDIT_DAYS=180
++WEB_TRUST_PROXY=1
++WEB_COOKIE_SECURE=false
++
++# OAuth de Discord. Si queda vacío, OAuth usa CLIENT_ID.
++DISCORD_OAUTH_CLIENT_ID=
++DISCORD_OAUTH_CLIENT_SECRET=
++
++# OAuth de Google (opcional)
++GOOGLE_CLIENT_ID=
++GOOGLE_CLIENT_SECRET=
++GOOGLE_OWNER_EMAILS=
++
++# Plataformas opcionales
++TWITCH_CLIENT_ID=
++TWITCH_CLIENT_SECRET=
++YOUTUBE_API_KEY=
++TIKTOK_ENABLED=true
++TIKTOK_LIVE_INTERVAL_MINUTES=10
++TIKTOK_VIDEO_INTERVAL_MINUTES=60
++TIKTOK_LIVE_CACHE_MINUTES=5
++TIKTOK_VIDEO_CACHE_MINUTES=30
++TIKTOK_CONCURRENCY=2
++TIKTOK_REQUEST_DELAY_MS=900
++TIKTOK_REQUEST_TIMEOUT_MS=30000
++TIKTOK_BROWSER_TIMEOUT_MS=60000
++TIKTOK_PAGE_SETTLE_MS=3000
++TIKTOK_BROWSER_PATH=
++
++# Música autohospedada
++LAVALINK_EMBEDDED=true
++LAVALINK_URL=
++LAVALINK_PASSWORD=
++LAVALINK_REQUEST_TIMEOUT_MS=15000
++MUSIC_REQUIRED=false
++MUSIC_RESOLVE_TIMEOUT_MS=30000
++YTDLP_PATH=
++FFMPEG_PATH=
++
++# Planes y operación
++PREMIUM_GUILD_IDS=
++NOTIFICATION_HISTORY_DAYS=90
++MONITOR_ERROR_COOLDOWN_MS=300000
++DATA_PATH=./data
++LOGS_PATH=./logs
++DEBUG=false
++LOG_ERRORS=true
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index edf743a..c1ea91f 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -1,5 +1,30 @@
+ # Changelog
+ 
++## 3.6.0 — Publicaciones personalizadas desde la web
++
++- Nueva pantalla **Crear publicación** para enviar un embed manual al canal
++  elegido, sin IDs ni código.
++- Admite texto exterior, autor, título enlazado, descripción con Markdown,
++  color, miniatura, imagen o GIF, pie, fecha, 25 campos y cinco botones HTTPS.
++- Vista previa en vivo y borrador local independiente para cada servidor.
++- Las menciones se bloquean al enviar, se validan los límites de Discord y se
++  limita la frecuencia de publicación a diez mensajes por minuto.
++- Cada envío queda en la auditoría sin almacenar el contenido privado del
++  anuncio.
++- Corregido el registro duplicado cuando entraba un bot.
++- Corregida la identidad de las vistas previas: ahora muestran AnkeBot o el
++  perfil configurado aunque la pantalla Apariencia no esté abierta.
++- Reforzada la identificación de moderadores en los registros: la auditoría
++  espera hasta ocho segundos, sobrevive a fallos transitorios y resuelve al
++  usuario mediante su ID cuando Discord entrega una entrada parcial.
++- Los casos excepcionales ahora distinguen entre falta de permiso, fallo de la
++  API y ausencia real de una entrada, sin mostrar «Desconocido» ni «No quedó
++  registrado».
++- Corregido el nombre del `Dockerfile` para que coincida con `render.yaml` en
++  sistemas Linux.
++- Reparadas las huellas de verificación visual que ya no coincidían con los
++  archivos versionados.
++
+ ## 3.5.0 — Español de Colombia, y se acabó el «Desconocido»
+ 
+ ### «Borrado por: Desconocido»
+diff --git a/dockerfile b/Dockerfile
+similarity index 100%
+rename from dockerfile
+rename to Dockerfile
+diff --git a/README.md b/README.md
+index fa44ed1..12140d3 100644
+--- a/README.md
++++ b/README.md
+@@ -1,7 +1,7 @@
+-# Vesper Bot 3.5.0
++# Vesper Bot 3.6.0
+ 
+ Bot de Discord para administración de servidores y notificaciones de Twitch,
+-YouTube y TikTok. La versión 2.8 conserva la presentación visual original con
++YouTube y TikTok. La versión actual conserva la presentación visual original con
+ Componentes V2, separa el servidor Main de los satélites e incorpora control
+ central, historial, moderación opcional, música autohospedada, funciones de
+ comunidad y un panel web con permisos verificados en Discord.
+@@ -83,7 +83,7 @@ Vesper sirve una interfaz adaptable en `/panel` desde el mismo proceso Node.js.
+ No necesita WordPress, otro servidor frontend ni una base de datos adicional.
+ Abrir la raíz del dominio en un navegador redirige directamente al panel.
+ 
+-Está organizado en diez secciones, cada una con su propia pantalla:
++Está organizado por tareas, cada una con su propia pantalla:
+ 
+ | Sección | Qué se hace ahí |
+ | --- | --- |
+@@ -96,6 +96,7 @@ Está organizado en diez secciones, cada una con su propia pantalla:
+ | Música | Canales permitidos y límites de la cola |
+ | Módulos y permisos | Qué funciones están activas y qué roles pueden usarlas |
+ | Todos los mensajes | Los 38 avisos que publica el bot, editables con vista previa |
++| Crear publicación | Compositor de embeds manuales con imágenes, campos, botones y canal de destino |
+ | Ofertas de juegos | Juegos gratis de Epic, sorteos y rebajas de Steam |
+ | Configuración | Todo lo guardado del servidor, con los IDs traducidos a nombres |
+ | Auditoría | Quién cambió qué desde la web |
+@@ -113,6 +114,10 @@ Además incluye:
+ - Creación y administración de advertencias y aislamientos.
+ - Vista privada para que cada usuario consulte únicamente sus propios casos.
+ - Auditoría de todos los cambios realizados desde la web.
++- **Compositor de publicaciones manuales** con vista previa estilo Discord,
++  Markdown, autor, título enlazado, miniatura, imagen o GIF, hasta 25 campos y
++  cinco botones de enlace. Permite elegir el canal por nombre, bloquea
++  menciones accidentales y conserva el borrador únicamente en el navegador.
+ - **Editor de embeds de bienvenida y despedida con vista previa en vivo**,
+   variables (`{user}`, `{username}`, `{displayName}`, `{server}`,
+   `{memberCount}`, `{userId}`) y botón para restablecer el diseño original.
+diff --git a/package-lock.json b/package-lock.json
+index 0ee388f..a36875f 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "vesper-bot",
+-  "version": "3.0.0",
++  "version": "3.6.0",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "vesper-bot",
+-      "version": "3.0.0",
++      "version": "3.6.0",
+       "hasInstallScript": true,
+       "license": "MIT",
+       "dependencies": {
+diff --git a/package.json b/package.json
+index 4aaf219..6f285ba 100644
+--- a/package.json
++++ b/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "vesper-bot",
+-  "version": "3.5.0",
++  "version": "3.6.0",
+   "description": "Vesper - Discord Bot for streaming monitoring",
+   "main": "src/index.js",
+   "scripts": {
+diff --git a/scripts/verify-visuals.js b/scripts/verify-visuals.js
+index 7766933..80f7e61 100644
+--- a/scripts/verify-visuals.js
++++ b/scripts/verify-visuals.js
+@@ -14,8 +14,8 @@ const expected = {
+   'src/platforms/tiktok/embeds.js': '0a06d0a9e526446c4ca33475c6416bbe2d26313a6bb393faef834407ccdbb63e',
+   'src/platforms/twitch/embeds.js': '988af1299227d0d4ae614a1ebf28a14b794b0017bccb934b0ad1c12958a1bb86',
+   'src/platforms/youtube/embeds.js': 'dfa42f78860420dce60bc628104052014bbc892f8bfcc15dd0985c3aa0df455f',
+-  'src/events/guild/memberAdd.js': '32ec9bdf82d8e5f82fc9fb3fa80645b2442dc8c5dedf5f0edcdca521f4eeadba',
+-  'src/events/guild/memberRemove.js': '55d8629fd042aba4b0bd693b1faade1b689921643b9a3a0b5d70f301a5377f3f'
++  'src/events/guild/memberAdd.js': 'd8572e856947956abbfe05c1b647896971df1eade3799456d69128644ddae9de',
++  'src/events/guild/memberRemove.js': '9f0e512e43c95ec0ede9a3f006537f15f6429ad7ad02c4e769a7d82d9bf5a3dc'
+ };
+ 
+ let failed = false;
+diff --git a/src/core/CustomEmbedService.js b/src/core/CustomEmbedService.js
+new file mode 100644
+index 0000000..62ed1c0
+--- /dev/null
++++ b/src/core/CustomEmbedService.js
+@@ -0,0 +1,234 @@
++const {
++  ActionRowBuilder,
++  ButtonBuilder,
++  ButtonStyle,
++  EmbedBuilder
++} = require('discord.js');
++const { isPrivateHostname } = require('../utils/imageUrlValidator');
++
++class CustomEmbedError extends Error {
++  constructor(message) {
++    super(message);
++    this.name = 'CustomEmbedError';
++    this.statusCode = 400;
++  }
++}
++
++const LIMITS = Object.freeze({
++  content: 2000,
++  authorName: 256,
++  title: 256,
++  description: 4096,
++  fieldName: 256,
++  fieldValue: 1024,
++  fields: 25,
++  footer: 2048,
++  buttons: 5,
++  buttonLabel: 80,
++  url: 500,
++  embedTotal: 6000
++});
++
++function plainObject(value, path) {
++  if (!value || typeof value !== 'object' || Array.isArray(value)) {
++    throw new CustomEmbedError(`${path} no es válido.`);
++  }
++  return value;
++}
++
++function optionalText(value, max, path) {
++  if (value === undefined || value === null || value === '') return null;
++  const text = String(value).trim();
++  if (!text) return null;
++  if (text.length > max) throw new CustomEmbedError(`${path} admite máximo ${max} caracteres.`);
++  return text;
++}
++
++function requiredText(value, max, path) {
++  const text = optionalText(value, max, path);
++  if (!text) throw new CustomEmbedError(`${path} es obligatorio.`);
++  return text;
++}
++
++function httpsUrl(value, path) {
++  if (value === undefined || value === null || value === '') return null;
++  const raw = String(value).trim();
++  if (raw.length > LIMITS.url) throw new CustomEmbedError(`${path} es demasiado largo.`);
++  try {
++    const url = new URL(raw);
++    if (url.protocol !== 'https:' || url.username || url.password || isPrivateHostname(url.hostname)) throw new Error('invalid');
++    return url.toString();
++  } catch {
++    throw new CustomEmbedError(`${path} debe ser una URL HTTPS pública y válida.`);
++  }
++}
++
++function colorNumber(value) {
++  const raw = String(value || '#5865F2').trim().replace(/^#/, '');
++  if (!/^[0-9A-Fa-f]{6}$/.test(raw)) {
++    throw new CustomEmbedError('El color debe tener el formato #5865F2.');
++  }
++  return Number.parseInt(raw, 16);
++}
++
++function buttonEmoji(value, path) {
++  const raw = optionalText(value, 100, path);
++  if (!raw) return null;
++  const custom = raw.match(/^<(a?):([A-Za-z0-9_]{2,32}):(\d{16,22})>$/);
++  if (custom) return { animated: custom[1] === 'a', name: custom[2], id: custom[3] };
++  if ([...raw].length > 8 || /[<>]/.test(raw)) {
++    throw new CustomEmbedError(`${path} debe ser un emoji normal o uno personalizado como <:nombre:ID>.`);
++  }
++  return { name: raw };
++}
++
++function sanitizeFields(value) {
++  if (value === undefined || value === null) return [];
++  if (!Array.isArray(value) || value.length > LIMITS.fields) {
++    throw new CustomEmbedError(`Puedes añadir máximo ${LIMITS.fields} campos.`);
++  }
++  return value.map((entry, index) => {
++    const field = plainObject(entry, `El campo ${index + 1}`);
++    return {
++      name: requiredText(field.name, LIMITS.fieldName, `El nombre del campo ${index + 1}`),
++      value: requiredText(field.value, LIMITS.fieldValue, `El contenido del campo ${index + 1}`),
++      inline: field.inline === true
++    };
++  });
++}
++
++function sanitizeButtons(value) {
++  if (value === undefined || value === null) return [];
++  if (!Array.isArray(value) || value.length > LIMITS.buttons) {
++    throw new CustomEmbedError(`Puedes añadir máximo ${LIMITS.buttons} botones.`);
++  }
++  return value.map((entry, index) => {
++    const button = plainObject(entry, `El botón ${index + 1}`);
++    const url = httpsUrl(button.url, `El enlace del botón ${index + 1}`);
++    if (!url) throw new CustomEmbedError(`El enlace del botón ${index + 1} es obligatorio.`);
++    return {
++      label: requiredText(button.label, LIMITS.buttonLabel, `La etiqueta del botón ${index + 1}`),
++      url,
++      emoji: buttonEmoji(button.emoji, `El emoji del botón ${index + 1}`)
++    };
++  });
++}
++
++function sanitizeCustomEmbed(input) {
++  const source = plainObject(input, 'La publicación');
++  const embedInput = source.embed === undefined ? source : plainObject(source.embed, 'El embed');
++  const authorInput = embedInput.author == null ? {} : plainObject(embedInput.author, 'El autor');
++  const footerInput = embedInput.footer == null ? {} : plainObject(embedInput.footer, 'El pie');
++
++  const result = {
++    channelId: requiredText(source.channelId, 22, 'El canal'),
++    content: optionalText(source.content, LIMITS.content, 'El texto exterior'),
++    embed: {
++      author: {
++        name: optionalText(authorInput.name, LIMITS.authorName, 'El nombre del autor'),
++        url: httpsUrl(authorInput.url, 'El enlace del autor'),
++        iconUrl: httpsUrl(authorInput.iconUrl, 'El icono del autor')
++      },
++      title: optionalText(embedInput.title, LIMITS.title, 'El título'),
++      url: httpsUrl(embedInput.url, 'El enlace del título'),
++      description: optionalText(embedInput.description, LIMITS.description, 'La descripción'),
++      color: colorNumber(embedInput.color),
++      thumbnail: httpsUrl(embedInput.thumbnail, 'La miniatura'),
++      image: httpsUrl(embedInput.image, 'La imagen principal'),
++      fields: sanitizeFields(embedInput.fields),
++      footer: {
++        text: optionalText(footerInput.text, LIMITS.footer, 'El pie'),
++        iconUrl: httpsUrl(footerInput.iconUrl, 'El icono del pie')
++      },
++      timestamp: embedInput.timestamp === true
++    },
++    buttons: sanitizeButtons(source.buttons)
++  };
++
++  if (!/^\d{16,22}$/.test(result.channelId)) throw new CustomEmbedError('El canal seleccionado no es válido.');
++  if (result.embed.url && !result.embed.title) throw new CustomEmbedError('Escribe un título antes de añadirle un enlace.');
++  if ((result.embed.author.url || result.embed.author.iconUrl) && !result.embed.author.name) {
++    throw new CustomEmbedError('Escribe el nombre del autor antes de añadir su enlace o icono.');
++  }
++  if (result.embed.footer.iconUrl && !result.embed.footer.text) {
++    throw new CustomEmbedError('Escribe el pie antes de añadirle un icono.');
++  }
++
++  const hasEmbed = Boolean(
++    result.embed.author.name || result.embed.title || result.embed.description ||
++    result.embed.thumbnail || result.embed.image || result.embed.fields.length || result.embed.footer.text
++  );
++  if (!hasEmbed) throw new CustomEmbedError('El embed necesita un título, una descripción, una imagen o al menos un campo.');
++
++  const total = [
++    result.embed.author.name,
++    result.embed.title,
++    result.embed.description,
++    result.embed.footer.text,
++    ...result.embed.fields.flatMap(field => [field.name, field.value])
++  ].reduce((sum, text) => sum + (text?.length || 0), 0);
++  if (total > LIMITS.embedTotal) {
++    throw new CustomEmbedError(`El contenido total del embed supera los ${LIMITS.embedTotal} caracteres permitidos por Discord.`);
++  }
++
++  return result;
++}
++
++function buildCustomEmbedPayload(input) {
++  const safe = sanitizeCustomEmbed(input);
++  const embed = new EmbedBuilder().setColor(safe.embed.color);
++
++  if (safe.embed.author.name) {
++    embed.setAuthor({
++      name: safe.embed.author.name,
++      ...(safe.embed.author.url ? { url: safe.embed.author.url } : {}),
++      ...(safe.embed.author.iconUrl ? { iconURL: safe.embed.author.iconUrl } : {})
++    });
++  }
++  if (safe.embed.title) embed.setTitle(safe.embed.title);
++  if (safe.embed.url) embed.setURL(safe.embed.url);
++  if (safe.embed.description) embed.setDescription(safe.embed.description);
++  if (safe.embed.thumbnail) embed.setThumbnail(safe.embed.thumbnail);
++  if (safe.embed.image) embed.setImage(safe.embed.image);
++  if (safe.embed.fields.length) embed.addFields(safe.embed.fields);
++  if (safe.embed.footer.text) {
++    embed.setFooter({
++      text: safe.embed.footer.text,
++      ...(safe.embed.footer.iconUrl ? { iconURL: safe.embed.footer.iconUrl } : {})
++    });
++  }
++  if (safe.embed.timestamp) embed.setTimestamp();
++
++  const payload = {
++    embeds: [embed],
++    allowedMentions: { parse: [], roles: [], users: [], repliedUser: false }
++  };
++  if (safe.content) payload.content = safe.content;
++  if (safe.buttons.length) {
++    const row = new ActionRowBuilder();
++    row.addComponents(safe.buttons.map(button => {
++      const component = new ButtonBuilder()
++        .setStyle(ButtonStyle.Link)
++        .setLabel(button.label)
++        .setURL(button.url);
++      if (button.emoji) component.setEmoji(button.emoji);
++      return component;
++    }));
++    payload.components = [row];
++  }
++
++  return { channelId: safe.channelId, payload, summary: {
++    fieldCount: safe.embed.fields.length,
++    buttonCount: safe.buttons.length,
++    hasImage: Boolean(safe.embed.image),
++    hasThumbnail: Boolean(safe.embed.thumbnail)
++  } };
++}
++
++module.exports = {
++  LIMITS,
++  CustomEmbedError,
++  sanitizeCustomEmbed,
++  buildCustomEmbedPayload,
++  buttonEmoji
++};
+diff --git a/src/events/guild/memberAdd.js b/src/events/guild/memberAdd.js
+index f52d788..4c3bfb3 100644
+--- a/src/events/guild/memberAdd.js
++++ b/src/events/guild/memberAdd.js
+@@ -70,14 +70,10 @@ module.exports = {
+     // Estos dos registros construían su embed a mano, saltándose el catálogo:
+     // por eso eran los únicos que no se podían editar desde el panel. Ahora
+     // pasan por el enrutador, como todos los demás.
++    let botRole = null;
+     if (member.user.bot) {
+-      const botRole = member.guild.roles.cache.get(general.botRole);
++      botRole = member.guild.roles.cache.get(general.botRole) || null;
+       if (botRole) await member.roles.add(botRole).catch(() => null);
+-
+-      await publishAlert(member.guild, guildConfig, 'log_bot_join', {
+-        vars: memberVars(member, { role: botRole ? `${botRole}` : 'ninguno', roleName: botRole?.name || 'ninguno' }),
+-        defaults: { authorIconUrl: member.user.displayAvatarURL() }
+-    });
+     }
+ 
+     const welcomeChannel = resolveChannel(member.guild, guildConfig, 'welcome');
+@@ -86,7 +82,9 @@ module.exports = {
+     }
+ 
+     await publishAlert(member.guild, guildConfig, member.user.bot ? 'log_bot_join' : 'log_member_join', {
+-      vars: memberVars(member),
++      vars: memberVars(member, member.user.bot
++        ? { role: botRole ? `${botRole}` : 'ninguno', roleName: botRole?.name || 'ninguno' }
++        : {}),
+       defaults: { authorIconUrl: member.user.displayAvatarURL() }
+     });
+   },
+@@ -96,4 +94,4 @@ module.exports = {
+   WELCOME_DEFAULT_IMAGE,
+   WELCOME_DEFAULT_COLOR,
+   welcomeDefaultMessage
+-};
+\ No newline at end of file
++};
+diff --git a/src/events/guild/memberUpdate.js b/src/events/guild/memberUpdate.js
+index bbc1543..1193729 100644
+--- a/src/events/guild/memberUpdate.js
++++ b/src/events/guild/memberUpdate.js
+@@ -2,7 +2,7 @@ const { Events, AuditLogEvent } = require('discord.js');
+ const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
+ const { memberVars } = require('../../core/EmbedCatalog');
+ const { publishAlert } = require('../../core/AlertRouter');
+-const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
++const { findRecentAuditEntry, resolveAuditExecutor } = require('../../utils/auditLog');
+ 
+ module.exports = {
+   name: Events.GuildMemberUpdate,
+@@ -52,7 +52,7 @@ module.exports = {
+     // Timeout changes
+     if (oldMember.communicationDisabledUntilTimestamp !== newMember.communicationDisabledUntilTimestamp) {
+       const timeoutLog = await findRecentAuditEntry(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
+-      const executor = auditExecutor(timeoutLog);
++      const executor = await resolveAuditExecutor(newMember.guild, timeoutLog);
+       const reason = timeoutLog?.reason || 'Sin motivo';
+ 
+       if (newMember.communicationDisabledUntilTimestamp) {
+diff --git a/src/utils/auditLog.js b/src/utils/auditLog.js
+index a506d40..7516674 100644
+--- a/src/utils/auditLog.js
++++ b/src/utils/auditLog.js
+@@ -1,26 +1,20 @@
+ // src/utils/auditLog.js
+ //
+-// Quién hizo cada cosa. Discord no lo manda con el evento: hay que ir a
+-// buscarlo al registro de auditoría del servidor.
+-//
+-// Dos cosas hacían que casi siempre saliera «Desconocido»:
+-//
+-//   1. Discord manda el evento por la pasarela ANTES de que la entrada de
+-//      auditoría se pueda consultar. Con un solo intento se pierde casi
+-//      siempre, así que se reintenta un par de veces con una pausa corta.
+-//   2. Se comparaba `entry.target.id`, y cuando lo borrado es un rol o un
+-//      canal, Discord ya no puede resolver ese objeto y `target` llega vacío.
+-//      `entry.targetId` viene igual en crudo y sí sirve.
+-//
+-// Y si el bot no tiene permiso para ver la auditoría, se dice en el propio
+-// aviso en vez de dejar un «Desconocido» que no explica nada.
++// Discord emite algunos eventos antes de que su entrada de auditoría esté
++// disponible. Además, una entrada puede llegar parcialmente resuelta: con
++// `targetId`/`executorId`, pero sin los objetos `target`/`executor`.
+ 
+ const { PermissionFlagsBits } = require('discord.js');
+ 
+-const INTENTOS_MS = [0, 800, 2000];
++// Son tiempos absolutos desde que comenzó la búsqueda, no pausas acumuladas.
++// Ocho segundos cubren la propagación habitual de Discord sin retrasar en
++// exceso el aviso. Los tests pueden inyectar una lista más corta.
++const INTENTOS_MS = [0, 750, 2_000, 4_500, 8_000];
++const DISCORD_EPOCH = 1_420_070_400_000;
+ 
+-const SIN_PERMISO = 'Vesper no puede ver la auditoría';
+-const SIN_DATO = 'No quedó registrado';
++const SIN_PERMISO = 'El bot no puede ver la auditoría';
++const SIN_DATO = 'Discord no indicó quién realizó la acción';
++const ERROR_AUDITORIA = 'No se pudo consultar la auditoría de Discord';
+ 
+ const esperar = ms => new Promise(resolve => setTimeout(resolve, ms));
+ 
+@@ -30,49 +24,155 @@ function puedeVerAuditoria(guild) {
+   return yo.permissions.has(PermissionFlagsBits.ViewAuditLog);
+ }
+ 
++function snowflakeTimestamp(id) {
++  try {
++    if (!/^\d{17,20}$/.test(String(id || ''))) return null;
++    return Number(BigInt(id) >> 22n) + DISCORD_EPOCH;
++  } catch {
++    return null;
++  }
++}
++
++function entryTimestamp(entry) {
++  if (Number.isFinite(entry?.createdTimestamp)) return entry.createdTimestamp;
++  const createdAt = entry?.createdAt instanceof Date ? entry.createdAt.getTime() : Date.parse(entry?.createdAt);
++  if (Number.isFinite(createdAt)) return createdAt;
++  return snowflakeTimestamp(entry?.id);
++}
++
++function entryTargetId(entry) {
++  return entry?.targetId ?? entry?.target?.id ?? entry?.target?.value ?? null;
++}
++
++function entriesOf(logs) {
++  const entries = logs?.entries;
++  if (!entries) return [];
++  if (Array.isArray(entries)) return entries;
++  if (typeof entries.values === 'function') return [...entries.values()];
++  if (typeof entries.find === 'function') {
++    // Collection#find es suficiente para la ruta normal. Este adaptador
++    // conserva compatibilidad con dobles sencillos usados en pruebas.
++    return { find: predicate => entries.find(predicate) };
++  }
++  return [];
++}
++
++function findEntry(logs, predicate) {
++  const entries = entriesOf(logs);
++  return typeof entries.find === 'function' ? entries.find(predicate) : undefined;
++}
++
+ function coincide(entry, targetId, options, ahora, maxAgeMs) {
+-  const idEntrada = entry.targetId ?? entry.target?.id ?? null;
++  const idEntrada = entryTargetId(entry);
+   const mismoObjetivo = !targetId || String(idEntrada || '') === String(targetId);
+-  const reciente = Number.isFinite(entry.createdTimestamp) && Math.abs(ahora - entry.createdTimestamp) <= maxAgeMs;
++  const timestamp = entryTimestamp(entry);
++  const reciente = Number.isFinite(timestamp) && Math.abs(ahora - timestamp) <= maxAgeMs;
+   const extra = typeof options.extraMatches !== 'function' || options.extraMatches(entry.extra);
+   return mismoObjetivo && reciente && extra;
+ }
+ 
+-async function findRecentAuditEntry(guild, type, targetId, options = {}) {
+-  const maxAgeMs = Number(options.maxAgeMs || 15_000);
+-  const limit = Number(options.limit || 6);
+-  if (!puedeVerAuditoria(guild)) return null;
++async function buscarEntrada(guild, type, targetId, options = {}) {
++  const maxAgeMs = Number(options.maxAgeMs || 60_000);
++  const limit = Number(options.limit || 25);
++  const intentos = Array.isArray(options.attemptDelaysMs) && options.attemptDelaysMs.length
++    ? options.attemptDelaysMs
++    : INTENTOS_MS;
++  let ultimaPausa = 0;
++  let ultimoError = null;
++  let huboRespuesta = false;
+ 
+-  for (const pausa of INTENTOS_MS) {
++  if (!puedeVerAuditoria(guild)) return { entry: null, error: null };
++
++  for (const pausaObjetivo of intentos) {
++    const pausaActual = Math.max(0, Number(pausaObjetivo) || 0);
++    const pausa = Math.max(0, pausaActual - ultimaPausa);
+     if (pausa) await esperar(pausa);
+-    let logs;
++    ultimaPausa = pausaActual;
++
+     try {
+-      logs = await guild.fetchAuditLogs({ limit, type });
+-    } catch {
+-      return null; // sin permiso o Discord caído: no tiene sentido insistir
++      const logs = await guild.fetchAuditLogs({ limit, type });
++      huboRespuesta = true;
++      const encontrada = findEntry(logs, entry => coincide(entry, targetId, options, Date.now(), maxAgeMs));
++      if (encontrada) return { entry: encontrada, error: null };
++    } catch (error) {
++      // Un 5xx, timeout o rate limit puntual no debe convertir el actor en
++      // «no registrado». Se conserva el error y se prueban los demás turnos.
++      ultimoError = error;
+     }
+-    const ahora = Date.now();
+-    const encontrada = logs.entries.find(entry => coincide(entry, targetId, options, ahora, maxAgeMs));
+-    if (encontrada) return encontrada;
+   }
+-  return null;
++
++  return { entry: null, error: huboRespuesta ? null : ultimoError };
++}
++
++async function findRecentAuditEntry(guild, type, targetId, options = {}) {
++  return (await buscarEntrada(guild, type, targetId, options)).entry;
+ }
+ 
+ function auditExecutor(entry) {
+-  return entry?.executor?.tag || entry?.executor?.username || SIN_DATO;
++  return entry?.executor?.globalName
++    || entry?.executor?.tag
++    || entry?.executor?.username
++    || (entry?.executorId ? `Usuario ${entry.executorId}` : SIN_DATO);
++}
++
++async function resolveAuditExecutor(guild, entry) {
++  const directo = entry?.executor?.globalName || entry?.executor?.tag || entry?.executor?.username;
++  if (directo) return directo;
++
++  const executorId = entry?.executorId ?? entry?.executor?.id;
++  if (!executorId) return SIN_DATO;
++
++  const miembroCache = guild?.members?.cache?.get?.(executorId);
++  if (miembroCache) {
++    return miembroCache.displayName || miembroCache.user?.globalName || miembroCache.user?.tag
++      || miembroCache.user?.username || `Usuario ${executorId}`;
++  }
++
++  try {
++    const miembro = await guild?.members?.fetch?.(executorId);
++    if (miembro) {
++      return miembro.displayName || miembro.user?.globalName || miembro.user?.tag
++        || miembro.user?.username || `Usuario ${executorId}`;
++    }
++  } catch {
++    // Puede ser un usuario que ya salió del servidor; se prueba la caché/API
++    // global de usuarios antes de recurrir al ID.
++  }
++
++  const usuarioCache = guild?.client?.users?.cache?.get?.(executorId);
++  if (usuarioCache) return usuarioCache.globalName || usuarioCache.tag || usuarioCache.username || `Usuario ${executorId}`;
++
++  try {
++    const usuario = await guild?.client?.users?.fetch?.(executorId);
++    if (usuario) return usuario.globalName || usuario.tag || usuario.username || `Usuario ${executorId}`;
++  } catch {
++    // El ID sigue siendo más útil y verificable que «desconocido».
++  }
++
++  return `Usuario ${executorId}`;
+ }
+ 
+ /**
+  * Lo que va en «Borrado por», «Baneado por» y demás. Devuelve siempre algo
+- * que se puede leer: el nombre de quien lo hizo, o por qué no se sabe.
++ * legible y distingue ausencia de datos, permisos y fallos de Discord.
+  */
+ async function quienLoHizo(guild, type, targetId, options = {}) {
+   if (!puedeVerAuditoria(guild)) return SIN_PERMISO;
+   try {
+-    return auditExecutor(await findRecentAuditEntry(guild, type, targetId, options));
++    const resultado = await buscarEntrada(guild, type, targetId, options);
++    if (resultado.entry) return resolveAuditExecutor(guild, resultado.entry);
++    return resultado.error ? ERROR_AUDITORIA : SIN_DATO;
+   } catch {
+-    return SIN_DATO;
++    return ERROR_AUDITORIA;
+   }
+ }
+ 
+-module.exports = { findRecentAuditEntry, auditExecutor, quienLoHizo, SIN_PERMISO, SIN_DATO };
++module.exports = {
++  findRecentAuditEntry,
++  auditExecutor,
++  resolveAuditExecutor,
++  quienLoHizo,
++  SIN_PERMISO,
++  SIN_DATO,
++  ERROR_AUDITORIA
++};
+diff --git a/src/utils/imageUrlValidator.js b/src/utils/imageUrlValidator.js
+index 6ca41f0..428d9af 100644
+--- a/src/utils/imageUrlValidator.js
++++ b/src/utils/imageUrlValidator.js
+@@ -29,14 +29,22 @@ function isPrivateIp(address) {
+   return true;
+ }
+ 
++function isPrivateHostname(hostname) {
++  const normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
++  return !normalized
++    || normalized === 'localhost'
++    || normalized.endsWith('.localhost')
++    || normalized.endsWith('.local')
++    || (net.isIP(normalized) !== 0 && isPrivateIp(normalized));
++}
++
+ async function assertPublicHost(hostname) {
+   const normalized = hostname.toLowerCase();
+-  if (normalized === 'localhost' || normalized.endsWith('.localhost') || normalized.endsWith('.local')) {
++  if (isPrivateHostname(normalized)) {
+     throw new Error('Host no permitido');
+   }
+ 
+   if (net.isIP(normalized)) {
+-    if (isPrivateIp(normalized)) throw new Error('Dirección privada no permitida');
+     return;
+   }
+ 
+@@ -90,4 +98,4 @@ async function isValidImageUrl(input, options = {}) {
+   return false;
+ }
+ 
+-module.exports = { isValidImageUrl, isPrivateIp };
++module.exports = { isValidImageUrl, isPrivateIp, isPrivateHostname };
+diff --git a/src/utils/webhookSender.js b/src/utils/webhookSender.js
+index 5582efd..36071f9 100644
+--- a/src/utils/webhookSender.js
++++ b/src/utils/webhookSender.js
+@@ -47,6 +47,16 @@ async function sendBrandedMessageNow(channel, payload, options = {}) {
+       config.twitch?.pingRole,
+       config.youtube?.pingRole
+     ].filter(Boolean);
++    // Algunas publicaciones (por ejemplo, las creadas manualmente desde el
++    // panel) deben bloquear todas las menciones aunque su texto contenga
++    // @everyone o el identificador de un rol. El llamador puede imponer una
++    // política más estricta; los avisos automáticos conservan sus roles
++    // autorizados de siempre.
++    const allowedMentions = options.allowedMentions || payload.allowedMentions || {
++      parse: [],
++      roles: allowedRoleIds,
++      users: []
++    };
+ 
+     const webhook = await getWebhook(channel);
+     
+@@ -56,11 +66,7 @@ async function sendBrandedMessageNow(channel, payload, options = {}) {
+         ...payload,
+         username: profile.displayName || branding.name || channel.client.user.username,
+         avatarURL: profile.avatar || branding.avatar || channel.client.user.displayAvatarURL(),
+-        allowedMentions: {
+-          parse: [],
+-          roles: allowedRoleIds,
+-          users: []
+-        }
++        allowedMentions
+       };
+       
+       if (payload.embeds && payload.embeds.length > 0) {
+@@ -81,14 +87,15 @@ async function sendBrandedMessageNow(channel, payload, options = {}) {
+       // Fallback a mensaje normal con el bot (sin branding personalizado)
+       return channel.send({
+         ...payload,
+-        allowedMentions: { parse: [], roles: allowedRoleIds, users: [] }
++        allowedMentions
+       });
+     }
+   } catch (error) {
+     monitorError('Webhook', 'Send Message', channel.guild.id, error, {
+       channelId: channel.id
+     });
+-    return channel.send({ ...payload, allowedMentions: { parse: [], roles: [], users: [] } }).catch(fallbackError => {
++    const fallbackMentions = options.allowedMentions || payload.allowedMentions || { parse: [], roles: [], users: [] };
++    return channel.send({ ...payload, allowedMentions: fallbackMentions }).catch(fallbackError => {
+       monitorError('Webhook', 'Fallback Send', channel.guild.id, fallbackError);
+       if (options.throwOnFailure) throw fallbackError;
+       return null;
+diff --git a/src/web/configSanitizer.js b/src/web/configSanitizer.js
+index 9ea7a66..0fff806 100644
+--- a/src/web/configSanitizer.js
++++ b/src/web/configSanitizer.js
+@@ -5,6 +5,7 @@ const { EMBED_FIELD_LIMITS } = require('../core/EmbedTemplateService');
+ const { isKnownKind, kindInfo } = require('../core/EmbedCatalog');
+ const { ROUTABLE } = require('../core/AlertRouter');
+ const { featureAvailable } = require('../config/guildPolicy');
++const { isPrivateHostname } = require('../utils/imageUrlValidator');
+ 
+ class ValidationError extends Error {
+   constructor(message) {
+@@ -106,10 +107,10 @@ function imageUrlValue(value, path) {
+   if (raw.length > 500) throw new ValidationError(`${path} es demasiado largo.`);
+   try {
+     const url = new URL(raw);
+-    if (url.protocol !== 'https:' || url.username || url.password) throw new Error('invalid');
++    if (url.protocol !== 'https:' || url.username || url.password || isPrivateHostname(url.hostname)) throw new Error('invalid');
+     return url.toString();
+   } catch {
+-    throw new ValidationError(`${path} debe ser una URL HTTPS válida.`);
++    throw new ValidationError(`${path} debe ser una URL HTTPS pública y válida.`);
+   }
+ }
+ 
+diff --git a/src/web/public/app.js b/src/web/public/app.js
+index 1e639c9..cc2354c 100644
+--- a/src/web/public/app.js
++++ b/src/web/public/app.js
+@@ -270,8 +270,10 @@ function avatarMarkup(url, fallbackText = 'V', className = 'avatar') {
+ function selectOptions(items, selected, emptyLabel = 'Sin configurar') {
+   const current = String(selected ?? '');
+   const options = (items || []).map(item => {
+-    const label = item.parent ? `${item.parent} / ${item.name}` : item.name;
+-    return `<option value="${escapeHtml(item.id)}"${String(item.id) === current ? ' selected' : ''}>${escapeHtml(label)}</option>`;
++    const baseLabel = item.parent ? `${item.parent} / ${item.name}` : item.name;
++    const blocked = item.sendable === false;
++    const label = blocked ? `${baseLabel} · faltan permisos` : baseLabel;
++    return `<option value="${escapeHtml(item.id)}"${String(item.id) === current ? ' selected' : ''}${blocked ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
+   }).join('');
+   return `<option value="">${escapeHtml(emptyLabel)}</option>${options}`;
+ }
+@@ -531,7 +533,13 @@ function messageHeaderMarkup({ name, avatar }) {
+ }
+ 
+ function embedPreviewMarkup(values, options) {
+-  const { componentsV2 = false, memberAvatar = null } = options;
++  const {
++    componentsV2 = false,
++    memberAvatar = null,
++    authorIcon = null,
++    thumbnailUrl = null,
++    footerIcon = null
++  } = options;
+   // El contenedor V2 sí convierte menciones en todas sus piezas; el embed
+   // clásico, solo en el cuerpo.
+   const title = sampleValues(values.title, { plain: !componentsV2 });
+@@ -542,15 +550,21 @@ function embedPreviewMarkup(values, options) {
+   // propio. Se pintan con datos de ejemplo para que la vista previa enseñe el
+   // mensaje tal y como va a salir, y no una nota diciendo que hay campos.
+   const fields = (values.fields || []).length
+-    ? `<div class="embed-fields">${values.fields.map(([name, value]) => `
+-        <div class="embed-field">
+-          <span class="embed-field-name">${escapeHtml(sampleValues(name))}</span>
+-          <span class="embed-field-value">${renderMarkdown(sampleValues(value))}</span>
+-        </div>`).join('')}</div>`
++    ? `<div class="embed-fields">${values.fields.map(field => {
++        const normalized = Array.isArray(field)
++          ? { name: field[0], value: field[1], inline: false }
++          : field;
++        return `
++        <div class="embed-field${normalized.inline ? ' inline' : ''}">
++          <span class="embed-field-name">${escapeHtml(sampleValues(normalized.name))}</span>
++          <span class="embed-field-value">${renderMarkdown(sampleValues(normalized.value))}</span>
++        </div>`;
++      }).join('')}</div>`
+     : '';
+ 
++  const thumbSource = thumbnailUrl || memberAvatar;
+   const thumb = !componentsV2 && values.thumbnail && values.showThumb
+-    ? `<div class="embed-thumb">${memberAvatar ? `<img src="${escapeHtml(memberAvatar)}" alt="">` : '👤'}</div>`
++    ? `<div class="embed-thumb">${thumbSource ? `<img src="${escapeHtml(thumbSource)}" alt="">` : '👤'}</div>`
+     : '';
+ 
+   // La fila de autor: foto pequeña y nombre de quien provocó el aviso. Es lo
+@@ -558,8 +572,8 @@ function embedPreviewMarkup(values, options) {
+   const author = values.author
+     ? (componentsV2
+       ? `<div class="embed-subtext">${escapeHtml(sampleValues(values.author, { plain: true }))}</div>`
+-      : `<div class="embed-author">${memberAvatar
+-        ? `<img src="${escapeHtml(memberAvatar)}" alt="">`
++      : `<div class="embed-author">${authorIcon || memberAvatar
++        ? `<img src="${escapeHtml(authorIcon || memberAvatar)}" alt="">`
+         : '<span class="embed-author-dot" aria-hidden="true"></span>'}<span>${escapeHtml(sampleValues(values.author, { plain: true }))}</span></div>`)
+     : '';
+ 
+@@ -573,7 +587,7 @@ function embedPreviewMarkup(values, options) {
+   const footerRow = footer
+     ? (componentsV2
+       ? `<div class="embed-subtext">${escapeHtml(footer)}</div>`
+-      : `<div class="embed-footer">${escapeHtml(footer)} · hoy a las 14:32</div>`)
++      : `<div class="embed-footer">${footerIcon ? `<img src="${escapeHtml(footerIcon)}" alt="">` : ''}<span>${escapeHtml(footer)}${values.timestamp ? ' · hoy a las 14:32' : ''}</span></div>`)
+     : '';
+ 
+   return `
+@@ -666,6 +680,13 @@ const SECTIONS = [
+     needs: 'configure',
+     keywords: ['embed', 'texto', 'editar', 'plantilla', 'formato', 'letra', 'símbolos', 'markdown', 'título']
+   },
++  {
++    id: 'publicar', group: 'Lo que dice', icon: '➤', label: 'Crear publicación',
++    title: 'Enviar un embed',
++    hint: 'Diseña y publica en un canal.',
++    needs: 'configure',
++    keywords: ['enviar', 'publicar', 'embed', 'anuncio', 'botón', 'imagen', 'canal', 'mensaje manual']
++  },
+ 
+   {
+     id: 'moderacion', group: 'Comunidad', icon: '⚖', label: 'Moderación',
+@@ -1297,10 +1318,22 @@ function renderIdentidad() {
+ function identityValues() {
+   const data = state.data;
+   const identity = data.identity || {};
+-  const profileName = $('#profile-name')?.value.trim() || '';
+-  const profileAvatar = $('#profile-avatar')?.value.trim() || '';
+-  const brandingName = $('#branding-name')?.value.trim() || '';
+-  const brandingAvatar = $('#branding-avatar')?.value.trim() || '';
++  // Fuera de la pantalla «Apariencia» esos inputs no existen. Antes la vista
++  // previa de Mensajes caía entonces al nombre global de la cuenta y mostraba
++  // «Vesper» aunque en el servidor publicase como AnkeBot. Si el formulario no
++  // está montado, se usan los valores guardados que llegaron de la API.
++  const profileName = $('#profile-name')
++    ? $('#profile-name').value.trim()
++    : String(data.config?.profile?.displayName || '').trim();
++  const profileAvatar = $('#profile-avatar')
++    ? $('#profile-avatar').value.trim()
++    : String(data.config?.profile?.avatar || '').trim();
++  const brandingName = $('#branding-name')
++    ? $('#branding-name').value.trim()
++    : String(data.config?.branding?.name || '').trim();
++  const brandingAvatar = $('#branding-avatar')
++    ? $('#branding-avatar').value.trim()
++    : String(data.config?.branding?.avatar || '').trim();
+   const account = identity.account || {};
+ 
+   return {
+@@ -2343,6 +2376,407 @@ function bindMensajes(root) {
+   });
+ }
+ 
++/* ---------------------------------------------------------------- */
++/* Publicaciones manuales                                            */
++/* ---------------------------------------------------------------- */
++
++const CUSTOM_DRAFT_VERSION = 1;
++
++function customDraftKey() {
++  return `vesper.publicacion.${state.guildId}`;
++}
++
++function emptyCustomDraft() {
++  return {
++    version: CUSTOM_DRAFT_VERSION,
++    channelId: '',
++    content: '',
++    embed: {
++      author: { name: '', url: '', iconUrl: '' },
++      title: '',
++      url: '',
++      description: '',
++      color: state.data?.config?.profile?.primaryColor || '#5865F2',
++      thumbnail: '',
++      image: '',
++      fields: [],
++      footer: { text: '', iconUrl: '' },
++      timestamp: false
++    },
++    buttons: []
++  };
++}
++
++function loadCustomDraft() {
++  const base = emptyCustomDraft();
++  try {
++    const saved = JSON.parse(localStorage.getItem(customDraftKey()) || 'null');
++    if (!saved || saved.version !== CUSTOM_DRAFT_VERSION) return base;
++    return {
++      ...base,
++      ...saved,
++      embed: {
++        ...base.embed,
++        ...(saved.embed || {}),
++        author: { ...base.embed.author, ...(saved.embed?.author || {}) },
++        footer: { ...base.embed.footer, ...(saved.embed?.footer || {}) },
++        fields: Array.isArray(saved.embed?.fields) ? saved.embed.fields.slice(0, 25) : []
++      },
++      buttons: Array.isArray(saved.buttons) ? saved.buttons.slice(0, 5) : []
++    };
++  } catch {
++    return base;
++  }
++}
++
++function customFieldMarkup(field = {}, index = 0) {
++  return `
++    <div class="composer-row" data-custom-field>
++      <div class="composer-row-main">
++        <div class="field">
++          <label for="custom-field-name-${index}">Nombre</label>
++          <input id="custom-field-name-${index}" data-field-name type="text" maxlength="256" value="${escapeHtml(field.name || '')}" placeholder="Por ejemplo: Fecha" required>
++        </div>
++        <div class="field grow">
++          <label for="custom-field-value-${index}">Contenido</label>
++          <textarea id="custom-field-value-${index}" data-field-value rows="2" maxlength="1024" placeholder="El contenido del campo" required>${escapeHtml(field.value || '')}</textarea>
++        </div>
++      </div>
++      <div class="composer-row-actions">
++        <label class="check compact"><input data-field-inline type="checkbox"${field.inline ? ' checked' : ''}><span>En línea</span></label>
++        <button class="button ghost sm" type="button" data-remove-custom-field aria-label="Quitar campo">Quitar</button>
++      </div>
++    </div>`;
++}
++
++function customButtonMarkup(button = {}, index = 0) {
++  return `
++    <div class="composer-row" data-custom-button>
++      <div class="composer-row-main three">
++        <div class="field">
++          <label for="custom-button-label-${index}">Texto</label>
++          <input id="custom-button-label-${index}" data-button-label type="text" maxlength="80" value="${escapeHtml(button.label || '')}" placeholder="Visitar sitio" required>
++        </div>
++        <div class="field grow">
++          <label for="custom-button-url-${index}">Enlace HTTPS</label>
++          <input id="custom-button-url-${index}" data-button-url type="url" maxlength="500" value="${escapeHtml(button.url || '')}" placeholder="https://…" pattern="https://.*" required>
++        </div>
++        <div class="field emoji-field">
++          <label for="custom-button-emoji-${index}">Emoji</label>
++          <input id="custom-button-emoji-${index}" data-button-emoji type="text" maxlength="100" value="${escapeHtml(button.emoji || '')}" placeholder="✨">
++        </div>
++      </div>
++      <div class="composer-row-actions">
++        <button class="button ghost sm" type="button" data-remove-custom-button aria-label="Quitar botón">Quitar</button>
++      </div>
++    </div>`;
++}
++
++function renderPublicar() {
++  const draft = loadCustomDraft();
++  const channels = (state.data.channels || []).filter(channel => channel.sendable !== false);
++  const noChannels = channels.length === 0;
++
++  return `
++    <div class="callout info">
++      <strong>Esta publicación es independiente de los mensajes automáticos.</strong>
++      <span>Se envía una vez al canal que elijas. El borrador queda guardado solo en este navegador y las menciones están desactivadas por seguridad.</span>
++    </div>
++    ${noChannels ? `<div class="callout danger"><strong>No hay canales disponibles.</strong><span>Vesper necesita Ver canal, Enviar mensajes e Insertar enlaces en al menos un canal de texto.</span></div>` : ''}
++    ${card({
++      eyebrow: 'Compositor',
++      title: 'Nueva publicación',
++      description: 'Título, texto, imágenes, campos y hasta cinco botones de enlace.',
++      ayuda: 'Los botones abren enlaces HTTPS. Los botones que ejecutan acciones necesitan programación adicional y por eso no se ofrecen como si fueran a funcionar solos.',
++      body: `
++        <div class="editor-layout composer-layout">
++          <form id="form-custom-embed" class="form">
++            <div class="field wide">
++              <label for="custom-channel">Canal de destino</label>
++              <select id="custom-channel" required${noChannels ? ' disabled' : ''}>${selectOptions(channels, draft.channelId, 'Elige un canal')}</select>
++              <span class="hint">Solo aparecen canales donde Vesper puede publicar embeds.</span>
++            </div>
++
++            <details class="more-options" open>
++              <summary>Texto y título</summary>
++              <div class="field wide">
++                <label for="custom-content">Texto encima del embed (opcional)</label>
++                ${formatToolbar('custom-content', { compact: true })}
++                <textarea id="custom-content" rows="3" maxlength="2000" placeholder="Un texto corto fuera del recuadro">${escapeHtml(draft.content || '')}</textarea>
++              </div>
++              <div class="form-row">
++                <div class="field">
++                  <label for="custom-title">Título</label>
++                  <input id="custom-title" type="text" maxlength="256" value="${escapeHtml(draft.embed.title || '')}" placeholder="Título de la publicación">
++                </div>
++                <div class="field">
++                  <label for="custom-title-url">Enlace del título (opcional)</label>
++                  <input id="custom-title-url" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.url || '')}" placeholder="https://…">
++                </div>
++              </div>
++              <div class="field wide">
++                <label for="custom-description">Descripción</label>
++                ${formatToolbar('custom-description')}
++                <textarea id="custom-description" rows="8" maxlength="4096" placeholder="Escribe el contenido principal del embed…">${escapeHtml(draft.embed.description || '')}</textarea>
++              </div>
++            </details>
++
++            <details class="more-options">
++              <summary>Autor y pie</summary>
++              <div class="form-row">
++                <div class="field">
++                  <label for="custom-author-name">Nombre del autor</label>
++                  <input id="custom-author-name" type="text" maxlength="256" value="${escapeHtml(draft.embed.author.name || '')}" placeholder="Nombre opcional">
++                </div>
++                <div class="field">
++                  <label for="custom-author-url">Enlace del autor</label>
++                  <input id="custom-author-url" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.author.url || '')}" placeholder="https://…">
++                </div>
++              </div>
++              <div class="field wide">
++                <label for="custom-author-icon">Icono del autor (URL HTTPS)</label>
++                <input id="custom-author-icon" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.author.iconUrl || '')}" placeholder="https://…">
++              </div>
++              <div class="form-row">
++                <div class="field">
++                  <label for="custom-footer">Texto del pie</label>
++                  <input id="custom-footer" type="text" maxlength="2048" value="${escapeHtml(draft.embed.footer.text || '')}" placeholder="Pie opcional">
++                </div>
++                <div class="field">
++                  <label for="custom-footer-icon">Icono del pie (URL HTTPS)</label>
++                  <input id="custom-footer-icon" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.footer.iconUrl || '')}" placeholder="https://…">
++                </div>
++              </div>
++              <label class="check"><input id="custom-timestamp" type="checkbox"${draft.embed.timestamp ? ' checked' : ''}><span>Añadir fecha y hora del envío</span></label>
++            </details>
++
++            <details class="more-options">
++              <summary>Color e imágenes</summary>
++              <div class="form-row">
++                <div class="field">
++                  <label for="custom-color">Color lateral</label>
++                  <div class="color-field"><input id="custom-color" type="color" value="${escapeHtml(draft.embed.color || '#5865F2')}"></div>
++                </div>
++                <div class="field">
++                  <label for="custom-thumbnail">Miniatura (URL HTTPS)</label>
++                  <input id="custom-thumbnail" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.thumbnail || '')}" placeholder="https://…">
++                </div>
++              </div>
++              <div class="field wide">
++                <label for="custom-image">Imagen principal o GIF (URL HTTPS)</label>
++                <input id="custom-image" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.image || '')}" placeholder="https://…">
++                <span class="hint">Usa un enlace directo público. Discord admite PNG, JPG, WebP y GIF.</span>
++              </div>
++            </details>
++
++            <details class="more-options"${draft.embed.fields.length ? ' open' : ''}>
++              <summary>Campos adicionales · <span id="custom-field-count">${draft.embed.fields.length}/25</span></summary>
++              <div id="custom-fields" class="composer-list">${draft.embed.fields.map(customFieldMarkup).join('')}</div>
++              <button id="add-custom-field" class="button quiet sm" type="button"${draft.embed.fields.length >= 25 ? ' disabled' : ''}>Añadir campo</button>
++            </details>
++
++            <details class="more-options"${draft.buttons.length ? ' open' : ''}>
++              <summary>Botones de enlace · <span id="custom-button-count">${draft.buttons.length}/5</span></summary>
++              <div id="custom-buttons" class="composer-list">${draft.buttons.map(customButtonMarkup).join('')}</div>
++              <button id="add-custom-button" class="button quiet sm" type="button"${draft.buttons.length >= 5 ? ' disabled' : ''}>Añadir botón</button>
++            </details>
++
++            <div class="form-actions">
++              <button class="button" type="submit"${noChannels ? ' disabled' : ''}>Enviar a Discord</button>
++              <button id="clear-custom-embed" class="button ghost" type="button">Limpiar borrador</button>
++            </div>
++            <div id="custom-send-result" class="send-result" aria-live="polite"></div>
++          </form>
++
++          <div class="editor-preview">
++            <p class="eyebrow">Vista previa en vivo</p>
++            <div class="preview-shell"><div class="discord-message" id="custom-embed-preview"></div></div>
++            <div id="custom-embed-usage" class="usage-line"></div>
++          </div>
++        </div>`
++    })}`;
++}
++
++function customEmbedValues() {
++  const value = selector => document.querySelector(selector)?.value.trim() || '';
++  const fields = [...document.querySelectorAll('[data-custom-field]')].map(row => ({
++    name: row.querySelector('[data-field-name]')?.value.trim() || '',
++    value: row.querySelector('[data-field-value]')?.value.trim() || '',
++    inline: row.querySelector('[data-field-inline]')?.checked === true
++  })).filter(field => field.name || field.value);
++  const buttons = [...document.querySelectorAll('[data-custom-button]')].map(row => ({
++    label: row.querySelector('[data-button-label]')?.value.trim() || '',
++    url: row.querySelector('[data-button-url]')?.value.trim() || '',
++    emoji: row.querySelector('[data-button-emoji]')?.value.trim() || ''
++  })).filter(button => button.label || button.url || button.emoji);
++
++  return {
++    version: CUSTOM_DRAFT_VERSION,
++    channelId: value('#custom-channel'),
++    content: value('#custom-content'),
++    embed: {
++      author: { name: value('#custom-author-name'), url: value('#custom-author-url'), iconUrl: value('#custom-author-icon') },
++      title: value('#custom-title'),
++      url: value('#custom-title-url'),
++      description: value('#custom-description'),
++      color: document.querySelector('#custom-color')?.value || '#5865F2',
++      thumbnail: value('#custom-thumbnail'),
++      image: value('#custom-image'),
++      fields,
++      footer: { text: value('#custom-footer'), iconUrl: value('#custom-footer-icon') },
++      timestamp: document.querySelector('#custom-timestamp')?.checked === true
++    },
++    buttons
++  };
++}
++
++function saveCustomDraft() {
++  try { localStorage.setItem(customDraftKey(), JSON.stringify(customEmbedValues())); } catch {}
++}
++
++function refreshCustomPreview() {
++  const root = document.querySelector('#custom-embed-preview');
++  if (!root) return;
++  const draft = customEmbedValues();
++  const identity = identityValues();
++  const hasEmbedContent = draft.embed.title || draft.embed.description || draft.embed.image ||
++    draft.embed.thumbnail || draft.embed.fields.length || draft.embed.author.name || draft.embed.footer.text;
++  const preview = {
++    author: draft.embed.author.name || null,
++    title: draft.embed.title || (hasEmbedContent ? '' : 'Título de tu publicación'),
++    message: draft.embed.description || (hasEmbedContent ? '' : 'Aquí verás el contenido mientras lo escribes.'),
++    fields: draft.embed.fields,
++    footer: draft.embed.footer.text || (draft.embed.timestamp ? ' ' : null),
++    image: draft.embed.image || null,
++    thumbnail: Boolean(draft.embed.thumbnail),
++    showThumb: Boolean(draft.embed.thumbnail),
++    timestamp: draft.embed.timestamp
++  };
++  const buttons = draft.buttons.length
++    ? `<div class="discord-components">${draft.buttons.map(button => `<span class="discord-button">${button.emoji ? `${escapeHtml(button.emoji)} ` : ''}${escapeHtml(button.label || 'Botón')} <span aria-hidden="true">↗</span></span>`).join('')}</div>`
++    : '';
++  root.innerHTML = `${messageHeaderMarkup(identity)}
++      ${draft.content ? `<div class="message-content">${renderMarkdown(draft.content)}</div>` : ''}
++      ${embedPreviewMarkup(preview, {
++        authorIcon: draft.embed.author.iconUrl || null,
++        thumbnailUrl: draft.embed.thumbnail || null,
++        footerIcon: draft.embed.footer.iconUrl || null
++      })}
++      ${buttons}
++    </div>`;
++  const embed = root.querySelector('.embed-preview');
++  if (embed) embed.style.setProperty('--embed-accent', draft.embed.color);
++  wireImageFallbacks(root);
++
++  const total = [draft.embed.author.name, draft.embed.title, draft.embed.description, draft.embed.footer.text,
++    ...draft.embed.fields.flatMap(field => [field.name, field.value])]
++    .reduce((sum, text) => sum + text.length, 0);
++  const usage = document.querySelector('#custom-embed-usage');
++  if (usage) {
++    usage.textContent = `${total.toLocaleString('es-CO')} / 6.000 caracteres del embed · ${draft.embed.fields.length}/25 campos · ${draft.buttons.length}/5 botones`;
++    usage.classList.toggle('danger', total > 6000);
++  }
++}
++
++function refreshComposerCounts() {
++  const fields = document.querySelectorAll('[data-custom-field]').length;
++  const buttons = document.querySelectorAll('[data-custom-button]').length;
++  const fieldCount = document.querySelector('#custom-field-count');
++  const buttonCount = document.querySelector('#custom-button-count');
++  if (fieldCount) fieldCount.textContent = `${fields}/25`;
++  if (buttonCount) buttonCount.textContent = `${buttons}/5`;
++  const addField = document.querySelector('#add-custom-field');
++  const addButton = document.querySelector('#add-custom-button');
++  if (addField) addField.disabled = fields >= 25;
++  if (addButton) addButton.disabled = buttons >= 5;
++}
++
++function bindPublicar(root) {
++  const form = root.querySelector('#form-custom-embed');
++  if (!form) return;
++  wireFormatting(root);
++  let saveTimer = null;
++  const changed = () => {
++    refreshCustomPreview();
++    clearTimeout(saveTimer);
++    saveTimer = setTimeout(saveCustomDraft, 250);
++  };
++  form.addEventListener('input', changed);
++  form.addEventListener('change', changed);
++
++  root.querySelector('#add-custom-field')?.addEventListener('click', () => {
++    const list = root.querySelector('#custom-fields');
++    const index = list.querySelectorAll('[data-custom-field]').length;
++    if (index >= 25) return;
++    list.insertAdjacentHTML('beforeend', customFieldMarkup({}, index));
++    refreshComposerCounts();
++    changed();
++  });
++  root.querySelector('#add-custom-button')?.addEventListener('click', () => {
++    const list = root.querySelector('#custom-buttons');
++    const index = list.querySelectorAll('[data-custom-button]').length;
++    if (index >= 5) return;
++    list.insertAdjacentHTML('beforeend', customButtonMarkup({}, index));
++    refreshComposerCounts();
++    changed();
++  });
++  root.addEventListener('click', event => {
++    const fieldButton = event.target.closest('[data-remove-custom-field]');
++    const linkButton = event.target.closest('[data-remove-custom-button]');
++    if (fieldButton) fieldButton.closest('[data-custom-field]')?.remove();
++    if (linkButton) linkButton.closest('[data-custom-button]')?.remove();
++    if (fieldButton || linkButton) {
++      refreshComposerCounts();
++      changed();
++    }
++  });
++
++  root.querySelector('#clear-custom-embed')?.addEventListener('click', async () => {
++    if (!await confirmDialog({
++      title: 'Limpiar el borrador',
++      message: 'Se borrará todo lo escrito en esta publicación. Los mensajes ya enviados a Discord no cambian.',
++      confirmLabel: 'Limpiar',
++      danger: true
++    })) return;
++    try { localStorage.removeItem(customDraftKey()); } catch {}
++    renderView();
++    toast('Borrador limpio.', 'ok');
++  });
++
++  form.addEventListener('submit', async event => {
++    event.preventDefault();
++    if (!form.reportValidity()) return;
++    const draft = customEmbedValues();
++    const channel = state.data.channels.find(item => item.id === draft.channelId);
++    if (!channel) return toast('Elige un canal disponible.', 'bad');
++    if (!await confirmDialog({
++      title: `Enviar a #${channel.name}`,
++      message: 'El mensaje se publicará inmediatamente. Después podrás abrirlo en Discord, pero no editarlo desde este formulario.',
++      confirmLabel: 'Enviar ahora'
++    })) return;
++
++    const submit = event.submitter;
++    if (submit) submit.disabled = true;
++    try {
++      const result = await api(`/guilds/${state.guildId}/custom-embeds/send`, {
++        method: 'POST',
++        body: JSON.stringify(draft)
++      });
++      saveCustomDraft();
++      const status = root.querySelector('#custom-send-result');
++      if (status) status.innerHTML = `<div class="callout success"><strong>Publicación enviada.</strong><span>Mensaje ${escapeHtml(result.messageId)} en #${escapeHtml(channel.name)}.</span><a class="button quiet sm" href="${escapeHtml(result.url)}" target="_blank" rel="noopener noreferrer">Abrir en Discord</a></div>`;
++      toast(`Publicado en #${channel.name}.`, 'ok');
++    } catch (error) {
++      toast(error.message, 'bad');
++    } finally {
++      if (submit) submit.disabled = false;
++    }
++  });
++
++  refreshComposerCounts();
++  refreshCustomPreview();
++}
++
+ /* ---------------------------------------------------------------- */
+ /* Avisos de redes                                                   */
+ /* ---------------------------------------------------------------- */
+@@ -3885,6 +4319,7 @@ const RENDERERS = {
+   bienvenidas: { render: renderBienvenidas, bind: bindBienvenidas },
+   avisos: { render: renderAvisos, bind: bindAvisos },
+   mensajes: { render: renderMensajes, bind: bindMensajes },
++  publicar: { render: renderPublicar, bind: bindPublicar },
+   ofertas: { render: renderOfertas, bind: bindOfertas },
+   moderacion: { render: renderModeracion, bind: bindModeracion },
+   comunidad: { render: renderComunidad, bind: bindComunidad },
+diff --git a/src/web/public/styles.css b/src/web/public/styles.css
+index d178679..9832dc4 100644
+--- a/src/web/public/styles.css
++++ b/src/web/public/styles.css
+@@ -584,8 +584,9 @@ body[data-mode="light"] .embed-preview { background: #fff; box-shadow: 0 0 0 1px
+ 
+ /* Los recuadros del aviso, igual que los pinta Discord: nombre en negrita y
+    valor debajo. */
+-.embed-fields { display: grid; gap: .5rem; margin-top: .55rem; }
+-.embed-field { display: grid; gap: .1rem; }
++.embed-fields { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: .5rem; margin-top: .55rem; }
++.embed-field { display: grid; grid-column: 1 / -1; gap: .1rem; }
++.embed-field.inline { grid-column: span 4; min-width: 0; }
+ .embed-field-name { color: var(--preview-ink); font-weight: 600; font-size: .8rem; }
+ .embed-field-value { font-size: .85rem; line-height: 1.45; overflow-wrap: anywhere; }
+ .embed-thumb {
+@@ -601,6 +602,7 @@ body[data-mode="light"] .embed-preview { background: #fff; box-shadow: 0 0 0 1px
+   color: var(--preview-muted); font-size: .76rem; text-align: center;
+ }
+ .embed-footer { display: flex; gap: .4rem; align-items: center; margin-top: .6rem; color: var(--preview-muted); font-size: .73rem; }
++.embed-footer img { width: 1.25rem; height: 1.25rem; border-radius: 999px; object-fit: cover; }
+ .embed-divider { height: 1px; margin: .6rem 0; background: rgba(255,255,255,.1); }
+ body[data-mode="light"] .embed-divider { background: rgba(6,6,7,.1); }
+ 
+@@ -612,6 +614,34 @@ body[data-mode="light"] .embed-divider { background: rgba(6,6,7,.1); }
+ .editor-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+ .editor-preview { position: sticky; top: 7.5rem; display: grid; gap: .5rem; }
+ 
++/* Compositor de publicaciones manuales. Mantiene el formulario respirable
++   incluso con 25 campos y deja los controles secundarios en una fila propia. */
++.composer-layout { grid-template-columns: minmax(0, 1.15fr) minmax(18rem, .85fr); }
++.composer-list { display: grid; gap: .55rem; margin-bottom: .65rem; }
++.composer-row {
++  display: grid; gap: .55rem; padding: .65rem;
++  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface);
++}
++.composer-row-main { display: grid; grid-template-columns: minmax(8rem, .7fr) minmax(0, 1.3fr); gap: .55rem; }
++.composer-row-main.three { grid-template-columns: minmax(8rem, .65fr) minmax(10rem, 1.25fr) minmax(5rem, .35fr); }
++.composer-row-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: flex-end; }
++.composer-row .field { margin: 0; }
++.composer-row textarea { min-height: 3.6rem; }
++.emoji-field input { text-align: center; }
++.message-content { margin-bottom: .45rem; font-size: .88rem; line-height: 1.5; overflow-wrap: anywhere; }
++.discord-components { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .45rem; }
++.discord-button {
++  display: inline-flex; gap: .3rem; align-items: center; justify-content: center;
++  min-height: 2rem; padding: .35rem .75rem; border-radius: .2rem;
++  background: #4e5058; color: #fff; font-size: .78rem; font-weight: 600;
++}
++body[data-mode="light"] .discord-button { background: #e3e5e8; color: #2e3338; }
++.usage-line { color: var(--text-3); font-size: .74rem; line-height: 1.45; }
++.usage-line.danger { color: var(--danger); font-weight: 700; }
++.send-result:empty { display: none; }
++.send-result .callout { align-items: flex-start; }
++.send-result .button { margin-top: .25rem; justify-self: start; }
++
+ .var-list { display: flex; flex-wrap: wrap; gap: .35rem; margin: 0; padding: 0; list-style: none; }
+ .var-list li { display: inline-flex; gap: .3rem; padding: .25rem .55rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); font-size: .75rem; color: var(--text-3); }
+ .var-list code { color: var(--accent); font-family: var(--font-mono); font-size: .74rem; }
+@@ -694,6 +724,17 @@ body[data-mode="light"] .embed-divider { background: rgba(6,6,7,.1); }
+   .editor-preview { position: static; }
+ }
+ 
++@media (max-width: 720px) {
++  .composer-row-main,
++  .composer-row-main.three { grid-template-columns: 1fr; }
++  .composer-row-actions { justify-content: space-between; }
++  .embed-field.inline { grid-column: span 6; }
++}
++
++@media (max-width: 420px) {
++  .embed-field.inline { grid-column: 1 / -1; }
++}
++
+ @media (max-width: 960px) {
+   .shell { grid-template-columns: 1fr; }
+ 
+diff --git a/src/web/routes.js b/src/web/routes.js
+index e8d8110..fdc1fb9 100644
+--- a/src/web/routes.js
++++ b/src/web/routes.js
+@@ -51,10 +51,13 @@ const { catalogForPanel } = require('../core/EmbedCatalog');
+ const { alertOverview } = require('../core/AlertRouter');
+ const { themesForPanel, themeAllowed, applyTheme, clearTheme } = require('../core/MessageThemes');
+ const { KINDS } = require('../core/EmbedCatalog');
++const { buildCustomEmbedPayload } = require('../core/CustomEmbedService');
++const { sendBrandedMessage } = require('../utils/webhookSender');
+ 
+ const publicDir = path.join(__dirname, 'public');
+ const authLimiter = createRateLimiter({ windowMs: 5 * 60 * 1000, max: 20 });
+ const apiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 120 });
++const customPublishLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10 });
+ 
+ function identity(session) {
+   return {
+@@ -343,7 +346,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
+     // proveedor las rechace: es literalmente lo único que hace falta saber
+     // para arreglar un «redirect_uri_mismatch».
+     redirectUris: redirectUris(),
+-    version: '3.5.0'
++    version: '3.6.0'
+   }));
+ 
+   app.get('/auth/discord', authLimiter, requireDashboard, async (req, res, next) => {
+@@ -435,7 +438,19 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
+       const availableChannels = access.configure ? [...access.guild.channels.cache.values()] : [];
+       const channels = availableChannels
+         .filter(channel => channel.isTextBased() && !channel.isThread?.())
+-        .map(channel => ({ id: channel.id, name: channel.name, parent: channel.parent?.name || null }))
++        .map(channel => {
++          const permissions = channel.permissionsFor(access.guild.members.me);
++          return {
++            id: channel.id,
++            name: channel.name,
++            parent: channel.parent?.name || null,
++            sendable: Boolean(permissions?.has([
++              PermissionFlagsBits.ViewChannel,
++              PermissionFlagsBits.SendMessages,
++              PermissionFlagsBits.EmbedLinks
++            ]))
++          };
++        })
+         .sort((a, b) => (a.parent || '').localeCompare(b.parent || '', 'es') || a.name.localeCompare(b.name, 'es'));
+       const voiceChannels = availableChannels
+         .filter(channel => [ChannelType.GuildVoice, ChannelType.GuildStageVoice].includes(channel.type))
+@@ -591,6 +606,56 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
+     } catch (error) { return next(error); }
+   });
+ 
++  // Publicación manual: crea un embed nuevo y lo envía al canal elegido. No
++  // guarda el texto en MongoDB (evita almacenar anuncios privados); el
++  // navegador conserva un borrador local hasta que el administrador lo limpie.
++  api.post('/guilds/:guildId/custom-embeds/send', customPublishLimiter, requireSession, requireCsrf, async (req, res, next) => {
++    try {
++      const context = await accessFor(req, res, getClient);
++      if (!context) return;
++      if (!context.access.configure) {
++        return res.status(403).json({ error: 'Necesitas Administrar servidor para enviar publicaciones.' });
++      }
++
++      const built = buildCustomEmbedPayload(req.body);
++      const channel = context.access.guild.channels.cache.get(built.channelId)
++        || await context.access.guild.channels.fetch(built.channelId).catch(() => null);
++      if (!channel || channel.guild?.id !== context.access.guild.id || !channel.isTextBased() || channel.isThread?.()) {
++        return res.status(400).json({ error: 'El canal seleccionado no pertenece a este servidor o no admite mensajes.' });
++      }
++
++      const permissions = channel.permissionsFor(context.access.guild.members.me);
++      if (!permissions?.has([
++        PermissionFlagsBits.ViewChannel,
++        PermissionFlagsBits.SendMessages,
++        PermissionFlagsBits.EmbedLinks
++      ])) {
++        return res.status(409).json({ error: `Vesper necesita Ver canal, Enviar mensajes e Insertar enlaces en #${channel.name}.` });
++      }
++
++      const noMentions = { parse: [], roles: [], users: [], repliedUser: false };
++      const message = await sendBrandedMessage(channel, built.payload, {
++        throwOnFailure: true,
++        allowedMentions: noMentions
++      });
++      if (!message) throw Object.assign(new Error('Discord no confirmó el envío del mensaje.'), { statusCode: 502 });
++
++      // La publicación ya ocurrió: un fallo secundario al escribir la auditoría
++      // no debe devolver error y provocar que la persona la envíe dos veces.
++      await recordAudit(req, req.params.guildId, 'customEmbed.send', message.id, {
++        channelId: channel.id,
++        ...built.summary
++      }).catch(error => console.error('❌ No se pudo auditar customEmbed.send:', error));
++
++      return res.status(201).json({
++        ok: true,
++        messageId: message.id,
++        channelId: channel.id,
++        url: message.url || `https://discord.com/channels/${context.access.guild.id}/${channel.id}/${message.id}`
++      });
++    } catch (error) { return next(error); }
++  });
++
+   api.post('/guilds/:guildId/social/:platform', requireSession, requireCsrf, async (req, res, next) => {
+     try {
+       const context = await accessFor(req, res, getClient);
+diff --git a/test/auditoria.test.js b/test/auditoria.test.js
+index e362c5a..f813337 100644
+--- a/test/auditoria.test.js
++++ b/test/auditoria.test.js
+@@ -4,7 +4,17 @@ const test = require('node:test');
+ const assert = require('node:assert/strict');
+ const { PermissionFlagsBits } = require('discord.js');
+ 
+-const { findRecentAuditEntry, auditExecutor, quienLoHizo, SIN_PERMISO, SIN_DATO } = require('../src/utils/auditLog');
++const {
++  findRecentAuditEntry,
++  auditExecutor,
++  resolveAuditExecutor,
++  quienLoHizo,
++  SIN_PERMISO,
++  SIN_DATO,
++  ERROR_AUDITORIA
++} = require('../src/utils/auditLog');
++
++const INTENTOS_RAPIDOS = { attemptDelaysMs: [0, 1, 2, 3, 4] };
+ 
+ function servidorFalso({ entradas = [], permiso = true, apareceTrasIntentos = 0 } = {}) {
+   let intentos = 0;
+@@ -31,7 +41,7 @@ const entrada = (targetId, tag = 'yojan') => ({
+ // entrada se pueda consultar, así que el primer intento vuelve vacío.
+ test('reintenta cuando la auditoría todavía no tiene la entrada', async () => {
+   const guild = servidorFalso({ entradas: [entrada('123')], apareceTrasIntentos: 1 });
+-  assert.equal(await quienLoHizo(guild, 0, '123'), 'yojan');
++  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), 'yojan');
+   assert.ok(guild.consultas() >= 2, 'debería haber preguntado más de una vez');
+ });
+ 
+@@ -39,25 +49,25 @@ test('reintenta cuando la auditoría todavía no tiene la entrada', async () =>
+ // el objeto y `entry.target` llega vacío. `targetId` sí viene.
+ test('reconoce la entrada aunque Discord no pueda resolver el objeto borrado', async () => {
+   const guild = servidorFalso({ entradas: [entrada('987')] });
+-  assert.equal(await quienLoHizo(guild, 0, '987'), 'yojan');
++  assert.equal(await quienLoHizo(guild, 0, '987', INTENTOS_RAPIDOS), 'yojan');
+ });
+ 
+ test('no confunde la acción de otro objeto', async () => {
+   const guild = servidorFalso({ entradas: [entrada('otro')] });
+-  assert.equal(await quienLoHizo(guild, 0, '123'), SIN_DATO);
++  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), SIN_DATO);
+ });
+ 
+ // Una entrada vieja es de otra acción parecida, no de esta.
+ test('descarta las entradas antiguas', async () => {
+-  const vieja = { ...entrada('123'), createdTimestamp: Date.now() - 60_000 };
++  const vieja = { ...entrada('123'), createdTimestamp: Date.now() - 120_000 };
+   const guild = servidorFalso({ entradas: [vieja] });
+-  assert.equal(await quienLoHizo(guild, 0, '123'), SIN_DATO);
++  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), SIN_DATO);
+ });
+ 
+ // Sin permiso, «Desconocido» no explicaba nada y nadie sabía qué arreglar.
+ test('sin permiso lo dice en vez de dejar un desconocido', async () => {
+   const guild = servidorFalso({ entradas: [entrada('123')], permiso: false });
+-  assert.equal(await quienLoHizo(guild, 0, '123'), SIN_PERMISO);
++  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), SIN_PERMISO);
+   assert.equal(guild.consultas(), 0, 'ni siquiera debería preguntar');
+ });
+ 
+@@ -66,7 +76,7 @@ test('si Discord falla, no revienta el aviso', async () => {
+     members: { me: { permissions: { has: () => true } } },
+     fetchAuditLogs: async () => { throw new Error('503'); }
+   };
+-  assert.equal(await quienLoHizo(guild, 0, '123'), SIN_DATO);
++  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), ERROR_AUDITORIA);
+ });
+ 
+ test('sin entrada, auditExecutor devuelve algo legible', () => {
+@@ -76,6 +86,36 @@ test('sin entrada, auditExecutor devuelve algo legible', () => {
+ 
+ test('findRecentAuditEntry devuelve la entrada, no un texto', async () => {
+   const guild = servidorFalso({ entradas: [entrada('123')] });
+-  const encontrada = await findRecentAuditEntry(guild, 0, '123');
++  const encontrada = await findRecentAuditEntry(guild, 0, '123', INTENTOS_RAPIDOS);
+   assert.equal(encontrada.executor.tag, 'yojan');
+ });
++
++test('sigue intentando si Discord falla de forma transitoria', async () => {
++  let consultas = 0;
++  const guild = {
++    members: { me: { permissions: { has: () => true } } },
++    async fetchAuditLogs() {
++      consultas += 1;
++      if (consultas === 1) throw new Error('503');
++      return { entries: [entrada('123')] };
++    }
++  };
++  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), 'yojan');
++  assert.equal(consultas, 2);
++});
++
++test('acepta createdAt cuando createdTimestamp no está resuelto', async () => {
++  const item = { ...entrada('123'), createdTimestamp: undefined, createdAt: new Date() };
++  const guild = servidorFalso({ entradas: [item] });
++  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), 'yojan');
++});
++
++test('resuelve al ejecutor por executorId si Discord no adjunta el usuario', async () => {
++  const guild = {
++    members: {
++      cache: new Map(),
++      fetch: async id => ({ displayName: id === '456' ? 'Moderadora' : null })
++    }
++  };
++  assert.equal(await resolveAuditExecutor(guild, { executorId: '456', executor: null }), 'Moderadora');
++});
+diff --git a/test/customEmbedService.test.js b/test/customEmbedService.test.js
+new file mode 100644
+index 0000000..fcd91c2
+--- /dev/null
++++ b/test/customEmbedService.test.js
+@@ -0,0 +1,104 @@
++const test = require('node:test');
++const assert = require('node:assert/strict');
++
++const {
++  LIMITS,
++  CustomEmbedError,
++  sanitizeCustomEmbed,
++  buildCustomEmbedPayload,
++  buttonEmoji
++} = require('../src/core/CustomEmbedService');
++
++const CHANNEL_ID = '123456789012345678';
++
++function completeMessage(overrides = {}) {
++  return {
++    channelId: CHANNEL_ID,
++    content: 'Texto exterior',
++    embed: {
++      author: { name: 'AnkeBot', url: 'https://example.com/autor', iconUrl: 'https://example.com/autor.png' },
++      title: 'Un anuncio',
++      url: 'https://example.com/anuncio',
++      description: '**Contenido** con Markdown.',
++      color: '#8DDCF4',
++      thumbnail: 'https://example.com/miniatura.png',
++      image: 'https://example.com/imagen.gif',
++      fields: [
++        { name: 'Fecha', value: '20 de septiembre', inline: true },
++        { name: 'Lugar', value: '#general', inline: true }
++      ],
++      footer: { text: 'Ankerie Dimension', iconUrl: 'https://example.com/pie.png' },
++      timestamp: true
++    },
++    buttons: [
++      { label: 'Abrir', url: 'https://example.com', emoji: '✨' },
++      { label: 'Discord', url: 'https://discord.com', emoji: '<:nube:123456789012345678>' }
++    ],
++    ...overrides
++  };
++}
++
++test('construye una publicación rica con imágenes, campos y botones', () => {
++  const built = buildCustomEmbedPayload(completeMessage());
++  assert.equal(built.channelId, CHANNEL_ID);
++  assert.deepEqual(built.payload.allowedMentions, { parse: [], roles: [], users: [], repliedUser: false });
++
++  const embed = built.payload.embeds[0].toJSON();
++  assert.equal(embed.title, 'Un anuncio');
++  assert.equal(embed.color, 0x8DDCF4);
++  assert.equal(embed.fields.length, 2);
++  assert.equal(embed.image.url, 'https://example.com/imagen.gif');
++  assert.equal(embed.thumbnail.url, 'https://example.com/miniatura.png');
++  assert.ok(embed.timestamp);
++
++  const row = built.payload.components[0].toJSON();
++  assert.equal(row.components.length, 2);
++  assert.equal(row.components[0].style, 5, 'los botones son enlaces y no prometen acciones sin programar');
++  assert.equal(row.components[1].emoji.id, '123456789012345678');
++  assert.deepEqual(built.summary, { fieldCount: 2, buttonCount: 2, hasImage: true, hasThumbnail: true });
++});
++
++test('el contenido nunca habilita menciones accidentales', () => {
++  const built = buildCustomEmbedPayload(completeMessage({ content: '@everyone <@&123456789012345678>' }));
++  assert.deepEqual(built.payload.allowedMentions.parse, []);
++  assert.deepEqual(built.payload.allowedMentions.roles, []);
++  assert.deepEqual(built.payload.allowedMentions.users, []);
++});
++
++test('rechaza publicaciones vacías, canales falsos y enlaces inseguros', () => {
++  assert.throws(() => sanitizeCustomEmbed({ channelId: CHANNEL_ID, embed: {} }), CustomEmbedError);
++  assert.throws(() => sanitizeCustomEmbed({ channelId: 'general', embed: { title: 'Hola' } }), /canal seleccionado/);
++  assert.throws(() => sanitizeCustomEmbed({ channelId: CHANNEL_ID, embed: { title: 'Hola', image: 'http:\/\/example.com\/x.png' } }), /HTTPS/);
++  assert.throws(() => sanitizeCustomEmbed({ channelId: CHANNEL_ID, embed: { title: 'Hola', image: 'https:\/\/127.0.0.1\/x.png' } }), /pública/);
++  assert.throws(() => sanitizeCustomEmbed({ channelId: CHANNEL_ID, embed: { url: 'https:\/\/example.com' } }), /título/);
++  assert.throws(() => sanitizeCustomEmbed({ channelId: CHANNEL_ID, embed: { title: 'Hola' }, buttons: [{ label: 'Sin enlace' }] }), /obligatorio/);
++});
++
++test('respeta los límites globales de Discord', () => {
++  const fields = Array.from({ length: LIMITS.fields + 1 }, (_, index) => ({ name: `Campo ${index}`, value: 'x' }));
++  assert.throws(() => sanitizeCustomEmbed({ channelId: CHANNEL_ID, embed: { title: 'Hola', fields } }), /máximo 25 campos/);
++
++  const buttons = Array.from({ length: LIMITS.buttons + 1 }, (_, index) => ({ label: `Botón ${index}`, url: 'https://example.com' }));
++  assert.throws(() => sanitizeCustomEmbed({ channelId: CHANNEL_ID, embed: { title: 'Hola' }, buttons }), /máximo 5 botones/);
++
++  const tooLong = {
++    channelId: CHANNEL_ID,
++    embed: {
++      title: 'T'.repeat(256),
++      description: 'D'.repeat(4096),
++      fields: [{ name: 'N'.repeat(256), value: 'V'.repeat(1024) }],
++      footer: { text: 'P'.repeat(500) }
++    }
++  };
++  assert.throws(() => sanitizeCustomEmbed(tooLong), /6.000 caracteres|6000 caracteres/);
++});
++
++test('normaliza emojis normales y personalizados', () => {
++  assert.deepEqual(buttonEmoji('✨', 'emoji'), { name: '✨' });
++  assert.deepEqual(buttonEmoji('<a:nube:123456789012345678>', 'emoji'), {
++    animated: true,
++    name: 'nube',
++    id: '123456789012345678'
++  });
++  assert.throws(() => buttonEmoji('<emoji roto>', 'emoji'), /emoji normal/);
++});
+diff --git a/test/deployment.test.js b/test/deployment.test.js
+new file mode 100644
+index 0000000..1207c09
+--- /dev/null
++++ b/test/deployment.test.js
+@@ -0,0 +1,37 @@
++const test = require('node:test');
++const assert = require('node:assert/strict');
++const fs = require('fs');
++const path = require('path');
++
++const root = path.join(__dirname, '..');
++
++test('Render apunta al Dockerfile que existe con la misma capitalización', () => {
++  const render = fs.readFileSync(path.join(root, 'render.yaml'), 'utf8');
++  const match = render.match(/dockerfilePath:\s*\.\/(\S+)/);
++  assert.ok(match, 'render.yaml debe declarar dockerfilePath');
++  assert.equal(match[1], 'Dockerfile');
++  assert.equal(fs.existsSync(path.join(root, match[1])), true);
++  assert.equal(fs.existsSync(path.join(root, 'dockerfile')), false, 'no debe quedar una copia con otro uso de mayúsculas');
++});
++
++test('la construcción tiene una plantilla de entorno sin secretos reales', () => {
++  const dockerfile = fs.readFileSync(path.join(root, 'Dockerfile'), 'utf8');
++  const examplePath = path.join(root, '.env.example');
++  assert.match(dockerfile, /COPY --chown=node:node \.env\.example/);
++  assert.equal(fs.existsSync(examplePath), true);
++
++  const example = fs.readFileSync(examplePath, 'utf8');
++  for (const key of ['TOKEN', 'MONGODB_URI', 'DISCORD_OAUTH_CLIENT_SECRET', 'GOOGLE_CLIENT_SECRET']) {
++    assert.match(example, new RegExp(`^${key}=$`, 'm'), `${key} debe estar vacío`);
++  }
++  assert.doesNotMatch(example, /mongodb\+srv:\/\/[^\s]+:[^\s]+@/i);
++  assert.doesNotMatch(example, /GOCSPX-[A-Za-z0-9_-]+/);
++  assert.doesNotMatch(example, /[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{20,}/);
++});
++
++test('package.json y package-lock.json declaran la misma versión', () => {
++  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
++  const lock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.json'), 'utf8'));
++  assert.equal(lock.version, pkg.version);
++  assert.equal(lock.packages[''].version, pkg.version);
++});
+diff --git a/test/stabilization241.test.js b/test/stabilization241.test.js
+index 3eaa0ef..d87445a 100644
+--- a/test/stabilization241.test.js
++++ b/test/stabilization241.test.js
+@@ -62,7 +62,7 @@ test('el audit log exige objetivo y ventana temporal', async () => {
+   const wrong = { target: { id: 'other' }, createdTimestamp: now };
+   const expected = { target: { id: 'wanted' }, createdTimestamp: now };
+   const guild = { fetchAuditLogs: async () => ({ entries: [stale, wrong, expected] }) };
+-  assert.equal(await findRecentAuditEntry(guild, 1, 'wanted'), expected);
++  assert.equal(await findRecentAuditEntry(guild, 1, 'wanted', { attemptDelaysMs: [0, 1] }), expected);
+ });
+ 
+ test('existe una única configuración predeterminada versionada', () => {
+diff --git a/test/webDashboard.test.js b/test/webDashboard.test.js
+index c2f6c44..3892745 100644
+--- a/test/webDashboard.test.js
++++ b/test/webDashboard.test.js
+@@ -213,11 +213,12 @@ test('la interfaz web es autocontenida y compatible con su propia CSP', () => {
+   assert.match(script, /setProperty\('--accent'/, 'el acento debe aplicarse por CSSOM');
+ 
+   // Piezas que el panel necesita para funcionar.
+-  for (const needle of ['publish-tickets', 'publish-selfroles', 'data-suggestion', 'data-embed-reset', 'refreshEmbedPreview', 'refreshIdentityPreview']) {
++  for (const needle of ['publish-tickets', 'publish-selfroles', 'data-suggestion', 'data-embed-reset', 'refreshEmbedPreview', 'refreshIdentityPreview', 'renderPublicar', 'refreshCustomPreview']) {
+     assert.ok(script.includes(needle), `falta ${needle} en el cliente del panel`);
+   }
+   assert.match(routes, /community\/publish/);
+   assert.match(routes, /suggestions\/:messageId/);
++  assert.match(routes, /custom-embeds\/send/);
+ 
+   // Todo lo que se interpola en el HTML pasa por escapeHtml.
+   assert.match(script, /function escapeHtml/);
+@@ -323,6 +324,7 @@ test('el editor de embeds valida lo que llega del panel', () => {
+ 
+   assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { color: 'rojo' } } }, guild), ValidationError);
+   assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { image: 'http://inseguro/a.gif' } } }, guild), ValidationError);
++  assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { image: 'https://localhost/a.gif' } } }, guild), ValidationError);
+   assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { message: 'x'.repeat(3001) } } }, guild), ValidationError);
+   assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { thumbnail: 'sí' } } }, guild), ValidationError);
+ 
