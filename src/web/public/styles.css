@@ -584,8 +584,9 @@ body[data-mode="light"] .embed-preview { background: #fff; box-shadow: 0 0 0 1px
 
 /* Los recuadros del aviso, igual que los pinta Discord: nombre en negrita y
    valor debajo. */
-.embed-fields { display: grid; gap: .5rem; margin-top: .55rem; }
-.embed-field { display: grid; gap: .1rem; }
+.embed-fields { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: .5rem; margin-top: .55rem; }
+.embed-field { display: grid; grid-column: 1 / -1; gap: .1rem; }
+.embed-field.inline { grid-column: span 4; min-width: 0; }
 .embed-field-name { color: var(--preview-ink); font-weight: 600; font-size: .8rem; }
 .embed-field-value { font-size: .85rem; line-height: 1.45; overflow-wrap: anywhere; }
 .embed-thumb {
@@ -601,6 +602,7 @@ body[data-mode="light"] .embed-preview { background: #fff; box-shadow: 0 0 0 1px
   color: var(--preview-muted); font-size: .76rem; text-align: center;
 }
 .embed-footer { display: flex; gap: .4rem; align-items: center; margin-top: .6rem; color: var(--preview-muted); font-size: .73rem; }
+.embed-footer img { width: 1.25rem; height: 1.25rem; border-radius: 999px; object-fit: cover; }
 .embed-divider { height: 1px; margin: .6rem 0; background: rgba(255,255,255,.1); }
 body[data-mode="light"] .embed-divider { background: rgba(6,6,7,.1); }
 
@@ -611,6 +613,34 @@ body[data-mode="light"] .embed-divider { background: rgba(6,6,7,.1); }
 
 .editor-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
 .editor-preview { position: sticky; top: 7.5rem; display: grid; gap: .5rem; }
+
+/* Compositor de publicaciones manuales. Mantiene el formulario respirable
+   incluso con 25 campos y deja los controles secundarios en una fila propia. */
+.composer-layout { grid-template-columns: minmax(0, 1.15fr) minmax(18rem, .85fr); }
+.composer-list { display: grid; gap: .55rem; margin-bottom: .65rem; }
+.composer-row {
+  display: grid; gap: .55rem; padding: .65rem;
+  border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface);
+}
+.composer-row-main { display: grid; grid-template-columns: minmax(8rem, .7fr) minmax(0, 1.3fr); gap: .55rem; }
+.composer-row-main.three { grid-template-columns: minmax(8rem, .65fr) minmax(10rem, 1.25fr) minmax(5rem, .35fr); }
+.composer-row-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: flex-end; }
+.composer-row .field { margin: 0; }
+.composer-row textarea { min-height: 3.6rem; }
+.emoji-field input { text-align: center; }
+.message-content { margin-bottom: .45rem; font-size: .88rem; line-height: 1.5; overflow-wrap: anywhere; }
+.discord-components { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .45rem; }
+.discord-button {
+  display: inline-flex; gap: .3rem; align-items: center; justify-content: center;
+  min-height: 2rem; padding: .35rem .75rem; border-radius: .2rem;
+  background: #4e5058; color: #fff; font-size: .78rem; font-weight: 600;
+}
+body[data-mode="light"] .discord-button { background: #e3e5e8; color: #2e3338; }
+.usage-line { color: var(--text-3); font-size: .74rem; line-height: 1.45; }
+.usage-line.danger { color: var(--danger); font-weight: 700; }
+.send-result:empty { display: none; }
+.send-result .callout { align-items: flex-start; }
+.send-result .button { margin-top: .25rem; justify-self: start; }
 
 .var-list { display: flex; flex-wrap: wrap; gap: .35rem; margin: 0; padding: 0; list-style: none; }
 .var-list li { display: inline-flex; gap: .3rem; padding: .25rem .55rem; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); font-size: .75rem; color: var(--text-3); }
@@ -692,6 +722,17 @@ body[data-mode="light"] .embed-divider { background: rgba(6,6,7,.1); }
 @media (max-width: 1180px) {
   .editor-layout { grid-template-columns: 1fr; }
   .editor-preview { position: static; }
+}
+
+@media (max-width: 720px) {
+  .composer-row-main,
+  .composer-row-main.three { grid-template-columns: 1fr; }
+  .composer-row-actions { justify-content: space-between; }
+  .embed-field.inline { grid-column: span 6; }
+}
+
+@media (max-width: 420px) {
+  .embed-field.inline { grid-column: 1 / -1; }
 }
 
 @media (max-width: 960px) {

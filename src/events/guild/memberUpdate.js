@@ -2,7 +2,7 @@ const { Events, AuditLogEvent } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager'); // Cambiado a mongoManager
 const { memberVars } = require('../../core/EmbedCatalog');
 const { publishAlert } = require('../../core/AlertRouter');
-const { findRecentAuditEntry, auditExecutor } = require('../../utils/auditLog');
+const { findRecentAuditEntry, resolveAuditExecutor } = require('../../utils/auditLog');
 
 module.exports = {
   name: Events.GuildMemberUpdate,
@@ -52,7 +52,7 @@ module.exports = {
     // Timeout changes
     if (oldMember.communicationDisabledUntilTimestamp !== newMember.communicationDisabledUntilTimestamp) {
       const timeoutLog = await findRecentAuditEntry(newMember.guild, AuditLogEvent.MemberUpdate, newMember.id);
-      const executor = auditExecutor(timeoutLog);
+      const executor = await resolveAuditExecutor(newMember.guild, timeoutLog);
       const reason = timeoutLog?.reason || 'Sin motivo';
 
       if (newMember.communicationDisabledUntilTimestamp) {

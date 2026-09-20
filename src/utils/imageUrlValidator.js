@@ -29,14 +29,22 @@ function isPrivateIp(address) {
   return true;
 }
 
+function isPrivateHostname(hostname) {
+  const normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+  return !normalized
+    || normalized === 'localhost'
+    || normalized.endsWith('.localhost')
+    || normalized.endsWith('.local')
+    || (net.isIP(normalized) !== 0 && isPrivateIp(normalized));
+}
+
 async function assertPublicHost(hostname) {
   const normalized = hostname.toLowerCase();
-  if (normalized === 'localhost' || normalized.endsWith('.localhost') || normalized.endsWith('.local')) {
+  if (isPrivateHostname(normalized)) {
     throw new Error('Host no permitido');
   }
 
   if (net.isIP(normalized)) {
-    if (isPrivateIp(normalized)) throw new Error('Dirección privada no permitida');
     return;
   }
 
@@ -90,4 +98,4 @@ async function isValidImageUrl(input, options = {}) {
   return false;
 }
 
-module.exports = { isValidImageUrl, isPrivateIp };
+module.exports = { isValidImageUrl, isPrivateIp, isPrivateHostname };

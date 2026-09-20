@@ -213,11 +213,12 @@ test('la interfaz web es autocontenida y compatible con su propia CSP', () => {
   assert.match(script, /setProperty\('--accent'/, 'el acento debe aplicarse por CSSOM');
 
   // Piezas que el panel necesita para funcionar.
-  for (const needle of ['publish-tickets', 'publish-selfroles', 'data-suggestion', 'data-embed-reset', 'refreshEmbedPreview', 'refreshIdentityPreview']) {
+  for (const needle of ['publish-tickets', 'publish-selfroles', 'data-suggestion', 'data-embed-reset', 'refreshEmbedPreview', 'refreshIdentityPreview', 'renderPublicar', 'refreshCustomPreview']) {
     assert.ok(script.includes(needle), `falta ${needle} en el cliente del panel`);
   }
   assert.match(routes, /community\/publish/);
   assert.match(routes, /suggestions\/:messageId/);
+  assert.match(routes, /custom-embeds\/send/);
 
   // Todo lo que se interpola en el HTML pasa por escapeHtml.
   assert.match(script, /function escapeHtml/);
@@ -323,6 +324,7 @@ test('el editor de embeds valida lo que llega del panel', () => {
 
   assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { color: 'rojo' } } }, guild), ValidationError);
   assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { image: 'http://inseguro/a.gif' } } }, guild), ValidationError);
+  assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { image: 'https://localhost/a.gif' } } }, guild), ValidationError);
   assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { message: 'x'.repeat(3001) } } }, guild), ValidationError);
   assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { thumbnail: 'sí' } } }, guild), ValidationError);
 

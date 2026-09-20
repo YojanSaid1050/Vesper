@@ -5,6 +5,7 @@ const { EMBED_FIELD_LIMITS } = require('../core/EmbedTemplateService');
 const { isKnownKind, kindInfo } = require('../core/EmbedCatalog');
 const { ROUTABLE } = require('../core/AlertRouter');
 const { featureAvailable } = require('../config/guildPolicy');
+const { isPrivateHostname } = require('../utils/imageUrlValidator');
 
 class ValidationError extends Error {
   constructor(message) {
@@ -106,10 +107,10 @@ function imageUrlValue(value, path) {
   if (raw.length > 500) throw new ValidationError(`${path} es demasiado largo.`);
   try {
     const url = new URL(raw);
-    if (url.protocol !== 'https:' || url.username || url.password) throw new Error('invalid');
+    if (url.protocol !== 'https:' || url.username || url.password || isPrivateHostname(url.hostname)) throw new Error('invalid');
     return url.toString();
   } catch {
-    throw new ValidationError(`${path} debe ser una URL HTTPS válida.`);
+    throw new ValidationError(`${path} debe ser una URL HTTPS pública y válida.`);
   }
 }
 

@@ -1,7 +1,7 @@
-# Vesper Bot 3.5.0
+# Vesper Bot 3.6.0
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
-YouTube y TikTok. La versión 2.8 conserva la presentación visual original con
+YouTube y TikTok. La versión actual conserva la presentación visual original con
 Componentes V2, separa el servidor Main de los satélites e incorpora control
 central, historial, moderación opcional, música autohospedada, funciones de
 comunidad y un panel web con permisos verificados en Discord.
@@ -83,7 +83,7 @@ Vesper sirve una interfaz adaptable en `/panel` desde el mismo proceso Node.js.
 No necesita WordPress, otro servidor frontend ni una base de datos adicional.
 Abrir la raíz del dominio en un navegador redirige directamente al panel.
 
-Está organizado en diez secciones, cada una con su propia pantalla:
+Está organizado por tareas, cada una con su propia pantalla:
 
 | Sección | Qué se hace ahí |
 | --- | --- |
@@ -96,6 +96,7 @@ Está organizado en diez secciones, cada una con su propia pantalla:
 | Música | Canales permitidos y límites de la cola |
 | Módulos y permisos | Qué funciones están activas y qué roles pueden usarlas |
 | Todos los mensajes | Los 38 avisos que publica el bot, editables con vista previa |
+| Crear publicación | Compositor de embeds manuales con imágenes, campos, botones y canal de destino |
 | Ofertas de juegos | Juegos gratis de Epic, sorteos y rebajas de Steam |
 | Configuración | Todo lo guardado del servidor, con los IDs traducidos a nombres |
 | Auditoría | Quién cambió qué desde la web |
@@ -113,6 +114,10 @@ Además incluye:
 - Creación y administración de advertencias y aislamientos.
 - Vista privada para que cada usuario consulte únicamente sus propios casos.
 - Auditoría de todos los cambios realizados desde la web.
+- **Compositor de publicaciones manuales** con vista previa estilo Discord,
+  Markdown, autor, título enlazado, miniatura, imagen o GIF, hasta 25 campos y
+  cinco botones de enlace. Permite elegir el canal por nombre, bloquea
+  menciones accidentales y conserva el borrador únicamente en el navegador.
 - **Editor de embeds de bienvenida y despedida con vista previa en vivo**,
   variables (`{user}`, `{username}`, `{displayName}`, `{server}`,
   `{memberCount}`, `{userId}`) y botón para restablecer el diseño original.

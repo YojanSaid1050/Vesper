@@ -70,14 +70,10 @@ module.exports = {
     // Estos dos registros construían su embed a mano, saltándose el catálogo:
     // por eso eran los únicos que no se podían editar desde el panel. Ahora
     // pasan por el enrutador, como todos los demás.
+    let botRole = null;
     if (member.user.bot) {
-      const botRole = member.guild.roles.cache.get(general.botRole);
+      botRole = member.guild.roles.cache.get(general.botRole) || null;
       if (botRole) await member.roles.add(botRole).catch(() => null);
-
-      await publishAlert(member.guild, guildConfig, 'log_bot_join', {
-        vars: memberVars(member, { role: botRole ? `${botRole}` : 'ninguno', roleName: botRole?.name || 'ninguno' }),
-        defaults: { authorIconUrl: member.user.displayAvatarURL() }
-    });
     }
 
     const welcomeChannel = resolveChannel(member.guild, guildConfig, 'welcome');
@@ -86,7 +82,9 @@ module.exports = {
     }
 
     await publishAlert(member.guild, guildConfig, member.user.bot ? 'log_bot_join' : 'log_member_join', {
-      vars: memberVars(member),
+      vars: memberVars(member, member.user.bot
+        ? { role: botRole ? `${botRole}` : 'ninguno', roleName: botRole?.name || 'ninguno' }
+        : {}),
       defaults: { authorIconUrl: member.user.displayAvatarURL() }
     });
   },

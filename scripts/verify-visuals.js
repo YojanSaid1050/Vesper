@@ -14,8 +14,8 @@ const expected = {
   'src/platforms/tiktok/embeds.js': '0a06d0a9e526446c4ca33475c6416bbe2d26313a6bb393faef834407ccdbb63e',
   'src/platforms/twitch/embeds.js': '988af1299227d0d4ae614a1ebf28a14b794b0017bccb934b0ad1c12958a1bb86',
   'src/platforms/youtube/embeds.js': 'dfa42f78860420dce60bc628104052014bbc892f8bfcc15dd0985c3aa0df455f',
-  'src/events/guild/memberAdd.js': '32ec9bdf82d8e5f82fc9fb3fa80645b2442dc8c5dedf5f0edcdca521f4eeadba',
-  'src/events/guild/memberRemove.js': '55d8629fd042aba4b0bd693b1faade1b689921643b9a3a0b5d70f301a5377f3f'
+  'src/events/guild/memberAdd.js': 'd8572e856947956abbfe05c1b647896971df1eade3799456d69128644ddae9de',
+  'src/events/guild/memberRemove.js': '9f0e512e43c95ec0ede9a3f006537f15f6429ad7ad02c4e769a7d82d9bf5a3dc'
 };
 
 let failed = false;
