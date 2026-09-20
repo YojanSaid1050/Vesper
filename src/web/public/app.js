@@ -270,8 +270,10 @@ function avatarMarkup(url, fallbackText = 'V', className = 'avatar') {
 function selectOptions(items, selected, emptyLabel = 'Sin configurar') {
   const current = String(selected ?? '');
   const options = (items || []).map(item => {
-    const label = item.parent ? `${item.parent} / ${item.name}` : item.name;
-    return `<option value="${escapeHtml(item.id)}"${String(item.id) === current ? ' selected' : ''}>${escapeHtml(label)}</option>`;
+    const baseLabel = item.parent ? `${item.parent} / ${item.name}` : item.name;
+    const blocked = item.sendable === false;
+    const label = blocked ? `${baseLabel} · faltan permisos` : baseLabel;
+    return `<option value="${escapeHtml(item.id)}"${String(item.id) === current ? ' selected' : ''}${blocked ? ' disabled' : ''}>${escapeHtml(label)}</option>`;
   }).join('');
   return `<option value="">${escapeHtml(emptyLabel)}</option>${options}`;
 }
@@ -531,7 +533,13 @@ function messageHeaderMarkup({ name, avatar }) {
 }
 
 function embedPreviewMarkup(values, options) {
-  const { componentsV2 = false, memberAvatar = null } = options;
+  const {
+    componentsV2 = false,
+    memberAvatar = null,
+    authorIcon = null,
+    thumbnailUrl = null,
+    footerIcon = null
+  } = options;
   // El contenedor V2 sí convierte menciones en todas sus piezas; el embed
   // clásico, solo en el cuerpo.
   const title = sampleValues(values.title, { plain: !componentsV2 });
@@ -542,15 +550,21 @@ function embedPreviewMarkup(values, options) {
   // propio. Se pintan con datos de ejemplo para que la vista previa enseñe el
   // mensaje tal y como va a salir, y no una nota diciendo que hay campos.
   const fields = (values.fields || []).length
-    ? `<div class="embed-fields">${values.fields.map(([name, value]) => `
-        <div class="embed-field">
-          <span class="embed-field-name">${escapeHtml(sampleValues(name))}</span>
-          <span class="embed-field-value">${renderMarkdown(sampleValues(value))}</span>
-        </div>`).join('')}</div>`
+    ? `<div class="embed-fields">${values.fields.map(field => {
+        const normalized = Array.isArray(field)
+          ? { name: field[0], value: field[1], inline: false }
+          : field;
+        return `
+        <div class="embed-field${normalized.inline ? ' inline' : ''}">
+          <span class="embed-field-name">${escapeHtml(sampleValues(normalized.name))}</span>
+          <span class="embed-field-value">${renderMarkdown(sampleValues(normalized.value))}</span>
+        </div>`;
+      }).join('')}</div>`
     : '';
 
+  const thumbSource = thumbnailUrl || memberAvatar;
   const thumb = !componentsV2 && values.thumbnail && values.showThumb
-    ? `<div class="embed-thumb">${memberAvatar ? `<img src="${escapeHtml(memberAvatar)}" alt="">` : '👤'}</div>`
+    ? `<div class="embed-thumb">${thumbSource ? `<img src="${escapeHtml(thumbSource)}" alt="">` : '👤'}</div>`
     : '';
 
   // La fila de autor: foto pequeña y nombre de quien provocó el aviso. Es lo
@@ -558,8 +572,8 @@ function embedPreviewMarkup(values, options) {
   const author = values.author
     ? (componentsV2
       ? `<div class="embed-subtext">${escapeHtml(sampleValues(values.author, { plain: true }))}</div>`
-      : `<div class="embed-author">${memberAvatar
-        ? `<img src="${escapeHtml(memberAvatar)}" alt="">`
+      : `<div class="embed-author">${authorIcon || memberAvatar
+        ? `<img src="${escapeHtml(authorIcon || memberAvatar)}" alt="">`
         : '<span class="embed-author-dot" aria-hidden="true"></span>'}<span>${escapeHtml(sampleValues(values.author, { plain: true }))}</span></div>`)
     : '';
 
@@ -573,7 +587,7 @@ function embedPreviewMarkup(values, options) {
   const footerRow = footer
     ? (componentsV2
       ? `<div class="embed-subtext">${escapeHtml(footer)}</div>`
-      : `<div class="embed-footer">${escapeHtml(footer)} · hoy a las 14:32</div>`)
+      : `<div class="embed-footer">${footerIcon ? `<img src="${escapeHtml(footerIcon)}" alt="">` : ''}<span>${escapeHtml(footer)}${values.timestamp ? ' · hoy a las 14:32' : ''}</span></div>`)
     : '';
 
   return `
@@ -665,6 +679,13 @@ const SECTIONS = [
     hint: 'Lo que escribe el bot.',
     needs: 'configure',
     keywords: ['embed', 'texto', 'editar', 'plantilla', 'formato', 'letra', 'símbolos', 'markdown', 'título']
+  },
+  {
+    id: 'publicar', group: 'Lo que dice', icon: '➤', label: 'Crear publicación',
+    title: 'Enviar un embed',
+    hint: 'Diseña y publica en un canal.',
+    needs: 'configure',
+    keywords: ['enviar', 'publicar', 'embed', 'anuncio', 'botón', 'imagen', 'canal', 'mensaje manual']
   },
 
   {
@@ -1297,10 +1318,22 @@ function renderIdentidad() {
 function identityValues() {
   const data = state.data;
   const identity = data.identity || {};
-  const profileName = $('#profile-name')?.value.trim() || '';
-  const profileAvatar = $('#profile-avatar')?.value.trim() || '';
-  const brandingName = $('#branding-name')?.value.trim() || '';
-  const brandingAvatar = $('#branding-avatar')?.value.trim() || '';
+  // Fuera de la pantalla «Apariencia» esos inputs no existen. Antes la vista
+  // previa de Mensajes caía entonces al nombre global de la cuenta y mostraba
+  // «Vesper» aunque en el servidor publicase como AnkeBot. Si el formulario no
+  // está montado, se usan los valores guardados que llegaron de la API.
+  const profileName = $('#profile-name')
+    ? $('#profile-name').value.trim()
+    : String(data.config?.profile?.displayName || '').trim();
+  const profileAvatar = $('#profile-avatar')
+    ? $('#profile-avatar').value.trim()
+    : String(data.config?.profile?.avatar || '').trim();
+  const brandingName = $('#branding-name')
+    ? $('#branding-name').value.trim()
+    : String(data.config?.branding?.name || '').trim();
+  const brandingAvatar = $('#branding-avatar')
+    ? $('#branding-avatar').value.trim()
+    : String(data.config?.branding?.avatar || '').trim();
   const account = identity.account || {};
 
   return {
@@ -2341,6 +2374,407 @@ function bindMensajes(root) {
       destino.dispatchEvent(new Event('input', { bubbles: true }));
     });
   });
+}
+
+/* ---------------------------------------------------------------- */
+/* Publicaciones manuales                                            */
+/* ---------------------------------------------------------------- */
+
+const CUSTOM_DRAFT_VERSION = 1;
+
+function customDraftKey() {
+  return `vesper.publicacion.${state.guildId}`;
+}
+
+function emptyCustomDraft() {
+  return {
+    version: CUSTOM_DRAFT_VERSION,
+    channelId: '',
+    content: '',
+    embed: {
+      author: { name: '', url: '', iconUrl: '' },
+      title: '',
+      url: '',
+      description: '',
+      color: state.data?.config?.profile?.primaryColor || '#5865F2',
+      thumbnail: '',
+      image: '',
+      fields: [],
+      footer: { text: '', iconUrl: '' },
+      timestamp: false
+    },
+    buttons: []
+  };
+}
+
+function loadCustomDraft() {
+  const base = emptyCustomDraft();
+  try {
+    const saved = JSON.parse(localStorage.getItem(customDraftKey()) || 'null');
+    if (!saved || saved.version !== CUSTOM_DRAFT_VERSION) return base;
+    return {
+      ...base,
+      ...saved,
+      embed: {
+        ...base.embed,
+        ...(saved.embed || {}),
+        author: { ...base.embed.author, ...(saved.embed?.author || {}) },
+        footer: { ...base.embed.footer, ...(saved.embed?.footer || {}) },
+        fields: Array.isArray(saved.embed?.fields) ? saved.embed.fields.slice(0, 25) : []
+      },
+      buttons: Array.isArray(saved.buttons) ? saved.buttons.slice(0, 5) : []
+    };
+  } catch {
+    return base;
+  }
+}
+
+function customFieldMarkup(field = {}, index = 0) {
+  return `
+    <div class="composer-row" data-custom-field>
+      <div class="composer-row-main">
+        <div class="field">
+          <label for="custom-field-name-${index}">Nombre</label>
+          <input id="custom-field-name-${index}" data-field-name type="text" maxlength="256" value="${escapeHtml(field.name || '')}" placeholder="Por ejemplo: Fecha" required>
+        </div>
+        <div class="field grow">
+          <label for="custom-field-value-${index}">Contenido</label>
+          <textarea id="custom-field-value-${index}" data-field-value rows="2" maxlength="1024" placeholder="El contenido del campo" required>${escapeHtml(field.value || '')}</textarea>
+        </div>
+      </div>
+      <div class="composer-row-actions">
+        <label class="check compact"><input data-field-inline type="checkbox"${field.inline ? ' checked' : ''}><span>En línea</span></label>
+        <button class="button ghost sm" type="button" data-remove-custom-field aria-label="Quitar campo">Quitar</button>
+      </div>
+    </div>`;
+}
+
+function customButtonMarkup(button = {}, index = 0) {
+  return `
+    <div class="composer-row" data-custom-button>
+      <div class="composer-row-main three">
+        <div class="field">
+          <label for="custom-button-label-${index}">Texto</label>
+          <input id="custom-button-label-${index}" data-button-label type="text" maxlength="80" value="${escapeHtml(button.label || '')}" placeholder="Visitar sitio" required>
+        </div>
+        <div class="field grow">
+          <label for="custom-button-url-${index}">Enlace HTTPS</label>
+          <input id="custom-button-url-${index}" data-button-url type="url" maxlength="500" value="${escapeHtml(button.url || '')}" placeholder="https://…" pattern="https://.*" required>
+        </div>
+        <div class="field emoji-field">
+          <label for="custom-button-emoji-${index}">Emoji</label>
+          <input id="custom-button-emoji-${index}" data-button-emoji type="text" maxlength="100" value="${escapeHtml(button.emoji || '')}" placeholder="✨">
+        </div>
+      </div>
+      <div class="composer-row-actions">
+        <button class="button ghost sm" type="button" data-remove-custom-button aria-label="Quitar botón">Quitar</button>
+      </div>
+    </div>`;
+}
+
+function renderPublicar() {
+  const draft = loadCustomDraft();
+  const channels = (state.data.channels || []).filter(channel => channel.sendable !== false);
+  const noChannels = channels.length === 0;
+
+  return `
+    <div class="callout info">
+      <strong>Esta publicación es independiente de los mensajes automáticos.</strong>
+      <span>Se envía una vez al canal que elijas. El borrador queda guardado solo en este navegador y las menciones están desactivadas por seguridad.</span>
+    </div>
+    ${noChannels ? `<div class="callout danger"><strong>No hay canales disponibles.</strong><span>Vesper necesita Ver canal, Enviar mensajes e Insertar enlaces en al menos un canal de texto.</span></div>` : ''}
+    ${card({
+      eyebrow: 'Compositor',
+      title: 'Nueva publicación',
+      description: 'Título, texto, imágenes, campos y hasta cinco botones de enlace.',
+      ayuda: 'Los botones abren enlaces HTTPS. Los botones que ejecutan acciones necesitan programación adicional y por eso no se ofrecen como si fueran a funcionar solos.',
+      body: `
+        <div class="editor-layout composer-layout">
+          <form id="form-custom-embed" class="form">
+            <div class="field wide">
+              <label for="custom-channel">Canal de destino</label>
+              <select id="custom-channel" required${noChannels ? ' disabled' : ''}>${selectOptions(channels, draft.channelId, 'Elige un canal')}</select>
+              <span class="hint">Solo aparecen canales donde Vesper puede publicar embeds.</span>
+            </div>
+
+            <details class="more-options" open>
+              <summary>Texto y título</summary>
+              <div class="field wide">
+                <label for="custom-content">Texto encima del embed (opcional)</label>
+                ${formatToolbar('custom-content', { compact: true })}
+                <textarea id="custom-content" rows="3" maxlength="2000" placeholder="Un texto corto fuera del recuadro">${escapeHtml(draft.content || '')}</textarea>
+              </div>
+              <div class="form-row">
+                <div class="field">
+                  <label for="custom-title">Título</label>
+                  <input id="custom-title" type="text" maxlength="256" value="${escapeHtml(draft.embed.title || '')}" placeholder="Título de la publicación">
+                </div>
+                <div class="field">
+                  <label for="custom-title-url">Enlace del título (opcional)</label>
+                  <input id="custom-title-url" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.url || '')}" placeholder="https://…">
+                </div>
+              </div>
+              <div class="field wide">
+                <label for="custom-description">Descripción</label>
+                ${formatToolbar('custom-description')}
+                <textarea id="custom-description" rows="8" maxlength="4096" placeholder="Escribe el contenido principal del embed…">${escapeHtml(draft.embed.description || '')}</textarea>
+              </div>
+            </details>
+
+            <details class="more-options">
+              <summary>Autor y pie</summary>
+              <div class="form-row">
+                <div class="field">
+                  <label for="custom-author-name">Nombre del autor</label>
+                  <input id="custom-author-name" type="text" maxlength="256" value="${escapeHtml(draft.embed.author.name || '')}" placeholder="Nombre opcional">
+                </div>
+                <div class="field">
+                  <label for="custom-author-url">Enlace del autor</label>
+                  <input id="custom-author-url" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.author.url || '')}" placeholder="https://…">
+                </div>
+              </div>
+              <div class="field wide">
+                <label for="custom-author-icon">Icono del autor (URL HTTPS)</label>
+                <input id="custom-author-icon" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.author.iconUrl || '')}" placeholder="https://…">
+              </div>
+              <div class="form-row">
+                <div class="field">
+                  <label for="custom-footer">Texto del pie</label>
+                  <input id="custom-footer" type="text" maxlength="2048" value="${escapeHtml(draft.embed.footer.text || '')}" placeholder="Pie opcional">
+                </div>
+                <div class="field">
+                  <label for="custom-footer-icon">Icono del pie (URL HTTPS)</label>
+                  <input id="custom-footer-icon" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.footer.iconUrl || '')}" placeholder="https://…">
+                </div>
+              </div>
+              <label class="check"><input id="custom-timestamp" type="checkbox"${draft.embed.timestamp ? ' checked' : ''}><span>Añadir fecha y hora del envío</span></label>
+            </details>
+
+            <details class="more-options">
+              <summary>Color e imágenes</summary>
+              <div class="form-row">
+                <div class="field">
+                  <label for="custom-color">Color lateral</label>
+                  <div class="color-field"><input id="custom-color" type="color" value="${escapeHtml(draft.embed.color || '#5865F2')}"></div>
+                </div>
+                <div class="field">
+                  <label for="custom-thumbnail">Miniatura (URL HTTPS)</label>
+                  <input id="custom-thumbnail" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.thumbnail || '')}" placeholder="https://…">
+                </div>
+              </div>
+              <div class="field wide">
+                <label for="custom-image">Imagen principal o GIF (URL HTTPS)</label>
+                <input id="custom-image" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.image || '')}" placeholder="https://…">
+                <span class="hint">Usa un enlace directo público. Discord admite PNG, JPG, WebP y GIF.</span>
+              </div>
+            </details>
+
+            <details class="more-options"${draft.embed.fields.length ? ' open' : ''}>
+              <summary>Campos adicionales · <span id="custom-field-count">${draft.embed.fields.length}/25</span></summary>
+              <div id="custom-fields" class="composer-list">${draft.embed.fields.map(customFieldMarkup).join('')}</div>
+              <button id="add-custom-field" class="button quiet sm" type="button"${draft.embed.fields.length >= 25 ? ' disabled' : ''}>Añadir campo</button>
+            </details>
+
+            <details class="more-options"${draft.buttons.length ? ' open' : ''}>
+              <summary>Botones de enlace · <span id="custom-button-count">${draft.buttons.length}/5</span></summary>
+              <div id="custom-buttons" class="composer-list">${draft.buttons.map(customButtonMarkup).join('')}</div>
+              <button id="add-custom-button" class="button quiet sm" type="button"${draft.buttons.length >= 5 ? ' disabled' : ''}>Añadir botón</button>
+            </details>
+
+            <div class="form-actions">
+              <button class="button" type="submit"${noChannels ? ' disabled' : ''}>Enviar a Discord</button>
+              <button id="clear-custom-embed" class="button ghost" type="button">Limpiar borrador</button>
+            </div>
+            <div id="custom-send-result" class="send-result" aria-live="polite"></div>
+          </form>
+
+          <div class="editor-preview">
+            <p class="eyebrow">Vista previa en vivo</p>
+            <div class="preview-shell"><div class="discord-message" id="custom-embed-preview"></div></div>
+            <div id="custom-embed-usage" class="usage-line"></div>
+          </div>
+        </div>`
+    })}`;
+}
+
+function customEmbedValues() {
+  const value = selector => document.querySelector(selector)?.value.trim() || '';
+  const fields = [...document.querySelectorAll('[data-custom-field]')].map(row => ({
+    name: row.querySelector('[data-field-name]')?.value.trim() || '',
+    value: row.querySelector('[data-field-value]')?.value.trim() || '',
+    inline: row.querySelector('[data-field-inline]')?.checked === true
+  })).filter(field => field.name || field.value);
+  const buttons = [...document.querySelectorAll('[data-custom-button]')].map(row => ({
+    label: row.querySelector('[data-button-label]')?.value.trim() || '',
+    url: row.querySelector('[data-button-url]')?.value.trim() || '',
+    emoji: row.querySelector('[data-button-emoji]')?.value.trim() || ''
+  })).filter(button => button.label || button.url || button.emoji);
+
+  return {
+    version: CUSTOM_DRAFT_VERSION,
+    channelId: value('#custom-channel'),
+    content: value('#custom-content'),
+    embed: {
+      author: { name: value('#custom-author-name'), url: value('#custom-author-url'), iconUrl: value('#custom-author-icon') },
+      title: value('#custom-title'),
+      url: value('#custom-title-url'),
+      description: value('#custom-description'),
+      color: document.querySelector('#custom-color')?.value || '#5865F2',
+      thumbnail: value('#custom-thumbnail'),
+      image: value('#custom-image'),
+      fields,
+      footer: { text: value('#custom-footer'), iconUrl: value('#custom-footer-icon') },
+      timestamp: document.querySelector('#custom-timestamp')?.checked === true
+    },
+    buttons
+  };
+}
+
+function saveCustomDraft() {
+  try { localStorage.setItem(customDraftKey(), JSON.stringify(customEmbedValues())); } catch {}
+}
+
+function refreshCustomPreview() {
+  const root = document.querySelector('#custom-embed-preview');
+  if (!root) return;
+  const draft = customEmbedValues();
+  const identity = identityValues();
+  const hasEmbedContent = draft.embed.title || draft.embed.description || draft.embed.image ||
+    draft.embed.thumbnail || draft.embed.fields.length || draft.embed.author.name || draft.embed.footer.text;
+  const preview = {
+    author: draft.embed.author.name || null,
+    title: draft.embed.title || (hasEmbedContent ? '' : 'Título de tu publicación'),
+    message: draft.embed.description || (hasEmbedContent ? '' : 'Aquí verás el contenido mientras lo escribes.'),
+    fields: draft.embed.fields,
+    footer: draft.embed.footer.text || (draft.embed.timestamp ? ' ' : null),
+    image: draft.embed.image || null,
+    thumbnail: Boolean(draft.embed.thumbnail),
+    showThumb: Boolean(draft.embed.thumbnail),
+    timestamp: draft.embed.timestamp
+  };
+  const buttons = draft.buttons.length
+    ? `<div class="discord-components">${draft.buttons.map(button => `<span class="discord-button">${button.emoji ? `${escapeHtml(button.emoji)} ` : ''}${escapeHtml(button.label || 'Botón')} <span aria-hidden="true">↗</span></span>`).join('')}</div>`
+    : '';
+  root.innerHTML = `${messageHeaderMarkup(identity)}
+      ${draft.content ? `<div class="message-content">${renderMarkdown(draft.content)}</div>` : ''}
+      ${embedPreviewMarkup(preview, {
+        authorIcon: draft.embed.author.iconUrl || null,
+        thumbnailUrl: draft.embed.thumbnail || null,
+        footerIcon: draft.embed.footer.iconUrl || null
+      })}
+      ${buttons}
+    </div>`;
+  const embed = root.querySelector('.embed-preview');
+  if (embed) embed.style.setProperty('--embed-accent', draft.embed.color);
+  wireImageFallbacks(root);
+
+  const total = [draft.embed.author.name, draft.embed.title, draft.embed.description, draft.embed.footer.text,
+    ...draft.embed.fields.flatMap(field => [field.name, field.value])]
+    .reduce((sum, text) => sum + text.length, 0);
+  const usage = document.querySelector('#custom-embed-usage');
+  if (usage) {
+    usage.textContent = `${total.toLocaleString('es-CO')} / 6.000 caracteres del embed · ${draft.embed.fields.length}/25 campos · ${draft.buttons.length}/5 botones`;
+    usage.classList.toggle('danger', total > 6000);
+  }
+}
+
+function refreshComposerCounts() {
+  const fields = document.querySelectorAll('[data-custom-field]').length;
+  const buttons = document.querySelectorAll('[data-custom-button]').length;
+  const fieldCount = document.querySelector('#custom-field-count');
+  const buttonCount = document.querySelector('#custom-button-count');
+  if (fieldCount) fieldCount.textContent = `${fields}/25`;
+  if (buttonCount) buttonCount.textContent = `${buttons}/5`;
+  const addField = document.querySelector('#add-custom-field');
+  const addButton = document.querySelector('#add-custom-button');
+  if (addField) addField.disabled = fields >= 25;
+  if (addButton) addButton.disabled = buttons >= 5;
+}
+
+function bindPublicar(root) {
+  const form = root.querySelector('#form-custom-embed');
+  if (!form) return;
+  wireFormatting(root);
+  let saveTimer = null;
+  const changed = () => {
+    refreshCustomPreview();
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveCustomDraft, 250);
+  };
+  form.addEventListener('input', changed);
+  form.addEventListener('change', changed);
+
+  root.querySelector('#add-custom-field')?.addEventListener('click', () => {
+    const list = root.querySelector('#custom-fields');
+    const index = list.querySelectorAll('[data-custom-field]').length;
+    if (index >= 25) return;
+    list.insertAdjacentHTML('beforeend', customFieldMarkup({}, index));
+    refreshComposerCounts();
+    changed();
+  });
+  root.querySelector('#add-custom-button')?.addEventListener('click', () => {
+    const list = root.querySelector('#custom-buttons');
+    const index = list.querySelectorAll('[data-custom-button]').length;
+    if (index >= 5) return;
+    list.insertAdjacentHTML('beforeend', customButtonMarkup({}, index));
+    refreshComposerCounts();
+    changed();
+  });
+  root.addEventListener('click', event => {
+    const fieldButton = event.target.closest('[data-remove-custom-field]');
+    const linkButton = event.target.closest('[data-remove-custom-button]');
+    if (fieldButton) fieldButton.closest('[data-custom-field]')?.remove();
+    if (linkButton) linkButton.closest('[data-custom-button]')?.remove();
+    if (fieldButton || linkButton) {
+      refreshComposerCounts();
+      changed();
+    }
+  });
+
+  root.querySelector('#clear-custom-embed')?.addEventListener('click', async () => {
+    if (!await confirmDialog({
+      title: 'Limpiar el borrador',
+      message: 'Se borrará todo lo escrito en esta publicación. Los mensajes ya enviados a Discord no cambian.',
+      confirmLabel: 'Limpiar',
+      danger: true
+    })) return;
+    try { localStorage.removeItem(customDraftKey()); } catch {}
+    renderView();
+    toast('Borrador limpio.', 'ok');
+  });
+
+  form.addEventListener('submit', async event => {
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+    const draft = customEmbedValues();
+    const channel = state.data.channels.find(item => item.id === draft.channelId);
+    if (!channel) return toast('Elige un canal disponible.', 'bad');
+    if (!await confirmDialog({
+      title: `Enviar a #${channel.name}`,
+      message: 'El mensaje se publicará inmediatamente. Después podrás abrirlo en Discord, pero no editarlo desde este formulario.',
+      confirmLabel: 'Enviar ahora'
+    })) return;
+
+    const submit = event.submitter;
+    if (submit) submit.disabled = true;
+    try {
+      const result = await api(`/guilds/${state.guildId}/custom-embeds/send`, {
+        method: 'POST',
+        body: JSON.stringify(draft)
+      });
+      saveCustomDraft();
+      const status = root.querySelector('#custom-send-result');
+      if (status) status.innerHTML = `<div class="callout success"><strong>Publicación enviada.</strong><span>Mensaje ${escapeHtml(result.messageId)} en #${escapeHtml(channel.name)}.</span><a class="button quiet sm" href="${escapeHtml(result.url)}" target="_blank" rel="noopener noreferrer">Abrir en Discord</a></div>`;
+      toast(`Publicado en #${channel.name}.`, 'ok');
+    } catch (error) {
+      toast(error.message, 'bad');
+    } finally {
+      if (submit) submit.disabled = false;
+    }
+  });
+
+  refreshComposerCounts();
+  refreshCustomPreview();
 }
 
 /* ---------------------------------------------------------------- */
@@ -3885,6 +4319,7 @@ const RENDERERS = {
   bienvenidas: { render: renderBienvenidas, bind: bindBienvenidas },
   avisos: { render: renderAvisos, bind: bindAvisos },
   mensajes: { render: renderMensajes, bind: bindMensajes },
+  publicar: { render: renderPublicar, bind: bindPublicar },
   ofertas: { render: renderOfertas, bind: bindOfertas },
   moderacion: { render: renderModeracion, bind: bindModeracion },
   comunidad: { render: renderComunidad, bind: bindComunidad },

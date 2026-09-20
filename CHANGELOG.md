@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.6.0 — Publicaciones personalizadas desde la web
+
+- Nueva pantalla **Crear publicación** para enviar un embed manual al canal
+  elegido, sin IDs ni código.
+- Admite texto exterior, autor, título enlazado, descripción con Markdown,
+  color, miniatura, imagen o GIF, pie, fecha, 25 campos y cinco botones HTTPS.
+- Vista previa en vivo y borrador local independiente para cada servidor.
+- Las menciones se bloquean al enviar, se validan los límites de Discord y se
+  limita la frecuencia de publicación a diez mensajes por minuto.
+- Cada envío queda en la auditoría sin almacenar el contenido privado del
+  anuncio.
+- Corregido el registro duplicado cuando entraba un bot.
+- Corregida la identidad de las vistas previas: ahora muestran AnkeBot o el
+  perfil configurado aunque la pantalla Apariencia no esté abierta.
+- Reforzada la identificación de moderadores en los registros: la auditoría
+  espera hasta ocho segundos, sobrevive a fallos transitorios y resuelve al
+  usuario mediante su ID cuando Discord entrega una entrada parcial.
+- Los casos excepcionales ahora distinguen entre falta de permiso, fallo de la
+  API y ausencia real de una entrada, sin mostrar «Desconocido» ni «No quedó
+  registrado».
+- Corregido el nombre del `Dockerfile` para que coincida con `render.yaml` en
+  sistemas Linux.
+- Reparadas las huellas de verificación visual que ya no coincidían con los
+  archivos versionados.
+
 ## 3.5.0 — Español de Colombia, y se acabó el «Desconocido»
 
 ### «Borrado por: Desconocido»

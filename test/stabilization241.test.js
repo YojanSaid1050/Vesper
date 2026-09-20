@@ -62,7 +62,7 @@ test('el audit log exige objetivo y ventana temporal', async () => {
   const wrong = { target: { id: 'other' }, createdTimestamp: now };
   const expected = { target: { id: 'wanted' }, createdTimestamp: now };
   const guild = { fetchAuditLogs: async () => ({ entries: [stale, wrong, expected] }) };
-  assert.equal(await findRecentAuditEntry(guild, 1, 'wanted'), expected);
+  assert.equal(await findRecentAuditEntry(guild, 1, 'wanted', { attemptDelaysMs: [0, 1] }), expected);
 });
 
 test('existe una única configuración predeterminada versionada', () => {

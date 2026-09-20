@@ -51,10 +51,13 @@ const { catalogForPanel } = require('../core/EmbedCatalog');
 const { alertOverview } = require('../core/AlertRouter');
 const { themesForPanel, themeAllowed, applyTheme, clearTheme } = require('../core/MessageThemes');
 const { KINDS } = require('../core/EmbedCatalog');
+const { buildCustomEmbedPayload } = require('../core/CustomEmbedService');
+const { sendBrandedMessage } = require('../utils/webhookSender');
 
 const publicDir = path.join(__dirname, 'public');
 const authLimiter = createRateLimiter({ windowMs: 5 * 60 * 1000, max: 20 });
 const apiLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 120 });
+const customPublishLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 10 });
 
 function identity(session) {
   return {
@@ -343,7 +346,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     // proveedor las rechace: es literalmente lo único que hace falta saber
     // para arreglar un «redirect_uri_mismatch».
     redirectUris: redirectUris(),
-    version: '3.5.0'
+    version: '3.6.0'
   }));
 
   app.get('/auth/discord', authLimiter, requireDashboard, async (req, res, next) => {
@@ -435,7 +438,19 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
       const availableChannels = access.configure ? [...access.guild.channels.cache.values()] : [];
       const channels = availableChannels
         .filter(channel => channel.isTextBased() && !channel.isThread?.())
-        .map(channel => ({ id: channel.id, name: channel.name, parent: channel.parent?.name || null }))
+        .map(channel => {
+          const permissions = channel.permissionsFor(access.guild.members.me);
+          return {
+            id: channel.id,
+            name: channel.name,
+            parent: channel.parent?.name || null,
+            sendable: Boolean(permissions?.has([
+              PermissionFlagsBits.ViewChannel,
+              PermissionFlagsBits.SendMessages,
+              PermissionFlagsBits.EmbedLinks
+            ]))
+          };
+        })
         .sort((a, b) => (a.parent || '').localeCompare(b.parent || '', 'es') || a.name.localeCompare(b.name, 'es'));
       const voiceChannels = availableChannels
         .filter(channel => [ChannelType.GuildVoice, ChannelType.GuildStageVoice].includes(channel.type))
@@ -588,6 +603,56 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
       });
       const config = await getGuildConfig(req.params.guildId);
       return res.json({ ok: true, config: serializedConfig(config), setup: setupChecks(config), warning: nicknameWarning });
+    } catch (error) { return next(error); }
+  });
+
+  // Publicación manual: crea un embed nuevo y lo envía al canal elegido. No
+  // guarda el texto en MongoDB (evita almacenar anuncios privados); el
+  // navegador conserva un borrador local hasta que el administrador lo limpie.
+  api.post('/guilds/:guildId/custom-embeds/send', customPublishLimiter, requireSession, requireCsrf, async (req, res, next) => {
+    try {
+      const context = await accessFor(req, res, getClient);
+      if (!context) return;
+      if (!context.access.configure) {
+        return res.status(403).json({ error: 'Necesitas Administrar servidor para enviar publicaciones.' });
+      }
+
+      const built = buildCustomEmbedPayload(req.body);
+      const channel = context.access.guild.channels.cache.get(built.channelId)
+        || await context.access.guild.channels.fetch(built.channelId).catch(() => null);
+      if (!channel || channel.guild?.id !== context.access.guild.id || !channel.isTextBased() || channel.isThread?.()) {
+        return res.status(400).json({ error: 'El canal seleccionado no pertenece a este servidor o no admite mensajes.' });
+      }
+
+      const permissions = channel.permissionsFor(context.access.guild.members.me);
+      if (!permissions?.has([
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+        PermissionFlagsBits.EmbedLinks
+      ])) {
+        return res.status(409).json({ error: `Vesper necesita Ver canal, Enviar mensajes e Insertar enlaces en #${channel.name}.` });
+      }
+
+      const noMentions = { parse: [], roles: [], users: [], repliedUser: false };
+      const message = await sendBrandedMessage(channel, built.payload, {
+        throwOnFailure: true,
+        allowedMentions: noMentions
+      });
+      if (!message) throw Object.assign(new Error('Discord no confirmó el envío del mensaje.'), { statusCode: 502 });
+
+      // La publicación ya ocurrió: un fallo secundario al escribir la auditoría
+      // no debe devolver error y provocar que la persona la envíe dos veces.
+      await recordAudit(req, req.params.guildId, 'customEmbed.send', message.id, {
+        channelId: channel.id,
+        ...built.summary
+      }).catch(error => console.error('❌ No se pudo auditar customEmbed.send:', error));
+
+      return res.status(201).json({
+        ok: true,
+        messageId: message.id,
+        channelId: channel.id,
+        url: message.url || `https://discord.com/channels/${context.access.guild.id}/${channel.id}/${message.id}`
+      });
     } catch (error) { return next(error); }
   });
 

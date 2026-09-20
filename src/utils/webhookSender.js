@@ -47,6 +47,16 @@ async function sendBrandedMessageNow(channel, payload, options = {}) {
       config.twitch?.pingRole,
       config.youtube?.pingRole
     ].filter(Boolean);
+    // Algunas publicaciones (por ejemplo, las creadas manualmente desde el
+    // panel) deben bloquear todas las menciones aunque su texto contenga
+    // @everyone o el identificador de un rol. El llamador puede imponer una
+    // política más estricta; los avisos automáticos conservan sus roles
+    // autorizados de siempre.
+    const allowedMentions = options.allowedMentions || payload.allowedMentions || {
+      parse: [],
+      roles: allowedRoleIds,
+      users: []
+    };
 
     const webhook = await getWebhook(channel);
     
@@ -56,11 +66,7 @@ async function sendBrandedMessageNow(channel, payload, options = {}) {
         ...payload,
         username: profile.displayName || branding.name || channel.client.user.username,
         avatarURL: profile.avatar || branding.avatar || channel.client.user.displayAvatarURL(),
-        allowedMentions: {
-          parse: [],
-          roles: allowedRoleIds,
-          users: []
-        }
+        allowedMentions
       };
       
       if (payload.embeds && payload.embeds.length > 0) {
@@ -81,14 +87,15 @@ async function sendBrandedMessageNow(channel, payload, options = {}) {
       // Fallback a mensaje normal con el bot (sin branding personalizado)
       return channel.send({
         ...payload,
-        allowedMentions: { parse: [], roles: allowedRoleIds, users: [] }
+        allowedMentions
       });
     }
   } catch (error) {
     monitorError('Webhook', 'Send Message', channel.guild.id, error, {
       channelId: channel.id
     });
-    return channel.send({ ...payload, allowedMentions: { parse: [], roles: [], users: [] } }).catch(fallbackError => {
+    const fallbackMentions = options.allowedMentions || payload.allowedMentions || { parse: [], roles: [], users: [] };
+    return channel.send({ ...payload, allowedMentions: fallbackMentions }).catch(fallbackError => {
       monitorError('Webhook', 'Fallback Send', channel.guild.id, fallbackError);
       if (options.throwOnFailure) throw fallbackError;
       return null;

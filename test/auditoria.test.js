@@ -4,7 +4,17 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { PermissionFlagsBits } = require('discord.js');
 
-const { findRecentAuditEntry, auditExecutor, quienLoHizo, SIN_PERMISO, SIN_DATO } = require('../src/utils/auditLog');
+const {
+  findRecentAuditEntry,
+  auditExecutor,
+  resolveAuditExecutor,
+  quienLoHizo,
+  SIN_PERMISO,
+  SIN_DATO,
+  ERROR_AUDITORIA
+} = require('../src/utils/auditLog');
+
+const INTENTOS_RAPIDOS = { attemptDelaysMs: [0, 1, 2, 3, 4] };
 
 function servidorFalso({ entradas = [], permiso = true, apareceTrasIntentos = 0 } = {}) {
   let intentos = 0;
@@ -31,7 +41,7 @@ const entrada = (targetId, tag = 'yojan') => ({
 // entrada se pueda consultar, así que el primer intento vuelve vacío.
 test('reintenta cuando la auditoría todavía no tiene la entrada', async () => {
   const guild = servidorFalso({ entradas: [entrada('123')], apareceTrasIntentos: 1 });
-  assert.equal(await quienLoHizo(guild, 0, '123'), 'yojan');
+  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), 'yojan');
   assert.ok(guild.consultas() >= 2, 'debería haber preguntado más de una vez');
 });
 
@@ -39,25 +49,25 @@ test('reintenta cuando la auditoría todavía no tiene la entrada', async () => 
 // el objeto y `entry.target` llega vacío. `targetId` sí viene.
 test('reconoce la entrada aunque Discord no pueda resolver el objeto borrado', async () => {
   const guild = servidorFalso({ entradas: [entrada('987')] });
-  assert.equal(await quienLoHizo(guild, 0, '987'), 'yojan');
+  assert.equal(await quienLoHizo(guild, 0, '987', INTENTOS_RAPIDOS), 'yojan');
 });
 
 test('no confunde la acción de otro objeto', async () => {
   const guild = servidorFalso({ entradas: [entrada('otro')] });
-  assert.equal(await quienLoHizo(guild, 0, '123'), SIN_DATO);
+  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), SIN_DATO);
 });
 
 // Una entrada vieja es de otra acción parecida, no de esta.
 test('descarta las entradas antiguas', async () => {
-  const vieja = { ...entrada('123'), createdTimestamp: Date.now() - 60_000 };
+  const vieja = { ...entrada('123'), createdTimestamp: Date.now() - 120_000 };
   const guild = servidorFalso({ entradas: [vieja] });
-  assert.equal(await quienLoHizo(guild, 0, '123'), SIN_DATO);
+  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), SIN_DATO);
 });
 
 // Sin permiso, «Desconocido» no explicaba nada y nadie sabía qué arreglar.
 test('sin permiso lo dice en vez de dejar un desconocido', async () => {
   const guild = servidorFalso({ entradas: [entrada('123')], permiso: false });
-  assert.equal(await quienLoHizo(guild, 0, '123'), SIN_PERMISO);
+  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), SIN_PERMISO);
   assert.equal(guild.consultas(), 0, 'ni siquiera debería preguntar');
 });
 
@@ -66,7 +76,7 @@ test('si Discord falla, no revienta el aviso', async () => {
     members: { me: { permissions: { has: () => true } } },
     fetchAuditLogs: async () => { throw new Error('503'); }
   };
-  assert.equal(await quienLoHizo(guild, 0, '123'), SIN_DATO);
+  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), ERROR_AUDITORIA);
 });
 
 test('sin entrada, auditExecutor devuelve algo legible', () => {
@@ -76,6 +86,36 @@ test('sin entrada, auditExecutor devuelve algo legible', () => {
 
 test('findRecentAuditEntry devuelve la entrada, no un texto', async () => {
   const guild = servidorFalso({ entradas: [entrada('123')] });
-  const encontrada = await findRecentAuditEntry(guild, 0, '123');
+  const encontrada = await findRecentAuditEntry(guild, 0, '123', INTENTOS_RAPIDOS);
   assert.equal(encontrada.executor.tag, 'yojan');
+});
+
+test('sigue intentando si Discord falla de forma transitoria', async () => {
+  let consultas = 0;
+  const guild = {
+    members: { me: { permissions: { has: () => true } } },
+    async fetchAuditLogs() {
+      consultas += 1;
+      if (consultas === 1) throw new Error('503');
+      return { entries: [entrada('123')] };
+    }
+  };
+  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), 'yojan');
+  assert.equal(consultas, 2);
+});
+
+test('acepta createdAt cuando createdTimestamp no está resuelto', async () => {
+  const item = { ...entrada('123'), createdTimestamp: undefined, createdAt: new Date() };
+  const guild = servidorFalso({ entradas: [item] });
+  assert.equal(await quienLoHizo(guild, 0, '123', INTENTOS_RAPIDOS), 'yojan');
+});
+
+test('resuelve al ejecutor por executorId si Discord no adjunta el usuario', async () => {
+  const guild = {
+    members: {
+      cache: new Map(),
+      fetch: async id => ({ displayName: id === '456' ? 'Moderadora' : null })
+    }
+  };
+  assert.equal(await resolveAuditExecutor(guild, { executorId: '456', executor: null }), 'Moderadora');
 });
