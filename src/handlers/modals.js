@@ -101,6 +101,11 @@ async function handleModal(interaction, client) {
     return;
   }
 
+  if (String(interaction.customId || '').startsWith('tempvoice:')) {
+    const { handleTempVoiceModal } = require('../core/TempVoiceService');
+    if (await handleTempVoiceModal(interaction)) return;
+  }
+
   if (interaction.customId.startsWith('community_')) {
     const { handleCommunityModal } = require('../core/CommunityService');
     if (await handleCommunityModal(interaction, client)) return;

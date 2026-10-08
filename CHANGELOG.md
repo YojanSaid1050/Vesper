@@ -1,5 +1,40 @@
 # Changelog
 
+## 3.7.0 — Embeds interactivos, TempVoice y música reparada
+
+- El compositor web ahora admite hasta 20 botones con enlaces, accesos a
+  canales, apertura de tickets y acciones para dar, quitar o alternar roles.
+- Nuevo menú desplegable de hasta 25 autorroles, con modos alternar, añadir,
+  quitar o selección exclusiva; también puede mencionar un único rol de forma
+  controlada.
+- Los autorroles rechazan permisos sensibles como Administrador, Gestionar
+  roles/canales, banear o moderar, incluso si el rol está debajo del bot.
+- Nuevo módulo **Canales de voz temporales**, con dashboard, canal generador,
+  categoría, nombre por variables, límite, bitrate, bloqueo y visibilidad.
+- Las salas temporales tienen propietario persistente, panel de controles,
+  transferencia automática y limpieza al quedar vacías o al reiniciar.
+- Música habilita Node 24 como motor JavaScript de `yt-dlp`, deja de forzar
+  clientes antiguos de YouTube y limpia conexiones creadas por búsquedas que
+  fallan.
+- `render.yaml` ya no anuncia Lavalink: el reproductor es integrado.
+- El `Dockerfile` conserva la capitalización que Render exige en Linux.
+
+### Correcciones de la verificación completa
+
+- La imagen Docker descarga el binario de ffmpeg: `npm ci --ignore-scripts`
+  saltaba el `install` de `ffmpeg-static` y la música no podía sonar en Render.
+  Si el binario falta, el bot usa el ffmpeg del sistema en lugar de una ruta
+  inexistente.
+- TempVoice transfiere la sala aunque, tras salir el propietario, salga otra
+  persona antes de la revisión; antes la sala se quedaba sin dueño.
+- Las salas ocultas o bloqueadas conservan el acceso del bot, que ya no pierde
+  la sala ni deja canales huérfanos al no poder borrarlos.
+- Los errores de TempVoice se registran sin impedir el log de voz ni producir
+  promesas rechazadas sin gestionar.
+- El panel informa la versión real del paquete en lugar de `3.6.0`.
+- `COMANDOS.md` refleja los 51 comandos reales y `/caso` en lugar de `/id`.
+- Actualizadas dependencias con avisos de seguridad (`proxy-addr`, `undici`).
+
 ## 3.6.0 — Publicaciones personalizadas desde la web
 
 - Nueva pantalla **Crear publicación** para enviar un embed manual al canal

@@ -55,7 +55,7 @@ test('construye una publicación rica con imágenes, campos y botones', () => {
   assert.equal(row.components.length, 2);
   assert.equal(row.components[0].style, 5, 'los botones son enlaces y no prometen acciones sin programar');
   assert.equal(row.components[1].emoji.id, '123456789012345678');
-  assert.deepEqual(built.summary, { fieldCount: 2, buttonCount: 2, hasImage: true, hasThumbnail: true });
+  assert.deepEqual(built.summary, { fieldCount: 2, buttonCount: 2, roleMenuCount: 0, hasImage: true, hasThumbnail: true, interactive: false });
 });
 
 test('el contenido nunca habilita menciones accidentales', () => {
@@ -63,6 +63,32 @@ test('el contenido nunca habilita menciones accidentales', () => {
   assert.deepEqual(built.payload.allowedMentions.parse, []);
   assert.deepEqual(built.payload.allowedMentions.roles, []);
   assert.deepEqual(built.payload.allowedMentions.users, []);
+});
+
+test('construye autorroles, tickets, canales y menú sin superar las filas de Discord', () => {
+  const roleId = '223456789012345678';
+  const targetChannel = '323456789012345678';
+  const guildId = '423456789012345678';
+  const built = buildCustomEmbedPayload(completeMessage({
+    mentionRoleId: roleId,
+    buttons: [
+      { type: 'role', label: 'Dame el rol', roleId, roleAction: 'toggle', style: 'success' },
+      { type: 'channel', label: 'Ir a reglas', channelId: targetChannel },
+      { type: 'ticket', label: 'Pedir ayuda', style: 'primary' }
+    ],
+    roleMenu: { enabled: true, mode: 'exclusive', placeholder: 'Elige uno', roles: [{ roleId, label: 'Mi rol' }] }
+  }), { guildId });
+
+  assert.equal(built.hasInteractiveComponents, true);
+  assert.deepEqual(built.targets.assignableRoleIds, [roleId]);
+  assert.deepEqual(built.payload.allowedMentions.roles, [roleId]);
+  assert.match(built.payload.content, new RegExp(roleId));
+  const components = built.payload.components.map(row => row.toJSON().components).flat();
+  assert.match(components[0].custom_id, /^vesper_role:toggle:/);
+  assert.equal(components[1].url, `https://discord.com/channels/${guildId}/${targetChannel}`);
+  assert.equal(components[2].custom_id, 'community_ticket_open');
+  assert.equal(components[3].custom_id, 'vesper_roles:exclusive');
+  assert.equal(components[3].max_values, 1);
 });
 
 test('rechaza publicaciones vacías, canales falsos y enlaces inseguros', () => {
@@ -79,7 +105,7 @@ test('respeta los límites globales de Discord', () => {
   assert.throws(() => sanitizeCustomEmbed({ channelId: CHANNEL_ID, embed: { title: 'Hola', fields } }), /máximo 25 campos/);
 
   const buttons = Array.from({ length: LIMITS.buttons + 1 }, (_, index) => ({ label: `Botón ${index}`, url: 'https://example.com' }));
-  assert.throws(() => sanitizeCustomEmbed({ channelId: CHANNEL_ID, embed: { title: 'Hola' }, buttons }), /máximo 5 botones/);
+  assert.throws(() => sanitizeCustomEmbed({ channelId: CHANNEL_ID, embed: { title: 'Hola' }, buttons }), /máximo 20 botones/);
 
   const tooLong = {
     channelId: CHANNEL_ID,

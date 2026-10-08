@@ -56,6 +56,16 @@ async function handleButton(interaction, client) {
   const customId = String(interaction.customId ?? '');
   if (!customId) return;
 
+  if (customId.startsWith('tempvoice:')) {
+    const { handleTempVoiceButton } = require('../core/TempVoiceService');
+    if (await handleTempVoiceButton(interaction)) return;
+  }
+
+  if (customId.startsWith('vesper_role:')) {
+    const { handleCustomRoleButton } = require('../core/CustomComponentService');
+    if (await handleCustomRoleButton(interaction)) return;
+  }
+
   if (customId.startsWith('community_')) {
     const { handleCommunityButton } = require('../core/CommunityService');
     if (await handleCommunityButton(interaction, client)) return;

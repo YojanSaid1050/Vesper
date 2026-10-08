@@ -64,6 +64,14 @@ test('los errores de yt-dlp se traducen a algo entendible', () => {
   assert.equal(sources.friendlyError(''), null);
 });
 
+test('yt-dlp usa el Node del contenedor para los retos actuales de YouTube', () => {
+  const args = sources.YTDLP_BASE_ARGS;
+  const position = args.indexOf('--js-runtimes');
+  assert.ok(position >= 0);
+  assert.equal(args[position + 1], `node:${process.execPath}`);
+  assert.doesNotMatch(args.join(' '), /player_client=android,web/);
+});
+
 /* ------------------------------------------------------------------ */
 /* ffmpeg entrega lo que Discord espera                                */
 /* ------------------------------------------------------------------ */
@@ -225,4 +233,14 @@ test('yt-dlp se busca primero donde lo deja el instalador del proyecto', () => {
   } finally {
     if (original !== undefined) process.env.YTDLP_PATH = original;
   }
+});
+
+test('si ffmpeg-static no descargó su binario se usa el ffmpeg del sistema', t => {
+  const fs = require('node:fs');
+  const sources = require('../src/core/music/sources');
+  const previous = process.env.FFMPEG_PATH;
+  delete process.env.FFMPEG_PATH;
+  t.after(() => { if (previous !== undefined) process.env.FFMPEG_PATH = previous; });
+  t.mock.method(fs, 'existsSync', () => false);
+  assert.equal(sources.ffmpegPath(), 'ffmpeg');
 });

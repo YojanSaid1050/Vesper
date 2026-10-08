@@ -16,7 +16,10 @@ function setupChecks(config = {}) {
     { key: 'tiktok', label: 'TikTok', ready: !isModuleEnabledConfig(config, 'tiktok') || (configured(config.tiktok?.users) && (configured(config.tiktok?.liveChannel) || configured(config.tiktok?.videoChannel))) },
     { key: 'twitch', label: 'Twitch', ready: !isModuleEnabledConfig(config, 'twitch') || (configured(config.twitch?.users) && configured(config.twitch?.liveChannel)) },
     { key: 'youtube', label: 'YouTube', ready: !isModuleEnabledConfig(config, 'youtube') || (configured(config.youtube?.users) && (configured(config.youtube?.liveChannel) || configured(config.youtube?.videoChannel) || configured(config.youtube?.shortChannel))) },
-    { key: 'music', label: 'Música', ready: !isModuleEnabledConfig(config, 'music') || configured(config.music?.requestChannel) },
+    // Los dos canales de música son restricciones opcionales: vacíos significa
+    // «cualquier canal», no «configuración incompleta».
+    { key: 'music', label: 'Música', ready: true },
+    { key: 'tempvoice', label: 'Salas temporales', ready: !isModuleEnabledConfig(config, 'tempvoice') || configured(config.tempVoice?.generatorChannel) },
     { key: 'tickets', label: 'Tickets', ready: !isModuleEnabledConfig(config, 'tickets') || (configured(config.community?.tickets?.panelChannel) && configured(config.community?.tickets?.staffRoles)) },
     { key: 'suggestions', label: 'Sugerencias', ready: !isModuleEnabledConfig(config, 'suggestions') || configured(config.community?.suggestions?.channel) },
     { key: 'selfroles', label: 'Autorroles', ready: !isModuleEnabledConfig(config, 'selfroles') || configured(config.community?.selfRoles?.roles) },

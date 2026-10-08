@@ -20,6 +20,12 @@ const STREAM_TTL_MS = 5 * 60 * 1000;
 
 const AUDIO_EXTENSIONS = /\.(mp3|ogg|oga|opus|m4a|aac|flac|wav|webm)(\?|$)/i;
 const STREAM_HINTS = /(\/stream\b|\/listen\b|icecast|shoutcast|radio)/i;
+const YTDLP_BASE_ARGS = Object.freeze([
+  '--no-warnings', '--ignore-config', '--no-check-certificates',
+  // Desde yt-dlp 2025.11 YouTube requiere un runtime JS externo. El bot ya
+  // corre sobre Node 24, pero yt-dlp no lo habilita automáticamente.
+  '--js-runtimes', `node:${process.execPath}`
+]);
 
 // Se busca en este orden: lo que diga el entorno, el binario que descarga
 // `npm run music:setup` dentro del proyecto, y por último el del sistema.
@@ -29,10 +35,14 @@ function ytdlpPath() {
   return fs.existsSync(local) ? local : 'yt-dlp';
 }
 
+// `ffmpeg-static` devuelve la ruta aunque su `install` no haya descargado el
+// binario (pasa con `npm ci --ignore-scripts`). En ese caso se usa el del
+// sistema en vez de apuntar a un archivo que no existe.
 function ffmpegPath() {
   if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
   try {
-    return require('ffmpeg-static') || 'ffmpeg';
+    const bundled = require('ffmpeg-static');
+    return bundled && fs.existsSync(bundled) ? bundled : 'ffmpeg';
   } catch {
     return 'ffmpeg';
   }
@@ -164,10 +174,7 @@ async function search(query, { limit = 1 } = {}) {
   const isPlaylist = isUrl && /[?&]list=/.test(clean);
   const target = isUrl ? clean : `ytsearch${Math.max(1, Math.min(20, limit))}:${clean}`;
 
-  const args = [
-    '--no-warnings', '--ignore-config', '--flat-playlist', '--dump-single-json',
-    '--no-check-certificates', '--extractor-args', 'youtube:player_client=android,web'
-  ];
+  const args = [...YTDLP_BASE_ARGS, '--flat-playlist', '--dump-single-json'];
   if (!isPlaylist) args.push('--no-playlist');
   args.push(target);
 
@@ -193,8 +200,7 @@ async function resolveStream(track) {
   if (!track.pageUrl) throw new Error('Esa pista no tiene un enlace válido.');
 
   const output = await run(ytdlpPath(), [
-    '--no-warnings', '--ignore-config', '--no-playlist', '--no-check-certificates',
-    '--extractor-args', 'youtube:player_client=android,web',
+    ...YTDLP_BASE_ARGS, '--no-playlist',
     '-f', 'bestaudio[acodec!=none]/bestaudio/best',
     '-g', track.pageUrl
   ]);
@@ -236,6 +242,15 @@ function openStream(url, { seekSeconds = 0, volume = 100, live = false } = {}) {
   return { process: child, stream: child.stdout, errorText: () => stderr };
 }
 
+function friendlyFfmpegError(stderr) {
+  const text = String(stderr || '');
+  if (/403 Forbidden|Server returned 403/i.test(text)) return 'El enlace de audio caducó o YouTube lo rechazó; vuelve a pedir la canción.';
+  if (/404 Not Found/i.test(text)) return 'La fuente de audio ya no está disponible.';
+  if (/Invalid data found|could not find codec parameters/i.test(text)) return 'El formato de audio no es compatible.';
+  if (/Connection timed out|Network is unreachable|Temporary failure/i.test(text)) return 'Se perdió la conexión con la fuente de audio.';
+  return text.split('\n').find(line => line.trim())?.trim().slice(0, 220) || 'ffmpeg no pudo reproducir el audio.';
+}
+
 module.exports = {
   search,
   resolveStream,
@@ -245,6 +260,8 @@ module.exports = {
   ytdlpPath,
   ffmpegPath,
   friendlyError,
+  friendlyFfmpegError,
   isHttpUrl,
-  STREAM_TTL_MS
+  STREAM_TTL_MS,
+  YTDLP_BASE_ARGS
 };

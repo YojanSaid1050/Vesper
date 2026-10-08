@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 const guildSchema = new mongoose.Schema({
   guildId: { type: String, required: true, unique: true, index: true },
-  schemaVersion: { type: Number, default: 8, min: 1 },
+  schemaVersion: { type: Number, default: 9, min: 1 },
   // Plan del servidor: 'free' o 'premium'. Los dos Main no lo usan, su plan
   // sale de MAIN_GUILD_ID / THEMED_MAIN_GUILD_IDS.
   plan: { type: String, enum: ['free', 'premium'], default: 'free' },
@@ -78,6 +78,7 @@ const guildSchema = new mongoose.Schema({
     boosts: { type: Boolean, default: true },
     deals: { type: Boolean, default: false },
     music: { type: Boolean, default: false },
+    tempvoice: { type: Boolean, default: false },
     moderation: { type: Boolean, default: false },
     tickets: { type: Boolean, default: false },
     suggestions: { type: Boolean, default: false },
@@ -117,6 +118,15 @@ const guildSchema = new mongoose.Schema({
     maxPerUser: { type: Number, min: 1, max: 25, default: 3 },
     maxTrackMinutes: { type: Number, min: 1, max: 180, default: 15 },
     idleSeconds: { type: Number, min: 30, max: 3600, default: 180 }
+  },
+  tempVoice: {
+    generatorChannel: { type: String, default: null },
+    category: { type: String, default: null },
+    nameTemplate: { type: String, default: 'Sala de {username}', maxlength: 80 },
+    userLimit: { type: Number, min: 0, max: 99, default: 0 },
+    bitrate: { type: Number, min: 8000, max: 384000, default: 64000 },
+    lockedByDefault: { type: Boolean, default: false },
+    hiddenByDefault: { type: Boolean, default: false }
   },
   community: {
     tickets: {
