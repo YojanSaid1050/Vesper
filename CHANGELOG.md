@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.7.1 — Música que funciona en el plan gratuito de Render
+
+- **Causa del fallo «La búsqueda tardó demasiado»:** con 0,1 CPU, yt-dlp de un
+  solo archivo tardaba ~11 s solo en arrancar (se descomprime entero en cada
+  uso), se ejecutaba dos veces por canción y además descargaba el reproductor
+  JavaScript de YouTube para resolver su reto. Todo junto superaba el tiempo
+  de espera, y al cortarse nunca llegaba a guardarse la caché.
+- En Linux x64 se instala la versión de yt-dlp **en carpeta**, que arranca en
+  menos de un segundo. Se actualiza sola si tiene más de una semana.
+- **Camino rápido:** búsqueda y audio salen en una sola llamada con el cliente
+  `visionos` de YouTube, que no necesita el reto JavaScript.
+- **Respaldo automático:** si el camino rápido falla o YouTube rechaza su
+  dirección, se usa el camino completo con Node, con más margen de tiempo
+  (`MUSIC_FULL_RESOLVE_TIMEOUT_MS`, 120 s) y caché en disco.
+- Las pistas Opus a volumen 100 se reempaquetan sin recodificar.
+- `/musica reproducir` muestra «Buscando y preparando la canción…» y
+  `/musica diagnostico` hace una prueba real contra YouTube y mide el tiempo.
+
 ## 3.7.0 — Embeds interactivos, TempVoice y música reparada
 
 - El compositor web ahora admite hasta 20 botones con enlaces, accesos a

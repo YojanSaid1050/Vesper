@@ -12,7 +12,12 @@ const { spawn } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
 
-const YTDLP_TIMEOUT_MS = Math.max(5_000, Number(process.env.MUSIC_RESOLVE_TIMEOUT_MS || 30_000));
+const YTDLP_TIMEOUT_MS = Math.max(5_000, Number(process.env.MUSIC_RESOLVE_TIMEOUT_MS || 45_000));
+// El camino completo resuelve el reto JavaScript de YouTube con Node. La
+// primera vez, con poca CPU, puede tardar bastante; después queda en caché.
+// Matarlo antes de terminar impedía que la caché llegara a escribirse y cada
+// intento volvía a empezar de cero.
+const FULL_TIMEOUT_MS = Math.max(YTDLP_TIMEOUT_MS, Number(process.env.MUSIC_FULL_RESOLVE_TIMEOUT_MS || 120_000));
 
 // Las direcciones que devuelve YouTube caducan. Se guardan un rato para no
 // volver a preguntar por la misma canción, pero nunca más allá de esto.
@@ -20,18 +25,33 @@ const STREAM_TTL_MS = 5 * 60 * 1000;
 
 const AUDIO_EXTENSIONS = /\.(mp3|ogg|oga|opus|m4a|aac|flac|wav|webm)(\?|$)/i;
 const STREAM_HINTS = /(\/stream\b|\/listen\b|icecast|shoutcast|radio)/i;
-const YTDLP_BASE_ARGS = Object.freeze([
-  '--no-warnings', '--ignore-config', '--no-check-certificates',
-  // Desde yt-dlp 2025.11 YouTube requiere un runtime JS externo. El bot ya
-  // corre sobre Node 24, pero yt-dlp no lo habilita automáticamente.
-  '--js-runtimes', `node:${process.execPath}`
+const AUDIO_FORMAT = 'bestaudio[acodec!=none]/bestaudio/best';
+const CACHE_DIR = path.join(process.env.DATA_PATH || path.join(__dirname, '..', '..', '..', 'data'), 'yt-dlp-cache');
+const COMMON_ARGS = Object.freeze(['--no-warnings', '--ignore-config', '--no-check-certificates', '--cache-dir', CACHE_DIR]);
+
+// Camino rápido. El cliente `visionos` de YouTube entrega el audio sin pedir
+// el reproductor JavaScript (~3 MB) ni resolver su reto, que es lo que más
+// CPU consume: con 0,1 CPU eso solo ya superaba el tiempo de espera.
+const FAST_ARGS = Object.freeze([
+  ...COMMON_ARGS,
+  '--extractor-args', 'youtube:player_client=visionos'
 ]);
+
+// Camino completo, de respaldo si el rápido falla. Desde yt-dlp 2025.11
+// YouTube requiere un runtime JS externo. El bot ya corre sobre Node 24, pero
+// yt-dlp no lo habilita automáticamente.
+const YTDLP_BASE_ARGS = Object.freeze([...COMMON_ARGS, '--js-runtimes', `node:${process.execPath}`]);
 
 // Se busca en este orden: lo que diga el entorno, el binario que descarga
 // `npm run music:setup` dentro del proyecto, y por último el del sistema.
+// La versión en carpeta (la que instala `npm run music:setup` en Linux x64)
+// va primero porque arranca mucho más rápido que la de un solo archivo.
 function ytdlpPath() {
   if (process.env.YTDLP_PATH) return process.env.YTDLP_PATH;
-  const local = path.join(__dirname, '..', '..', '..', 'bin', process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
+  const bin = path.join(__dirname, '..', '..', '..', 'bin');
+  const onedir = path.join(bin, 'yt-dlp-onedir', 'yt-dlp_linux');
+  if (process.platform === 'linux' && fs.existsSync(onedir)) return onedir;
+  const local = path.join(bin, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
   return fs.existsSync(local) ? local : 'yt-dlp';
 }
 
@@ -74,14 +94,14 @@ function inPath(binary) {
   });
 }
 
-function run(binary, args, { timeoutMs = YTDLP_TIMEOUT_MS } = {}) {
+function run(binary, args, { timeoutMs = YTDLP_TIMEOUT_MS, timeoutMessage = 'La búsqueda tardó demasiado. Inténtalo otra vez.' } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(binary, args, { stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
-      reject(new Error('La búsqueda tardó demasiado. Inténtalo otra vez.'));
+      reject(Object.assign(new Error(timeoutMessage), { timedOut: true }));
     }, timeoutMs);
 
     child.stdout.on('data', chunk => { stdout += chunk; });
@@ -145,23 +165,49 @@ function directAudio(query) {
 function trackFromJson(entry) {
   if (!entry) return null;
   const id = entry.id || entry.url;
+  const streamUrl = entry.requested_downloads?.[0]?.url || (entry.formats ? entry.url : null) || null;
   return {
     title: entry.title || entry.fulltitle || 'Sin título',
     author: entry.uploader || entry.channel || entry.artist || entry.extractor_key || 'Desconocido',
     duration: Number(entry.duration) || 0,
     live: Boolean(entry.is_live || entry.live_status === 'is_live'),
     pageUrl: entry.webpage_url || entry.original_url || (id && `https://www.youtube.com/watch?v=${id}`) || null,
-    streamUrl: null,
-    streamExpires: 0,
+    streamUrl,
+    streamExpires: streamUrl ? Date.now() + STREAM_TTL_MS : 0,
+    acodec: entry.acodec || null,
     thumbnail: entry.thumbnail || entry.thumbnails?.at(-1)?.url || null,
     source: entry.extractor_key || 'yt-dlp'
   };
 }
 
+function parseJson(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error('No entendí la respuesta del buscador. Inténtalo otra vez.');
+  }
+}
+
+function tracksFrom(parsed) {
+  const entries = Array.isArray(parsed?.entries) ? parsed.entries : [parsed];
+  return entries.map(trackFromJson).filter(track => track && track.pageUrl);
+}
+
+// Busca y saca la dirección del audio en una sola llamada a yt-dlp. Antes
+// eran dos procesos por canción (buscar y luego resolver), y en un
+// alojamiento con poca CPU cada arranque cuenta.
+async function searchAndResolve(target) {
+  const raw = await run(ytdlpPath(), [...FAST_ARGS, '--no-playlist', '-f', AUDIO_FORMAT, '-J', target]);
+  const [track] = tracksFrom(parseJson(raw));
+  if (track) track.resolvedWith = 'fast';
+  return track || null;
+}
+
 /**
  * Busca lo que pidió la persona y devuelve una o varias pistas.
- * Solo se piden los datos; la dirección del audio se saca justo antes de
- * sonar, porque caduca en pocos minutos.
+ * Para una sola canción se intenta traer ya la dirección del audio; si ese
+ * camino rápido falla, se busca solo el título y el audio se resuelve justo
+ * antes de sonar con el camino completo.
  */
 async function search(query, { limit = 1 } = {}) {
   const clean = String(query || '').trim();
@@ -174,41 +220,62 @@ async function search(query, { limit = 1 } = {}) {
   const isPlaylist = isUrl && /[?&]list=/.test(clean);
   const target = isUrl ? clean : `ytsearch${Math.max(1, Math.min(20, limit))}:${clean}`;
 
-  const args = [...YTDLP_BASE_ARGS, '--flat-playlist', '--dump-single-json'];
+  let fastError = null;
+  if (!isPlaylist) {
+    try {
+      const track = await searchAndResolve(isUrl ? clean : `ytsearch1:${clean}`);
+      if (track?.streamUrl) return [track];
+    } catch (error) {
+      // Un video privado o inexistente no se arregla con el camino completo.
+      if (!error.timedOut && /privado|no está disponible|iniciar sesión|No sé reproducir/.test(error.message)) throw error;
+      fastError = error;
+    }
+  }
+
+  const args = [...COMMON_ARGS, '--flat-playlist', '--dump-single-json'];
   if (!isPlaylist) args.push('--no-playlist');
   args.push(target);
 
-  const raw = await run(ytdlpPath(), args);
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error('No entendí la respuesta del buscador. Inténtalo otra vez.');
-  }
-
-  const entries = Array.isArray(parsed.entries) ? parsed.entries : [parsed];
-  const tracks = entries.map(trackFromJson).filter(track => track && track.pageUrl);
-  if (!tracks.length) throw new Error('No encontré nada con esa búsqueda.');
+  const tracks = tracksFrom(parseJson(await run(ytdlpPath(), args)));
+  if (!tracks.length) throw fastError || new Error('No encontré nada con esa búsqueda.');
+  for (const track of tracks) track.fastFailed = Boolean(fastError);
   return isPlaylist ? tracks.slice(0, Math.max(1, Math.min(100, limit))) : tracks.slice(0, 1);
 }
 
+async function resolveWith(args, track, options) {
+  const output = await run(ytdlpPath(), [...args, '--no-playlist', '-f', AUDIO_FORMAT, '-g', track.pageUrl], options);
+  return output.split('\n').map(line => line.trim()).find(Boolean) || null;
+}
+
 /**
- * Saca la dirección real del audio, justo antes de reproducirlo.
+ * Saca la dirección real del audio, justo antes de reproducirlo. Primero el
+ * camino rápido y, si falla o ya falló antes con esta pista, el completo.
+ * `{ full: true }` fuerza el completo (cuando YouTube rechazó la dirección
+ * que dio el rápido).
  */
-async function resolveStream(track) {
-  if (track.streamUrl && Date.now() < track.streamExpires) return track.streamUrl;
+async function resolveStream(track, { full = false } = {}) {
+  if (!full && track.streamUrl && Date.now() < track.streamExpires) return track.streamUrl;
   if (!track.pageUrl) throw new Error('Esa pista no tiene un enlace válido.');
 
-  const output = await run(ytdlpPath(), [
-    ...YTDLP_BASE_ARGS, '--no-playlist',
-    '-f', 'bestaudio[acodec!=none]/bestaudio/best',
-    '-g', track.pageUrl
-  ]);
-
-  const url = output.split('\n').map(line => line.trim()).find(Boolean);
+  let url = null;
+  let mode = 'fast';
+  if (!full && !track.fastFailed) {
+    url = await resolveWith(FAST_ARGS, track).catch(error => {
+      if (!error.timedOut && /privado|no está disponible|iniciar sesión/.test(error.message)) throw error;
+      return null;
+    });
+  }
+  if (!url) {
+    mode = 'full';
+    url = await resolveWith(YTDLP_BASE_ARGS, track, {
+      timeoutMs: FULL_TIMEOUT_MS,
+      timeoutMessage: 'Preparar el audio tardó demasiado. Vuelve a intentarlo en un momento: la siguiente vez será más rápido.'
+    });
+  }
   if (!url) throw new Error('No pude obtener el audio de esa pista.');
   track.streamUrl = url;
   track.streamExpires = Date.now() + STREAM_TTL_MS;
+  track.resolvedWith = mode;
   return url;
 }
 
@@ -219,8 +286,11 @@ async function resolveStream(track) {
  * hace falta ninguna librería nativa de codificación ni se gasta CPU de más:
  * importa, porque el bot y la música comparten la única máquina que hay.
  */
-function openStream(url, { seekSeconds = 0, volume = 100, live = false } = {}) {
+function openStream(url, { seekSeconds = 0, volume = 100, live = false, codec = null } = {}) {
   const gain = Math.max(0, Math.min(200, Number(volume) || 100)) / 100;
+  // Si el original ya es Opus y no hay que tocar el volumen, basta con
+  // reempaquetarlo: recodificar consume ~1/3 de la CPU del plan gratuito.
+  const passthrough = gain === 1 && !live && codec === 'opus';
   const args = ['-hide_banner', '-loglevel', 'error'];
   // Las emisiones largas se cortan solas y esto las reengancha, pero son
   // opciones del protocolo HTTP: si se le pasan a un archivo local, ffmpeg ni
@@ -230,8 +300,9 @@ function openStream(url, { seekSeconds = 0, volume = 100, live = false } = {}) {
   args.push(
     '-i', url,
     '-vn', '-sn', '-dn',
-    '-af', `volume=${gain.toFixed(3)}`,
-    '-c:a', 'libopus', '-b:a', '96k', '-ar', '48000', '-ac', '2',
+    ...(passthrough
+      ? ['-c:a', 'copy']
+      : ['-af', `volume=${gain.toFixed(3)}`, '-c:a', 'libopus', '-b:a', '96k', '-ar', '48000', '-ac', '2']),
     '-f', 'opus', 'pipe:1'
   );
 
@@ -240,6 +311,26 @@ function openStream(url, { seekSeconds = 0, volume = 100, live = false } = {}) {
   child.stderr.on('data', chunk => { stderr += chunk.toString().slice(0, 1000); });
   child.on('error', () => { /* lo gestiona quien consume el flujo */ });
   return { process: child, stream: child.stdout, errorText: () => stderr };
+}
+
+// Espera a que ffmpeg entregue el primer audio. Si se cierra antes —YouTube
+// rechazó la dirección, el formato no sirve— devuelve false para poder
+// reintentar en vez de mandar a Discord un flujo vacío.
+function waitForAudio(handle, timeoutMs = 20_000) {
+  return new Promise(resolve => {
+    let timer = null;
+    const done = ok => {
+      clearTimeout(timer);
+      handle.stream.off('readable', onReadable);
+      handle.process.off('close', onClose);
+      resolve(ok);
+    };
+    const onReadable = () => { if (handle.stream.readableLength > 0) done(true); };
+    const onClose = () => done(handle.stream.readableLength > 0);
+    timer = setTimeout(() => done(true), timeoutMs);
+    handle.stream.on('readable', onReadable);
+    handle.process.once('close', onClose);
+  });
 }
 
 function friendlyFfmpegError(stderr) {
@@ -261,7 +352,10 @@ module.exports = {
   ffmpegPath,
   friendlyError,
   friendlyFfmpegError,
+  waitForAudio,
   isHttpUrl,
   STREAM_TTL_MS,
-  YTDLP_BASE_ARGS
+  YTDLP_BASE_ARGS,
+  FAST_ARGS,
+  CACHE_DIR
 };
