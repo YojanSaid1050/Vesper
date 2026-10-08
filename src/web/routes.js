@@ -52,6 +52,7 @@ const { alertOverview } = require('../core/AlertRouter');
 const { themesForPanel, themeAllowed, applyTheme, clearTheme } = require('../core/MessageThemes');
 const { KINDS } = require('../core/EmbedCatalog');
 const { buildCustomEmbedPayload } = require('../core/CustomEmbedService');
+const { selfAssignableRoleIssue } = require('../core/RoleSafetyService');
 const { sendBrandedMessage } = require('../utils/webhookSender');
 
 const publicDir = path.join(__dirname, 'public');
@@ -130,6 +131,7 @@ function serializedConfig(config) {
     permissions: config.permissions || {},
     moderation: config.moderation || {},
     music: config.music || {},
+    tempVoice: config.tempVoice || {},
     deals: config.deals || {},
     community: config.community || {}
   };
@@ -454,7 +456,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         .sort((a, b) => (a.parent || '').localeCompare(b.parent || '', 'es') || a.name.localeCompare(b.name, 'es'));
       const voiceChannels = availableChannels
         .filter(channel => [ChannelType.GuildVoice, ChannelType.GuildStageVoice].includes(channel.type))
-        .map(channel => ({ id: channel.id, name: channel.name, parent: channel.parent?.name || null }))
+        .map(channel => ({ id: channel.id, name: channel.name, parent: channel.parent?.name || null, stage: channel.type === ChannelType.GuildStageVoice }))
         .sort((a, b) => (a.parent || '').localeCompare(b.parent || '', 'es') || a.name.localeCompare(b.name, 'es'));
       const categories = availableChannels
         .filter(channel => channel.type === ChannelType.GuildCategory)
@@ -466,7 +468,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
           id: role.id,
           name: role.name,
           color: role.hexColor,
-          assignable: Boolean(access.guild.members.me?.permissions?.has(PermissionFlagsBits.ManageRoles) && role.position < access.guild.members.me.roles.highest.position)
+          assignable: !selfAssignableRoleIssue(role, access.guild, access.guild.members.me)
         }))
         .sort((a, b) => a.name.localeCompare(b.name, 'es')) : [];
       return res.json({
@@ -475,6 +477,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
           name: access.guild.name,
           icon: access.guild.iconURL({ extension: 'png', size: 128 }),
           memberCount: access.guild.memberCount,
+          maximumBitrate: access.guild.maximumBitrate || 96000,
           tier: guildTier(access.guild.id)
         },
         permissions: {
@@ -617,7 +620,9 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         return res.status(403).json({ error: 'Necesitas Administrar servidor para enviar publicaciones.' });
       }
 
-      const built = buildCustomEmbedPayload(req.body);
+      const guildId = req.params.guildId;
+      const guild = context.access.guild;
+      const built = buildCustomEmbedPayload(req.body, { guildId });
       const channel = context.access.guild.channels.cache.get(built.channelId)
         || await context.access.guild.channels.fetch(built.channelId).catch(() => null);
       if (!channel || channel.guild?.id !== context.access.guild.id || !channel.isTextBased() || channel.isThread?.()) {
@@ -630,14 +635,49 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         PermissionFlagsBits.SendMessages,
         PermissionFlagsBits.EmbedLinks
       ])) {
-        return res.status(409).json({ error: `Vesper necesita Ver canal, Enviar mensajes e Insertar enlaces en #${channel.name}.` });
+        return res.status(409).json({ error: `El bot necesita Ver canal, Enviar mensajes e Insertar enlaces en #${channel.name}.` });
       }
 
-      const noMentions = { parse: [], roles: [], users: [], repliedUser: false };
-      const message = await sendBrandedMessage(channel, built.payload, {
-        throwOnFailure: true,
-        allowedMentions: noMentions
-      });
+      const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+      if (built.targets.mentionRoleId) {
+        const mentionRole = guild.roles.cache.get(built.targets.mentionRoleId)
+          || await guild.roles.fetch(built.targets.mentionRoleId).catch(() => null);
+        if (!mentionRole || mentionRole.id === guild.id || mentionRole.managed) {
+          return res.status(400).json({ error: 'El rol seleccionado para mencionar no existe o no se puede mencionar.' });
+        }
+        if (!mentionRole.mentionable && !botMember?.permissions.has(PermissionFlagsBits.MentionEveryone)) {
+          return res.status(409).json({ error: `El rol ${mentionRole.name} no es mencionable y al bot le falta Mencionar @everyone, @here y todos los roles.` });
+        }
+      }
+
+      if (built.targets.assignableRoleIds.length) {
+        if (!botMember?.permissions.has(PermissionFlagsBits.ManageRoles)) {
+          return res.status(409).json({ error: 'El bot necesita el permiso Gestionar roles para publicar controles de autorroles.' });
+        }
+        for (const roleId of built.targets.assignableRoleIds) {
+          const role = guild.roles.cache.get(roleId) || await guild.roles.fetch(roleId).catch(() => null);
+          const issue = selfAssignableRoleIssue(role, guild, botMember);
+          if (issue) return res.status(409).json({ error: `El rol ${role?.name || roleId} no puede ser un autorrol. ${issue}` });
+        }
+      }
+
+      for (const channelId of built.targets.channelIds) {
+        const target = guild.channels.cache.get(channelId) || await guild.channels.fetch(channelId).catch(() => null);
+        if (!target || target.guild?.id !== guild.id) return res.status(400).json({ error: 'Uno de los canales enlazados no pertenece a este servidor.' });
+      }
+      if (built.targets.usesTicket && context.config.features?.tickets !== true) {
+        return res.status(409).json({ error: 'Activa y configura el módulo de tickets antes de publicar un botón para abrir tickets.' });
+      }
+
+      // Los componentes interactivos deben salir de la cuenta del bot. Los
+      // webhooks entrantes pueden conservar la marca, pero Discord ignora sus
+      // botones con custom_id porque no pertenecen a una aplicación.
+      const message = built.hasInteractiveComponents
+        ? await channel.send(built.payload)
+        : await sendBrandedMessage(channel, built.payload, {
+          throwOnFailure: true,
+          allowedMentions: built.payload.allowedMentions
+        });
       if (!message) throw Object.assign(new Error('Discord no confirmó el envío del mensaje.'), { statusCode: 502 });
 
       // La publicación ya ocurrió: un fallo secundario al escribir la auditoría

@@ -25,6 +25,8 @@ module.exports = {
     if (!member || member.user?.bot) return;
 
     const guildConfig = await getGuildConfig(newState.guild.id); // Añadir await
+    const { handleVoiceStateUpdate } = require('../../core/TempVoiceService');
+    await handleVoiceStateUpdate(oldState, newState, guildConfig);
 
     // Joined voice channel
     if (!oldState.channelId && newState.channelId) {

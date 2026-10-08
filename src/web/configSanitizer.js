@@ -6,6 +6,7 @@ const { isKnownKind, kindInfo } = require('../core/EmbedCatalog');
 const { ROUTABLE } = require('../core/AlertRouter');
 const { featureAvailable } = require('../config/guildPolicy');
 const { isPrivateHostname } = require('../utils/imageUrlValidator');
+const { selfAssignableRoleIssue } = require('../core/RoleSafetyService');
 
 class ValidationError extends Error {
   constructor(message) {
@@ -69,9 +70,8 @@ function assignableRoleValue(guild, value, path) {
   const roleId = roleValue(guild, value, path);
   const role = guild.roles.cache.get(roleId);
   const me = guild.members.me;
-  if (role.managed || !me?.permissions?.has(PermissionFlagsBits.ManageRoles) || role.position >= me.roles.highest.position) {
-    throw new ValidationError(`${path} no es asignable por Vesper debido a la jerarquía de roles.`);
-  }
+  const issue = selfAssignableRoleIssue(role, guild, me);
+  if (issue) throw new ValidationError(`${path} no es un autorrol seguro. ${issue}`);
   return role.id;
 }
 
@@ -84,6 +84,17 @@ function voiceChannelValue(guild, value, path) {
   const permissions = channel.permissionsFor(guild.members.me);
   if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.Speak])) {
     throw new ValidationError(`Vesper necesita Ver canal, Conectar y Hablar en ${channel.name}.`);
+  }
+  return channel.id;
+}
+
+function tempVoiceGeneratorValue(guild, value, path) {
+  if (value === null || value === '') return null;
+  const channel = guild.channels.cache.get(String(value));
+  if (!channel || channel.type !== ChannelType.GuildVoice) throw new ValidationError(`${path} debe ser un canal de voz normal de este servidor.`);
+  const permissions = channel.permissionsFor(guild.members.me);
+  if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.Connect, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.MoveMembers])) {
+    throw new ValidationError(`El bot necesita Ver canal, Conectar, Gestionar canales y Mover miembros en ${channel.name}.`);
   }
   return channel.id;
 }
@@ -353,6 +364,40 @@ function sanitizeGuildPatch(input, guild) {
       if (source[field] !== undefined) target[field] = integerValue(source[field], min, max, `music.${field}`);
     }
     if (Object.keys(target).length) updates.music = target;
+  }
+
+  if (input.tempVoice !== undefined) {
+    const source = input.tempVoice;
+    if (!source || typeof source !== 'object' || Array.isArray(source)) throw new ValidationError('tempVoice no es válido.');
+    const target = {};
+    if (source.generatorChannel !== undefined) target.generatorChannel = tempVoiceGeneratorValue(guild, source.generatorChannel, 'tempVoice.generatorChannel');
+    if (source.category !== undefined) {
+      if (source.category === null || source.category === '') target.category = null;
+      else {
+        const category = guild.channels.cache.get(String(source.category));
+        if (!category || category.type !== ChannelType.GuildCategory) throw new ValidationError('tempVoice.category no es una categoría del servidor.');
+        const permissions = category.permissionsFor(guild.members.me);
+        if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels, PermissionFlagsBits.MoveMembers])) {
+          throw new ValidationError(`El bot necesita Ver canal, Gestionar canales y Mover miembros en ${category.name}.`);
+        }
+        target.category = category.id;
+      }
+    }
+    if (source.nameTemplate !== undefined) {
+      target.nameTemplate = shortText(source.nameTemplate, 80, 'tempVoice.nameTemplate');
+      if (!target.nameTemplate.includes('{username}') && !target.nameTemplate.includes('{displayName}')) {
+        throw new ValidationError('tempVoice.nameTemplate debe incluir {username} o {displayName}.');
+      }
+    }
+    if (source.userLimit !== undefined) target.userLimit = integerValue(source.userLimit, 0, 99, 'tempVoice.userLimit');
+    if (source.bitrate !== undefined) {
+      const maxBitrate = Math.min(384000, Number(guild.maximumBitrate || 96000));
+      target.bitrate = integerValue(source.bitrate, 8000, maxBitrate, 'tempVoice.bitrate');
+    }
+    for (const field of ['lockedByDefault', 'hiddenByDefault']) {
+      if (source[field] !== undefined) target[field] = booleanValue(source[field], `tempVoice.${field}`);
+    }
+    if (Object.keys(target).length) updates.tempVoice = target;
   }
 
   if (input.community !== undefined) {

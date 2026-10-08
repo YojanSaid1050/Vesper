@@ -26,6 +26,9 @@ module.exports = {
     try {
       await connectMongo();
       console.log('✅ MongoDB conectado y listo');
+      const { reconcileTemporaryVoiceChannels } = require('../core/TempVoiceService');
+      const tempVoice = await reconcileTemporaryVoiceChannels(client);
+      console.log(`🔊 Salas temporales revisadas: ${tempVoice.checked}; eliminadas: ${tempVoice.removed}`);
     } catch (error) {
       console.error('❌ Error conectando a MongoDB:', error.message);
     }

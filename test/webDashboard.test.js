@@ -178,6 +178,32 @@ test('el panel configura identidad, voz y autorroles del Main temático sin escr
   if (previousThemed === undefined) delete process.env.THEMED_MAIN_GUILD_IDS; else process.env.THEMED_MAIN_GUILD_IDS = previousThemed;
 });
 
+test('el panel valida la configuración completa de canales temporales', () => {
+  const guild = mockGuild();
+  guild.maximumBitrate = 96000;
+  guild.channels.cache.set('423456789012345678', {
+    id: '423456789012345678', name: 'Crear sala', type: ChannelType.GuildVoice,
+    permissionsFor: () => ({ has: () => true })
+  });
+  guild.channels.cache.set('523456789012345678', {
+    id: '523456789012345678', name: 'Temporales', type: ChannelType.GuildCategory,
+    permissionsFor: () => ({ has: () => true })
+  });
+  const result = sanitizeGuildPatch({
+    features: { tempvoice: true },
+    tempVoice: {
+      generatorChannel: '423456789012345678', category: '523456789012345678',
+      nameTemplate: 'Sala de {displayName}', userLimit: 8, bitrate: 96000,
+      lockedByDefault: true, hiddenByDefault: false
+    }
+  }, guild);
+  assert.equal(result.features.tempvoice, true);
+  assert.equal(result.tempVoice.generatorChannel, '423456789012345678');
+  assert.equal(result.tempVoice.userLimit, 8);
+  assert.throws(() => sanitizeGuildPatch({ tempVoice: { nameTemplate: 'Sala sin variable' } }, guild), /username|displayName/);
+  assert.throws(() => sanitizeGuildPatch({ tempVoice: { bitrate: 128000 } }, guild), /96000/);
+});
+
 test('las utilidades de sesión usan HMAC, cookies seguras y comparación constante', () => {
   const oldSecret = process.env.WEB_SESSION_SECRET;
   process.env.WEB_SESSION_SECRET = 'a'.repeat(64);
