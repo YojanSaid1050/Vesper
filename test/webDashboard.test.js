@@ -675,3 +675,32 @@ test('los recuadros del catálogo usan variables que ese mensaje admite', () => 
   }
   assert.deepEqual(problemas, []);
 });
+
+test('el resumen para miembros dice qué está activo sin revelar canales privados', () => {
+  const { memberViewFor } = require('../src/web/routes');
+  const { PermissionsBitField, PermissionFlagsBits } = require('discord.js');
+  const member = { id: '700000000000000002' };
+  const channel = (id, name, canView) => ({
+    id, name,
+    permissionsFor: who => (who === member && canView ? new PermissionsBitField(PermissionFlagsBits.ViewChannel) : new PermissionsBitField(0n))
+  });
+  const channels = new Map([
+    ['111111111111111111', channel('111111111111111111', 'musica', true)],
+    ['222222222222222222', channel('222222222222222222', 'staff-sugerencias', false)],
+    ['333333333333333333', channel('333333333333333333', 'Crear sala', true)]
+  ]);
+  const access = { member, guild: { channels: { cache: channels } } };
+  const config = {
+    features: { music: true, suggestions: true, tempvoice: true, tickets: false },
+    music: { requestChannel: '111111111111111111' },
+    tempVoice: { generatorChannel: '333333333333333333' },
+    community: { suggestions: { channel: '222222222222222222' } }
+  };
+
+  const view = memberViewFor(config, access, null);
+  assert.deepEqual(view.music.requestChannel, { id: '111111111111111111', name: 'musica' });
+  assert.deepEqual(view.suggestions, { channel: null });
+  assert.equal(view.tickets, null);
+  assert.equal(view.tempvoice.generator.name, 'Crear sala');
+  assert.equal(JSON.stringify(view).includes('staff'), false);
+});

@@ -367,6 +367,16 @@ function card({ eyebrow, title, description, ayuda = '', actions = '', body, id 
     </section>`;
 }
 
+// Aviso de módulo apagado con el interruptor al lado. Antes mandaba a buscar
+// «Módulos y permisos», una pantalla que en el menú se llama de otra forma.
+function moduleOffCallout(key, title, detail) {
+  return `
+    <div class="callout warn callout-action">
+      <div><strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}</span></div>
+      <button class="button sm" type="button" data-enable-module="${escapeHtml(key)}">Activar ahora</button>
+    </div>`;
+}
+
 function emptyBlock(title, detail) {
   return `<div class="empty"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}</span></div>`;
 }
@@ -745,6 +755,19 @@ const SECTIONS = [
   }
 ];
 
+// Un miembro sin permisos de moderación solo ve sus propios casos: la
+// sección se presenta así en vez de como «Moderación · Filtros y sanciones».
+function sectionDisplay(section) {
+  const data = state.data;
+  if (section.id === 'moderacion' && data && !data.permissions?.moderate) {
+    return { ...section, group: 'Tu cuenta', label: 'Mis casos', title: 'Mis casos', hint: 'Tu historial de moderación en este servidor.' };
+  }
+  if (section.id === 'inicio' && data && !data.permissions?.configure) {
+    return { ...section, title: data.guild?.name || section.title, hint: 'Lo que puedes hacer en este servidor.' };
+  }
+  return section;
+}
+
 function sectionAllowed(section) {
   if (!section.needs) return true;
   return Boolean(state.data?.permissions?.[section.needs]);
@@ -1043,15 +1066,16 @@ function serverCardMarkup(guild, { invitable = false } = {}) {
       </article>`;
   }
 
-  const plan = guild.tier === 'primary_main' || guild.tier === 'themed_main' ? 'principal' : null;
+  const permissions = guild.permissions || {};
+  const role = permissions.configure ? 'Administras' : permissions.moderate ? 'Moderas' : 'Miembro';
   return `
     <article class="server-card ready">
       ${guildAvatarMarkup(guild)}
       <div class="server-copy">
         <strong>${escapeHtml(guild.name)}</strong>
-        <small>${formatNumber(guild.memberCount || 0)} miembros${plan ? ' · servidor principal' : ''}</small>
+        <small>${formatNumber(guild.memberCount || 0)} miembros · <span class="role-badge${permissions.configure ? ' admin' : ''}">${role}</span></small>
       </div>
-      <button class="button" type="button" data-open-guild="${escapeHtml(guild.id)}">Configurar</button>
+      <button class="button${permissions.configure ? '' : ' quiet'}" type="button" data-open-guild="${escapeHtml(guild.id)}">${permissions.configure ? 'Configurar' : 'Abrir'}</button>
     </article>`;
 }
 
@@ -1063,8 +1087,8 @@ function renderServidores() {
     return `
       <div class="empty-hero">
         <span class="empty-icon" aria-hidden="true">✦</span>
-        <h2>Todavía no hay nada que configurar</h2>
-        <p>Añade Vesper a un servidor donde seas administrador y aparecerá aquí.</p>
+        <h2>Ningún servidor tuyo tiene Vesper todavía</h2>
+        <p>Cuando entres a un servidor con Vesper aparecerá aquí. Si administras uno, puedes añadirlo ahora.</p>
         <a class="button big" href="${escapeHtml(inviteUrlFor())}" target="_blank" rel="noopener">Añadir a un servidor</a>
       </div>`;
   }
@@ -1080,7 +1104,7 @@ function renderServidores() {
       <section class="server-block">
         <h2>Añadir a otro servidor</h2>
         <div class="server-grid">${porInvitar.map(guild => serverCardMarkup(guild, { invitable: true })).join('')}</div>
-      </section>` : `
+      </section>` : !listos.some(guild => guild.permissions?.configure) ? '' : `
       <section class="server-block">
         <h2>¿Otro servidor?</h2>
         <div class="server-grid">
@@ -1164,7 +1188,102 @@ function moduleCardMarkup(card) {
     </article>`;
 }
 
+// Lo que puede hacer un miembro sin permisos. Antes veía la rejilla de
+// interruptores del administrador, todos apagados (no recibe la
+// configuración) y sin poder tocarlos: parecía que el bot no hacía nada.
+const MEMBER_FEATURES = [
+  {
+    key: 'music', icon: '♪', title: 'Música',
+    blurb: 'Pon canciones en un canal de voz. Entra primero al canal y luego pide la canción.',
+    commands: ['/musica reproducir', '/musica cola', '/musica saltar'],
+    where: info => [
+      info.requestChannel && `Pide las canciones en #${info.requestChannel.name}.`,
+      info.voiceChannel && `Suena en 🔊 ${info.voiceChannel.name}.`
+    ]
+  },
+  {
+    key: 'tickets', icon: '🎫', title: 'Soporte',
+    blurb: 'Abre un ticket privado y habla solo con el equipo del servidor.',
+    commands: ['/ticket abrir', '/ticket estado'],
+    where: info => [info.panelChannel && `También puedes usar el botón de #${info.panelChannel.name}.`]
+  },
+  {
+    key: 'suggestions', icon: '💡', title: 'Sugerencias',
+    blurb: 'Propón ideas para mejorar el servidor y sigue si se aprueban.',
+    commands: ['/sugerir'],
+    where: info => [info.channel && `Se publican en #${info.channel.name}.`]
+  },
+  {
+    key: 'tempvoice', icon: '🔊', title: 'Tu propia sala de voz',
+    blurb: 'Entra al canal generador y Vesper crea una sala para ti, con botones para renombrarla, limitarla, bloquearla u ocultarla.',
+    commands: [],
+    where: info => [info.generator ? `Entra a 🔊 ${info.generator.name}.` : null]
+  },
+  {
+    key: 'selfroles', icon: '🎭', title: 'Elige tus roles',
+    blurb: 'Ponte o quítate los roles que te interesen con un clic.',
+    commands: [],
+    where: info => [info.panelChannel ? `Están en #${info.panelChannel.name}.` : 'Busca el mensaje con botones o el menú de roles.']
+  },
+  {
+    key: 'starboard', icon: '⭐', title: 'Destacados',
+    blurb: 'Los mensajes que más gustan aparecen en el tablón del servidor.',
+    commands: [],
+    where: info => [`Reacciona con ${info.emoji} a un mensaje; con ${info.threshold} o más, se destaca.`, info.channel && `Tablón: #${info.channel.name}.`]
+  }
+];
+
+function memberFeatureMarkup(feature, info) {
+  const where = feature.where(info).filter(Boolean);
+  return `
+    <article class="member-card">
+      <div class="member-card-head">
+        <span class="module-icon" aria-hidden="true">${feature.icon}</span>
+        <strong>${escapeHtml(feature.title)}</strong>
+      </div>
+      <p>${escapeHtml(feature.blurb)}</p>
+      ${where.length ? `<ul class="member-where">${where.map(line => `<li>${escapeHtml(line)}</li>`).join('')}</ul>` : ''}
+      ${feature.commands.length ? `<div class="command-list">${feature.commands.map(command => `
+        <button class="command-chip" type="button" data-copy="${escapeHtml(command)}" title="Copiar comando">
+          <code>${escapeHtml(command)}</code><span aria-hidden="true">⧉</span>
+        </button>`).join('')}</div>` : ''}
+    </article>`;
+}
+
+function renderMemberHome() {
+  const data = state.data;
+  const view = data.memberView || {};
+  const user = state.session?.user || {};
+  const name = user.discord?.globalName || user.discord?.username || user.google?.name || '';
+  const botName = data.identity?.webhook?.name || data.bot?.username || 'Vesper';
+  const available = MEMBER_FEATURES.filter(feature => view[feature.key]);
+  const activeCases = (data.cases || []).filter(item => item.status === 'active').length;
+
+  const cases = data.permissions.viewOwnCases ? `
+    <article class="member-card">
+      <div class="member-card-head">
+        <span class="module-icon" aria-hidden="true">⚖</span>
+        <strong>Mis casos</strong>
+      </div>
+      <p>${activeCases
+    ? `Tienes ${activeCases} ${activeCases === 1 ? 'caso activo' : 'casos activos'} de moderación.`
+    : 'No tienes casos activos de moderación.'} Solo tú puedes verlos.</p>
+      <div class="command-list"><button class="button quiet sm" type="button" data-goto="moderacion">Ver mis casos</button></div>
+    </article>` : '';
+
+  return `
+    <div class="module-head member-head">
+      <h2>${name ? `Hola, ${escapeHtml(name)}` : 'Hola'} 👋</h2>
+      <p>Esto es lo que puedes hacer con ${escapeHtml(botName)} en <strong>${escapeHtml(data.guild.name)}</strong>. Los comandos se escriben en cualquier canal de Discord; pulsa uno para copiarlo.</p>
+    </div>
+    ${available.length || cases
+    ? `<div class="member-grid">${available.map(feature => memberFeatureMarkup(feature, view[feature.key])).join('')}${cases}</div>`
+    : emptyBlock('Este servidor todavía no ha activado funciones para miembros', 'Cuando los administradores las enciendan aparecerán aquí.')}
+    <p class="member-foot">¿Administras este servidor? Necesitas el permiso «Administrar servidor» en Discord para configurarlo desde aquí.</p>`;
+}
+
 function renderInicio() {
+  if (!state.data.permissions.configure) return renderMemberHome();
   const data = state.data;
   const problemas = healthIssues().filter(issue => issue.level !== 'info');
   const activos = MODULE_CARDS.filter(card => data.config?.features?.[card.key] && !modulePlanState(card.key)).length;
@@ -2652,7 +2771,7 @@ function renderPublicar() {
                 </div>
                 <div class="field grow">
                   <label for="custom-role-menu-placeholder">Texto del menú</label>
-                  <input id="custom-role-menu-placeholder" maxlength="150" value="${escapeHtml(draft.roleMenu.placeholder || 'Elige tus roles')}">
+                  <input id="custom-role-menu-placeholder" type="text" maxlength="150" value="${escapeHtml(draft.roleMenu.placeholder || 'Elige tus roles')}">
                 </div>
               </div>
               <div class="field wide">
@@ -2993,7 +3112,7 @@ function renderOfertas() {
   const chosen = new Set(deals.giveawayPlatforms || ['steam', 'epic-games-store', 'gog']);
 
   return `
-    ${!enabled ? '<div class="callout warn"><strong>El módulo de ofertas está apagado.</strong><span>Actívalo en «Módulos y permisos» para que Vesper empiece a publicar.</span></div>' : ''}
+    ${!enabled ? moduleOffCallout('deals', 'El módulo de ofertas está apagado.', 'Mientras siga apagado, Vesper no publica juegos gratis ni sorteos.') : ''}
 
     ${card({
       eyebrow: 'Cómo funciona',
@@ -3087,12 +3206,14 @@ function bindOfertas(root) {
 function caseRowsMarkup() {
   const data = state.data;
   const canModerate = data.permissions.moderate;
-  if (!data.cases?.length) return `<tr><td colspan="${canModerate ? 7 : 6}">${escapeHtml('No hay casos registrados.')}</td></tr>`;
+  if (!data.cases?.length) {
+    return `<tr><td colspan="${canModerate ? 7 : 5}">${escapeHtml(canModerate ? 'No hay casos registrados.' : 'No tienes ningún caso. ¡Sigue así!')}</td></tr>`;
+  }
 
   return data.cases.map(item => `
     <tr>
       <td class="mono">#${escapeHtml(item.id)}</td>
-      <td class="mono">${escapeHtml(item.userId)}</td>
+      ${canModerate ? `<td class="mono">${escapeHtml(item.userId)}</td>` : ''}
       <td>${escapeHtml(ACTION_LABELS[item.action] || item.action)}</td>
       <td><span class="tag ${item.status === 'active' ? 'warn' : item.status === 'revoked' ? '' : 'ok'}">${escapeHtml(STATUS_LABELS[item.status] || item.status)}</span></td>
       <td class="wrap">${escapeHtml(item.reason)}</td>
@@ -3174,7 +3295,8 @@ function renderModeracion() {
     title: 'Registrar una sanción',
     description: 'Busca al miembro por su nombre; no hace falta copiar IDs.',
     body: `
-      ${!moderationOn ? '<div class="callout warn"><strong>El módulo de moderación está apagado.</strong><span>Actívalo en «Módulos y permisos» para poder registrar casos.</span></div>' : ''}
+      ${!moderationOn && canConfigure ? moduleOffCallout('moderation', 'El módulo de moderación está apagado.', 'Actívalo para que funcionen los filtros y se puedan registrar casos.') : ''}
+      ${!moderationOn && !canConfigure ? '<div class="callout warn"><strong>El módulo de moderación está apagado.</strong><span>Pide a un administrador que lo active para poder registrar casos.</span></div>' : ''}
       <form id="form-case" class="form">
         <div class="field wide">
           <label for="case-search">Buscar miembro</label>
@@ -3218,7 +3340,7 @@ function renderModeracion() {
     body: `
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Caso</th><th>Usuario</th><th>Acción</th><th>Estado</th><th>Motivo</th><th>Fecha</th>${canModerate ? '<th>Acciones</th>' : ''}</tr></thead>
+          <thead><tr><th>Caso</th>${canModerate ? '<th>Usuario</th>' : ''}<th>Acción</th><th>Estado</th><th>Motivo</th><th>Fecha</th>${canModerate ? '<th>Acciones</th>' : ''}</tr></thead>
           <tbody id="case-rows">${caseRowsMarkup()}</tbody>
         </table>
       </div>`
@@ -3376,7 +3498,7 @@ function renderMusica() {
   ];
 
   return `
-    ${!config.features?.music ? '<div class="callout warn"><strong>El módulo de música está apagado.</strong><span>Actívalo en «Módulos y permisos» para que /musica funcione.</span></div>' : ''}
+    ${!config.features?.music ? moduleOffCallout('music', 'El módulo de música está apagado.', 'Mientras siga apagado, /musica no responde en este servidor.') : ''}
     ${health.music?.available === false
       ? `<div class="callout warn"><strong>El reproductor no está disponible.</strong><span>${escapeHtml(health.music.reason || 'Faltan las herramientas de audio en el alojamiento.')}</span></div>`
       : '<div class="callout ok"><strong>El reproductor está listo.</strong><span>Vesper busca y reproduce por su cuenta, dentro del mismo proceso. No hace falta ningún servidor de música aparte ni pagar nada.</span></div>'}
@@ -3422,10 +3544,12 @@ function renderTempVoice() {
   const configured = Boolean(temp.generatorChannel);
   const maxBitrate = Number(data.guild?.maximumBitrate || 96000);
   return `
-    <div class="callout ${enabled && configured ? 'ok' : 'warn'}">
-      <strong>${enabled && configured ? 'Las salas temporales están listas.' : 'Falta completar la activación.'}</strong>
-      <span>${!enabled ? 'Activa «Canales de voz temporales» en Módulos y permisos. ' : ''}${!configured ? 'Elige un canal generador. ' : ''}El bot necesita Ver canal, Gestionar canales y Mover miembros.</span>
-    </div>
+    ${!enabled
+    ? moduleOffCallout('tempvoice', 'Las salas temporales están apagadas.', `Actívalas${configured ? '' : ' y elige un canal generador'}. El bot necesita Ver canal, Gestionar canales y Mover miembros.`)
+    : `<div class="callout ${configured ? 'ok' : 'warn'}">
+      <strong>${configured ? 'Las salas temporales están listas.' : 'Falta elegir el canal generador.'}</strong>
+      <span>${configured ? '' : 'Elígelo abajo y guarda. '}El bot necesita Ver canal, Gestionar canales y Mover miembros.</span>
+    </div>`}
     ${card({
       eyebrow: 'TempVoice',
       title: 'Canal «unirse para crear»',
@@ -3447,7 +3571,7 @@ function renderTempVoice() {
           <div class="form-row">
             <div class="field grow">
               <label for="tempvoice-name">Nombre de la sala</label>
-              <input id="tempvoice-name" maxlength="80" value="${escapeHtml(temp.nameTemplate || 'Sala de {username}')}" required>
+              <input id="tempvoice-name" type="text" maxlength="80" value="${escapeHtml(temp.nameTemplate || 'Sala de {username}')}" required>
               <span class="hint">Variables: {username} y {displayName}. Debe incluir al menos una.</span>
             </div>
             <div class="field">
@@ -3465,7 +3589,7 @@ function renderTempVoice() {
             <label class="switch"><input id="tempvoice-locked" type="checkbox"${temp.lockedByDefault ? ' checked' : ''}><span class="switch-copy"><strong>Nacer bloqueada</strong><small>Solo entran quienes ya tengan permiso.</small></span></label>
             <label class="switch"><input id="tempvoice-hidden" type="checkbox"${temp.hiddenByDefault ? ' checked' : ''}><span class="switch-copy"><strong>Nacer oculta</strong><small>Solo la ven el propietario y quienes tengan permiso.</small></span></label>
           </div>
-          ${formActions('Guardar TempVoice', '<button class="button quiet" type="button" data-goto="modulos">Abrir módulos</button>')}
+          ${formActions('Guardar TempVoice')}
         </form>`
     })}
     ${card({
@@ -3851,6 +3975,23 @@ function bindCommon(root) {
 
   root.querySelectorAll('[data-goto]').forEach(button => {
     button.addEventListener('click', () => showSection(button.dataset.goto));
+  });
+
+  root.querySelectorAll('[data-enable-module]').forEach(button => {
+    button.addEventListener('click', () => {
+      saveConfig({ features: { [button.dataset.enableModule]: true } }, 'Módulo activado.', button);
+    });
+  });
+
+  root.querySelectorAll('[data-copy]').forEach(button => {
+    button.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(button.dataset.copy);
+        toast(`Copiado: ${button.dataset.copy}`, 'ok');
+      } catch {
+        toast('No se pudo copiar. Escríbelo en Discord tal cual.', 'bad');
+      }
+    });
   });
 
   root.querySelectorAll('[data-meter]').forEach(meter => {
@@ -4610,7 +4751,7 @@ function bindHelp(root) {
 
 function renderNav() {
   const nav = $('#section-nav');
-  const available = SECTIONS.filter(sectionAllowed);
+  const available = SECTIONS.filter(sectionAllowed).map(sectionDisplay);
   let lastGroup = null;
   nav.innerHTML = available.map(section => {
     const heading = section.group !== lastGroup ? `<p class="nav-group-label">${escapeHtml(section.group)}</p>` : '';
@@ -4663,9 +4804,14 @@ function renderGuildSwitcher() {
 function renderBrand() {
   const identity = state.data?.identity;
   const name = identity?.webhook?.name || state.data?.guild?.name || 'Vesper';
-  $('#brand-avatar').innerHTML = identity?.webhook?.avatar
+  const brandAvatar = $('#brand-avatar');
+  brandAvatar.innerHTML = identity?.webhook?.avatar
     ? `<img src="${escapeHtml(identity.webhook.avatar)}" alt="" referrerpolicy="no-referrer">`
     : escapeHtml(name.slice(0, 1).toUpperCase());
+  // Un avatar caído dejaba el icono de imagen rota junto al nombre.
+  brandAvatar.querySelector('img')?.addEventListener('error', () => {
+    brandAvatar.textContent = name.slice(0, 1).toUpperCase();
+  }, { once: true });
   $('#brand-name').textContent = name;
   $('#brand-sub').textContent = state.data?.guild?.name || 'Panel de control';
 }
@@ -4741,9 +4887,10 @@ function renderView() {
   const section = currentSection();
   const view = $('#view');
 
-  $('#view-eyebrow').textContent = section.group;
-  $('#view-title').textContent = section.title;
-  $('#view-hint').textContent = section.hint || '';
+  const shown = sectionDisplay(section);
+  $('#view-eyebrow').textContent = shown.group;
+  $('#view-title').textContent = shown.title;
+  $('#view-hint').textContent = shown.hint || '';
 
   if (!state.data) {
     view.innerHTML = '<div class="card"><div class="skeleton line"></div><div class="skeleton block"></div></div>';
