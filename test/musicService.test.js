@@ -64,6 +64,14 @@ test('los errores de yt-dlp se traducen a algo entendible', () => {
   assert.equal(sources.friendlyError(''), null);
 });
 
+test('yt-dlp usa el Node del contenedor para los retos actuales de YouTube', () => {
+  const args = sources.YTDLP_BASE_ARGS;
+  const position = args.indexOf('--js-runtimes');
+  assert.ok(position >= 0);
+  assert.equal(args[position + 1], `node:${process.execPath}`);
+  assert.doesNotMatch(args.join(' '), /player_client=android,web/);
+});
+
 /* ------------------------------------------------------------------ */
 /* ffmpeg entrega lo que Discord espera                                */
 /* ------------------------------------------------------------------ */

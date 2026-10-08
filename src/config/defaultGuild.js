@@ -1,7 +1,7 @@
 const { moduleDefaults, isMainGuild, isThemedMainGuild } = require('./guildPolicy');
 const { defaultEmbedsConfig } = require('../core/EmbedTemplateService');
 
-const CURRENT_SCHEMA_VERSION = 8;
+const CURRENT_SCHEMA_VERSION = 9;
 
 function defaultProfileConfig(guildId = null) {
   if (isThemedMainGuild(guildId)) {
@@ -80,6 +80,15 @@ function createDefaultGuildConfig(guildId = null) {
       minDiscount: 50, giveawayPlatforms: ['steam', 'epic-games-store', 'gog'], maxPerCycle: 5
     },
     music: { requestChannel: null, preferredVoiceChannel: null, defaultVolume: 50, maxQueue: 100, maxPerUser: 3, maxTrackMinutes: 15, idleSeconds: 180 },
+    tempVoice: {
+      generatorChannel: null,
+      category: null,
+      nameTemplate: 'Sala de {username}',
+      userLimit: 0,
+      bitrate: 64000,
+      lockedByDefault: false,
+      hiddenByDefault: false
+    },
     community: defaultCommunityConfig(),
     testPanel: { activeSection: 'general' }
   };

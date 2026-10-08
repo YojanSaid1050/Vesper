@@ -154,7 +154,7 @@ async function updateGuildConfig(guildId, updates) {
   await connectMongo();
   
   try {
-    const allowedSections = ['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'features', 'permissions', 'moderation', 'music', 'deals', 'community', 'testPanel'];
+    const allowedSections = ['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'features', 'permissions', 'moderation', 'music', 'tempVoice', 'deals', 'community', 'testPanel'];
     const sanitizedUpdates = {};
     for (const section of allowedSections) {
       if (updates?.[section] === undefined) continue;
@@ -229,7 +229,7 @@ async function updateGuildSection(guildId, section, values) {
     // OJO: 'alerts' tiene que estar aquí. Sin ella, guardar el interruptor de
     // un registro desde el panel lanzaba «Sección de configuración no
     // permitida» y no se guardaba nada.
-    const allowedSections = new Set(['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'alerts', 'features', 'permissions', 'moderation', 'music', 'deals', 'testPanel']);
+    const allowedSections = new Set(['general', 'dashboard', 'tiktok', 'twitch', 'youtube', 'branding', 'profile', 'embeds', 'alerts', 'features', 'permissions', 'moderation', 'music', 'tempVoice', 'deals', 'testPanel']);
     if (!allowedSections.has(section)) throw new Error(`Sección de configuración no permitida: ${section}`);
 
     const update = {};

@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.7.0 — Embeds interactivos, TempVoice y música reparada
+
+- El compositor web ahora admite hasta 20 botones con enlaces, accesos a
+  canales, apertura de tickets y acciones para dar, quitar o alternar roles.
+- Nuevo menú desplegable de hasta 25 autorroles, con modos alternar, añadir,
+  quitar o selección exclusiva; también puede mencionar un único rol de forma
+  controlada.
+- Los autorroles rechazan permisos sensibles como Administrador, Gestionar
+  roles/canales, banear o moderar, incluso si el rol está debajo del bot.
+- Nuevo módulo **Canales de voz temporales**, con dashboard, canal generador,
+  categoría, nombre por variables, límite, bitrate, bloqueo y visibilidad.
+- Las salas temporales tienen propietario persistente, panel de controles,
+  transferencia automática y limpieza al quedar vacías o al reiniciar.
+- Música habilita Node 24 como motor JavaScript de `yt-dlp`, deja de forzar
+  clientes antiguos de YouTube y limpia conexiones creadas por búsquedas que
+  fallan.
+- `render.yaml` ya no anuncia Lavalink: el reproductor es integrado.
+- El `Dockerfile` conserva la capitalización que Render exige en Linux.
+
 ## 3.6.0 — Publicaciones personalizadas desde la web
 
 - Nueva pantalla **Crear publicación** para enviar un embed manual al canal

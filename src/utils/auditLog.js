@@ -59,7 +59,8 @@ function entriesOf(logs) {
 
 function findEntry(logs, predicate) {
   const entries = entriesOf(logs);
-  return typeof entries.find === 'function' ? entries.find(predicate) : undefined;
+  if (!Array.isArray(entries)) return typeof entries.find === 'function' ? entries.find(predicate) : undefined;
+  return entries.filter(predicate).sort((a, b) => (entryTimestamp(b) || 0) - (entryTimestamp(a) || 0))[0];
 }
 
 function coincide(entry, targetId, options, ahora, maxAgeMs) {

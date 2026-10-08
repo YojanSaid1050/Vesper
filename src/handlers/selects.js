@@ -14,6 +14,11 @@ async function getPanelMode(guildId, platform) {
 async function handleSelect(interaction, client) {
   if (!interaction.guild) return;
 
+  if (String(interaction.customId || '').startsWith('vesper_roles:')) {
+    const { handleCustomRoleMenu } = require('../core/CustomComponentService');
+    if (await handleCustomRoleMenu(interaction)) return;
+  }
+
   if (interaction.customId === 'community_selfroles') {
     const { handleSelfRoles } = require('../core/CommunityService');
     return handleSelfRoles(interaction, client);

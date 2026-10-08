@@ -16,6 +16,7 @@ const Suggestion = require('../database/models/Suggestion');
 const StarboardEntry = require('../database/models/StarboardEntry');
 const { getGuildConfig } = require('../database/mongoManager');
 const { isApprovedGuild, isModuleEnabledConfig } = require('../config/guildPolicy');
+const { selfAssignableRoleIssue } = require('./RoleSafetyService');
 
 const ticketLocks = new Set();
 const ticketCloseLocks = new Set();
@@ -221,13 +222,15 @@ async function closeTicket(interaction, ticketId, reason = '') {
 async function publishSelfRolePanel(guild, channel, roles) {
   if (!channel?.isTextBased?.() || channel.isThread?.()) throw new Error('El panel necesita un canal de texto.');
   if (!roles?.length) throw new Error('Configura al menos un autorrol antes de publicar.');
+  const safeRoles = roles.filter(item => !selfAssignableRoleIssue(guild.roles.cache.get(item.roleId), guild, guild.members.me));
+  if (!safeRoles.length) throw new Error('Los roles configurados ya no son autorroles seguros. Revísalos en el panel.');
   const permissions = channel.permissionsFor(guild.members.me);
   if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks])) {
     throw new Error('Vesper no puede publicar el panel en ese canal.');
   }
   const menu = new StringSelectMenuBuilder().setCustomId('community_selfroles').setPlaceholder('Selecciona tus roles')
-    .setMinValues(0).setMaxValues(Math.min(roles.length, 25));
-  for (const item of roles.slice(0, 25)) {
+    .setMinValues(0).setMaxValues(Math.min(safeRoles.length, 25));
+  for (const item of safeRoles.slice(0, 25)) {
     const option = { label: item.label.slice(0, 100), value: item.roleId, ...(item.description ? { description: item.description.slice(0, 100) } : {}) };
     if (item.emoji) option.emoji = item.emoji;
     menu.addOptions(option);
@@ -250,7 +253,7 @@ async function handleSelfRoles(interaction) {
   if (!me?.permissions?.has(PermissionFlagsBits.ManageRoles)) return interaction.reply({ content: 'No puedo gestionar roles.', flags: 64 });
   const manageable = [...allowedIds].filter(id => {
     const role = interaction.guild.roles.cache.get(id);
-    return role && !role.managed && role.position < me.roles.highest.position;
+    return !selfAssignableRoleIssue(role, interaction.guild, me);
   });
   const add = manageable.filter(id => selected.has(id) && !interaction.member.roles.cache.has(id));
   const remove = manageable.filter(id => selected.has(id) && interaction.member.roles.cache.has(id));
