@@ -1,6 +1,7 @@
 const path = require('path');
 const express = require('express');
 const { ChannelType, PermissionFlagsBits } = require('discord.js');
+const { version: packageVersion } = require('../../package.json');
 const ModerationCase = require('../database/models/ModerationCase');
 const Suggestion = require('../database/models/Suggestion');
 const WebAuditLog = require('../database/models/WebAuditLog');
@@ -348,7 +349,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     // proveedor las rechace: es literalmente lo único que hace falta saber
     // para arreglar un «redirect_uri_mismatch».
     redirectUris: redirectUris(),
-    version: '3.6.0'
+    version: packageVersion
   }));
 
   app.get('/auth/discord', authLimiter, requireDashboard, async (req, res, next) => {

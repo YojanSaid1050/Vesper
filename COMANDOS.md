@@ -1,6 +1,6 @@
 # Comandos de Vesper: quién los ve y cuáles ya sobran
 
-Referencia de los 52 comandos registrados, con quién puede verlos en Discord y
+Referencia de los 51 comandos registrados, con quién puede verlos en Discord y
 cuáles quedan cubiertos por el panel web.
 
 ## Cómo decide Discord quién ve cada comando
@@ -30,7 +30,7 @@ Solo estos cinco. Todo lo demás está oculto por permisos de Discord:
 | `/musica` | Reproductor: poner, saltar, cola, volumen. |
 | `/ticket` | Abre un ticket de soporte. |
 | `/sugerir` | Envía una sugerencia al buzón. |
-| `/id` | Consulta un caso de moderación por su identificador. |
+| `/caso` | Consulta un caso de moderación por su identificador (`/caso ver`). |
 
 Antes también veía `/advertir`, `/aislar` y `/sanciones`; ya no.
 
@@ -42,8 +42,8 @@ rol configurado en `permissions.moderatorRoles` desde el panel.
 
 ## Lo que ve un administrador
 
-Todo lo anterior más los 40 comandos de configuración. Aquí está el punto
-importante: **esos 40 ya están cubiertos por el panel web.**
+Todo lo anterior más los 40 comandos de configuración y `/tiktok-test`. Aquí
+está el punto importante: **esos 40 ya están cubiertos por el panel web.**
 
 ## Los 40 comandos que el panel ya reemplaza
 
@@ -71,10 +71,11 @@ deje sin forma de administrar el bot.
 
 ## Comandos que no se ocultan nunca
 
-`panel`, `musica`, `ticket`, `sugerir`, `id`, `clear`, `advertir`, `aislar`,
-`sanciones` y `vesper-control`. Los ocho primeros son de uso diario y no tienen
-equivalente en el panel; `vesper-control` es el centro de control dentro de
-Discord y sirve de respaldo si el panel se cae.
+`panel`, `musica`, `ticket`, `sugerir`, `caso`, `clear`, `advertir`, `aislar`,
+`sanciones`, `vesper-control` y `tiktok-test`. Los nueve primeros son de uso
+diario y no tienen equivalente en el panel; `vesper-control` es el centro de
+control dentro de Discord y sirve de respaldo si el panel se cae, y
+`tiktok-test` es una herramienta de diagnóstico para administradores.
 
 ## Dónde se registra cada comando
 
@@ -89,6 +90,6 @@ Discord y sirve de respaldo si el panel se cae.
 ## Resumen de lo que puedes retirar
 
 Si el panel ya te funciona, pon `WEB_ADMIN_MODE=true` y vuelve a desplegar
-comandos (`npm run deploy`). Pasas de 52 comandos a 12, que es un menú que un
-miembro puede leer de un vistazo. Y de esos 12, un miembro sin permisos solo
-ve cinco: `/panel`, `/musica`, `/ticket`, `/sugerir` e `/id`.
+comandos (`npm run deploy`). Pasas de 51 comandos a 11, que es un menú que un
+miembro puede leer de un vistazo. Y de esos 11, un miembro sin permisos solo
+ve cinco: `/panel`, `/musica`, `/ticket`, `/sugerir` y `/caso`.

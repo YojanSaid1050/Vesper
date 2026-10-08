@@ -19,6 +19,22 @@
 - `render.yaml` ya no anuncia Lavalink: el reproductor es integrado.
 - El `Dockerfile` conserva la capitalización que Render exige en Linux.
 
+### Correcciones de la verificación completa
+
+- La imagen Docker descarga el binario de ffmpeg: `npm ci --ignore-scripts`
+  saltaba el `install` de `ffmpeg-static` y la música no podía sonar en Render.
+  Si el binario falta, el bot usa el ffmpeg del sistema en lugar de una ruta
+  inexistente.
+- TempVoice transfiere la sala aunque, tras salir el propietario, salga otra
+  persona antes de la revisión; antes la sala se quedaba sin dueño.
+- Las salas ocultas o bloqueadas conservan el acceso del bot, que ya no pierde
+  la sala ni deja canales huérfanos al no poder borrarlos.
+- Los errores de TempVoice se registran sin impedir el log de voz ni producir
+  promesas rechazadas sin gestionar.
+- El panel informa la versión real del paquete en lugar de `3.6.0`.
+- `COMANDOS.md` refleja los 51 comandos reales y `/caso` en lugar de `/id`.
+- Actualizadas dependencias con avisos de seguridad (`proxy-addr`, `undici`).
+
 ## 3.6.0 — Publicaciones personalizadas desde la web
 
 - Nueva pantalla **Crear publicación** para enviar un embed manual al canal
