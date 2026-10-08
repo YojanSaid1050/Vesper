@@ -1484,6 +1484,48 @@ body[data-view="servidores"] .view { max-width: 60rem; margin-inline: auto; widt
 .module-copy small { color: var(--text-3); font-size: .77rem; line-height: 1.4; }
 .module-lock { font-size: .9rem; opacity: .7; }
 
+/* Inicio de un miembro: qué puede hacer y con qué comando. */
+.member-head p strong { color: var(--text); }
+.member-grid {
+  display: grid; gap: .75rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+}
+.member-card {
+  display: grid; gap: .6rem; align-content: start; min-width: 0;
+  padding: 1rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--r-xl);
+  background: var(--surface);
+}
+.member-card-head { display: flex; align-items: center; gap: .7rem; }
+.member-card-head strong { font-size: .98rem; }
+.member-card p { color: var(--text-2); font-size: .86rem; line-height: 1.5; }
+.member-where { display: grid; gap: .2rem; margin: 0; padding: 0; list-style: none; }
+.member-where li { color: var(--text); font-size: .84rem; }
+.member-where li::before { content: '→ '; color: var(--accent); }
+.command-list { display: flex; flex-wrap: wrap; gap: .4rem; }
+.command-chip {
+  display: inline-flex; align-items: center; gap: .45rem; min-height: 2.25rem;
+  padding: .35rem .7rem; border: 1px solid var(--accent-line); border-radius: 999px;
+  background: var(--accent-soft); color: var(--text); cursor: pointer;
+  transition: border-color .12s ease, transform .12s ease;
+}
+.command-chip:hover { border-color: var(--accent); transform: translateY(-1px); }
+.command-chip code { font-family: var(--font-mono); font-size: .8rem; }
+.command-chip span { color: var(--text-3); font-size: .8rem; }
+.member-foot { margin-top: 1.4rem; color: var(--text-3); font-size: .8rem; }
+
+.role-badge { color: var(--text-3); }
+.role-badge.admin { color: var(--accent); font-weight: 600; }
+
+/* Aviso con su acción al lado («Activar ahora»). */
+.callout-action {
+  grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: .75rem;
+}
+.callout-action > div { display: grid; gap: .3rem; min-width: 0; }
+@media (max-width: 560px) {
+  .callout-action { grid-template-columns: 1fr; }
+  .callout-action .button { justify-self: start; }
+}
+
 /* Aviso de que algo no funciona, en una línea. */
 .alert-banner {
   display: grid; gap: .75rem; align-items: center; min-width: 0;

@@ -117,6 +117,29 @@ function publicSuggestion(record) {
   };
 }
 
+// Lo que un miembro sin permisos necesita saber para usar el bot: qué
+// funciones están encendidas y dónde. Nunca incluye la configuración privada,
+// y solo nombra canales que esa persona ya puede ver en Discord.
+function memberViewFor(config, access, guildId) {
+  const member = access.member;
+  const visible = channelId => {
+    const channel = channelId && access.guild.channels.cache.get(String(channelId));
+    if (!channel) return null;
+    if (member && !channel.permissionsFor?.(member)?.has(PermissionFlagsBits.ViewChannel)) return null;
+    return { id: channel.id, name: channel.name };
+  };
+  const on = key => isModuleEnabledConfig(config, key, guildId);
+  const community = config.community || {};
+  return {
+    music: on('music') ? { requestChannel: visible(config.music?.requestChannel), voiceChannel: visible(config.music?.preferredVoiceChannel) } : null,
+    tickets: on('tickets') ? { panelChannel: visible(community.tickets?.panelChannel) } : null,
+    suggestions: on('suggestions') ? { channel: visible(community.suggestions?.channel) } : null,
+    selfroles: on('selfroles') ? { panelChannel: visible(community.selfRoles?.panelChannel) } : null,
+    starboard: on('starboard') ? { channel: visible(community.starboard?.channel), emoji: community.starboard?.emoji || '⭐', threshold: community.starboard?.threshold || 3 } : null,
+    tempvoice: on('tempvoice') && config.tempVoice?.generatorChannel ? { generator: visible(config.tempVoice.generatorChannel) } : null
+  };
+}
+
 function serializedConfig(config) {
   return {
     general: config.general || {},
@@ -491,6 +514,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         health: runtimeHealth(),
         setup: setupChecks(config),
         modules: { moderation: isModuleEnabledConfig(config, 'moderation') },
+        memberView: memberViewFor(config, access, req.params.guildId),
         embedDefaults: access.configure ? embedDefaultsFor(req.params.guildId, access.guild.name) : null,
         messageCatalog: access.configure
           ? catalogForPanel(welcomeLayoutsFor(req.params.guildId))
@@ -919,4 +943,4 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
   });
 }
 
-module.exports = { mountWebDashboard, publicCase, publicSuggestion, serializedConfig, identity, actorCanTarget, embedDefaultsFor, welcomeLayoutsFor, templateMember, effectiveIdentity };
+module.exports = { mountWebDashboard, publicCase, publicSuggestion, serializedConfig, identity, actorCanTarget, embedDefaultsFor, welcomeLayoutsFor, templateMember, effectiveIdentity, memberViewFor };
