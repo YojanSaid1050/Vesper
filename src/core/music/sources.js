@@ -35,10 +35,14 @@ function ytdlpPath() {
   return fs.existsSync(local) ? local : 'yt-dlp';
 }
 
+// `ffmpeg-static` devuelve la ruta aunque su `install` no haya descargado el
+// binario (pasa con `npm ci --ignore-scripts`). En ese caso se usa el del
+// sistema en vez de apuntar a un archivo que no existe.
 function ffmpegPath() {
   if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
   try {
-    return require('ffmpeg-static') || 'ffmpeg';
+    const bundled = require('ffmpeg-static');
+    return bundled && fs.existsSync(bundled) ? bundled : 'ffmpeg';
   } catch {
     return 'ffmpeg';
   }

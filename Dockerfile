@@ -21,6 +21,11 @@ COPY --chown=node:node .env.example ./.env.example
 
 RUN npm ci --omit=dev --ignore-scripts
 
+# `--ignore-scripts` también salta el `install` de ffmpeg-static, que es el que
+# descarga el binario: sin esto la imagen arranca sin ffmpeg y la música no
+# suena. Igual que con yt-dlp, un fallo de red no rompe la construcción.
+RUN npm rebuild ffmpeg-static || echo "⚠️ No se pudo descargar ffmpeg; la música quedará desactivada."
+
 COPY --chown=node:node . .
 
 # El postinstall crea las carpetas y descarga yt-dlp. Si la descarga falla no

@@ -65,6 +65,16 @@ async function ephemeral(interaction, content) {
   return interaction.reply(payload);
 }
 
+// Ocultar o bloquear la sala niega Ver canal y Conectar a @everyone, y eso
+// también alcanza al bot si no es administrador: dejaba de ver la sala, no
+// podía borrarla al quedar vacía y la música no podía entrar. El bot conserva
+// su acceso con un permiso propio sobre el canal.
+async function ensureBotAccess(channel) {
+  const me = channel.guild.members.me;
+  if (!me) return;
+  await channel.permissionOverwrites.edit(me.id, { ViewChannel: true, Connect: true }, { reason: 'Acceso del bot a la sala temporal' });
+}
+
 async function createRoom(newState, config) {
   const member = newState.member;
   const guild = newState.guild;
@@ -99,6 +109,7 @@ async function createRoom(newState, config) {
       });
       await channel.permissionOverwrites.edit(member.id, { ViewChannel: true, Connect: true, Speak: true }, { reason: 'Propietario de sala temporal' });
       if (settings.lockedByDefault || settings.hiddenByDefault) {
+        await ensureBotAccess(channel);
         await channel.permissionOverwrites.edit(guild.roles.everyone, {
           Connect: settings.lockedByDefault ? false : null,
           ViewChannel: settings.hiddenByDefault ? false : null
@@ -129,30 +140,47 @@ async function cleanupRoom(oldState) {
   if (!oldState.channelId) return;
   const record = await findRoom(oldState.channelId);
   if (!record) return;
-  clearTimeout(deleteTimers.get(record.channelId));
-  const timer = setTimeout(async () => {
-    deleteTimers.delete(record.channelId);
-    const channel = oldState.guild.channels.cache.get(record.channelId)
-      || await oldState.guild.channels.fetch(record.channelId).catch(() => null);
-    if (!channel) return TemporaryVoiceChannel.deleteOne({ channelId: record.channelId });
-    const humans = channel.members.filter(member => !member.user.bot);
-    if (!humans.size) {
-      await TemporaryVoiceChannel.deleteOne({ channelId: record.channelId });
-      await channel.delete('Sala temporal vacía').catch(() => null);
-      return;
-    }
-    if (record.ownerId === oldState.id && !humans.has(record.ownerId)) {
-      const next = humans.first();
-      const previousOwnerId = record.ownerId;
-      record.ownerId = next.id;
-      await record.save();
-      await channel.permissionOverwrites.delete(previousOwnerId, 'Transferencia de sala temporal').catch(() => null);
-      await channel.permissionOverwrites.edit(next.id, { ViewChannel: true, Connect: true, Speak: true }, { reason: 'Nuevo propietario de sala temporal' }).catch(() => null);
-      const control = record.controlMessageId && await channel.messages?.fetch(record.controlMessageId).catch(() => null);
-      if (control) await control.edit(controlPayload(next.id, record)).catch(() => null);
-    }
+  const channelId = record.channelId;
+  clearTimeout(deleteTimers.get(channelId));
+  const timer = setTimeout(() => {
+    deleteTimers.delete(channelId);
+    settleRoom(oldState.guild, channelId).catch(error => {
+      console.error(`[TempVoice] No pude revisar la sala ${channelId}:`, error.message || error);
+    });
   }, 2500);
-  deleteTimers.set(record.channelId, timer);
+  deleteTimers.set(channelId, timer);
+}
+
+// Se vuelve a leer el registro al vencer la espera: en esos 2,5 s la sala pudo
+// cerrarse desde el botón, o pudo salir otra persona y reprogramar el
+// temporizador. Antes se usaba el registro de cuando salió la primera persona
+// y solo se transfería si el último en salir era el propietario, así que si
+// salía el dueño y después otro miembro, la sala se quedaba sin dueño.
+async function settleRoom(guild, channelId) {
+  const record = await findRoom(channelId);
+  if (!record) return;
+  const channel = guild.channels.cache.get(channelId)
+    || await guild.channels.fetch(channelId).catch(() => null);
+  if (!channel) {
+    await TemporaryVoiceChannel.deleteOne({ channelId });
+    return;
+  }
+  const humans = channel.members.filter(member => !member.user.bot);
+  if (!humans.size) {
+    await TemporaryVoiceChannel.deleteOne({ channelId });
+    await channel.delete('Sala temporal vacía').catch(() => null);
+    return;
+  }
+  if (humans.has(record.ownerId)) return;
+
+  const next = humans.first();
+  const previousOwnerId = record.ownerId;
+  record.ownerId = next.id;
+  await record.save();
+  await channel.permissionOverwrites.delete(previousOwnerId, 'Transferencia de sala temporal').catch(() => null);
+  await channel.permissionOverwrites.edit(next.id, { ViewChannel: true, Connect: true, Speak: true }, { reason: 'Nuevo propietario de sala temporal' }).catch(() => null);
+  const control = record.controlMessageId && await channel.messages?.fetch(record.controlMessageId).catch(() => null);
+  if (control) await control.edit(controlPayload(next.id, record)).catch(() => null);
 }
 
 async function handleVoiceStateUpdate(oldState, newState, config = null) {
@@ -188,6 +216,7 @@ async function handleTempVoiceButton(interaction) {
     }
     if (action === 'lock' || action === 'unlock') {
       const locked = action === 'lock';
+      await ensureBotAccess(channel);
       await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { Connect: locked ? false : null }, { reason: 'Control de sala temporal' });
       room.locked = locked;
       await room.save();
@@ -197,6 +226,7 @@ async function handleTempVoiceButton(interaction) {
     }
     if (action === 'hide' || action === 'show') {
       const hidden = action === 'hide';
+      await ensureBotAccess(channel);
       await channel.permissionOverwrites.edit(interaction.guild.roles.everyone, { ViewChannel: hidden ? false : null }, { reason: 'Control de sala temporal' });
       room.hidden = hidden;
       await room.save();
@@ -267,5 +297,6 @@ module.exports = {
   reconcileTemporaryVoiceChannels,
   roomName,
   cleanChannelName,
-  controlPayload
+  controlPayload,
+  settleRoom
 };

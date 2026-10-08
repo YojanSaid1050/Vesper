@@ -26,7 +26,11 @@ module.exports = {
 
     const guildConfig = await getGuildConfig(newState.guild.id); // Añadir await
     const { handleVoiceStateUpdate } = require('../../core/TempVoiceService');
-    await handleVoiceStateUpdate(oldState, newState, guildConfig);
+    // Un fallo creando la sala (permisos, MongoDB) no debe impedir que se
+    // publique el registro de voz.
+    await handleVoiceStateUpdate(oldState, newState, guildConfig).catch(error => {
+      console.error('[TempVoice] Error gestionando la sala temporal:', error.message || error);
+    });
 
     // Joined voice channel
     if (!oldState.channelId && newState.channelId) {
