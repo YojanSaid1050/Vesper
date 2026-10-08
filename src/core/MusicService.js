@@ -233,29 +233,40 @@ class MusicService {
 
   async enqueue(interaction, query) {
     const { config, voiceChannel } = await this.ensureAllowed(interaction);
+    const hadPlayer = this.players.has(interaction.guildId);
     const player = await this.join(interaction.guild, voiceChannel, interaction.channelId, config.music || {});
-    const maxQueue = Number(player.settings.maxQueue || DEFAULTS.maxQueue);
-    const maxPerUser = Number(player.settings.maxPerUser || DEFAULTS.maxPerUser);
-    if (player.queue.length >= maxQueue) throw new Error(`La cola alcanzó su límite de ${maxQueue} canciones`);
-    const pending = player.queue.filter(item => item.requesterId === interaction.user.id).length;
-    if (pending >= maxPerUser) throw new Error(`Cada usuario puede tener máximo ${maxPerUser} canciones pendientes`);
+    try {
+      const maxQueue = Number(player.settings.maxQueue || DEFAULTS.maxQueue);
+      const maxPerUser = Number(player.settings.maxPerUser || DEFAULTS.maxPerUser);
+      if (player.queue.length >= maxQueue) throw new Error(`La cola alcanzó su límite de ${maxQueue} canciones`);
+      const pending = player.queue.filter(item => item.requesterId === interaction.user.id).length;
+      if (pending >= maxPerUser) throw new Error(`Cada usuario puede tener máximo ${maxPerUser} canciones pendientes`);
 
-    const track = await this.loadTrack(query);
-    if (!track) throw new Error('No encontré una canción para esa búsqueda');
-    const info = track.info || {};
-    if (info.isStream && player.settings.allowLive === false) throw new Error('Los directos están desactivados en el reproductor');
-    const maxLength = Number(player.settings.maxTrackMinutes || DEFAULTS.maxTrackMinutes) * 60 * 1000;
-    if (!info.isStream && Number(info.length || 0) > maxLength) {
-      throw new Error(`La canción supera el máximo de ${player.settings.maxTrackMinutes || DEFAULTS.maxTrackMinutes} minutos`);
+      const track = await this.loadTrack(query);
+      if (!track) throw new Error('No encontré una canción para esa búsqueda');
+      const info = track.info || {};
+      if (info.isStream && player.settings.allowLive === false) throw new Error('Los directos están desactivados en el reproductor');
+      const maxLength = Number(player.settings.maxTrackMinutes || DEFAULTS.maxTrackMinutes) * 60 * 1000;
+      if (!info.isStream && Number(info.length || 0) > maxLength) {
+        throw new Error(`La canción supera el máximo de ${player.settings.maxTrackMinutes || DEFAULTS.maxTrackMinutes} minutos`);
+      }
+      const trackUri = info.uri || info.identifier;
+      const duplicate = [player.current, ...player.queue].some(item => (item?.info?.uri || item?.info?.identifier) === trackUri);
+      if (trackUri && duplicate) throw new Error('Esa canción ya está en reproducción o en la cola');
+
+      const item = { ...track, requesterId: interaction.user.id };
+      player.queue.push(item);
+      if (!player.current) {
+        await this.advance(interaction.guildId);
+        if (player.current !== item && !player.queue.includes(item)) {
+          throw new Error(this.lastError || 'No pude iniciar esa canción. Revisa /musica diagnostico e inténtalo otra vez.');
+        }
+      }
+      return { item, position: player.current === item ? 0 : player.queue.indexOf(item) + 1 };
+    } catch (error) {
+      if (!hadPlayer && !player.current && !player.queue.length) await this.stop(interaction.guildId).catch(() => null);
+      throw error;
     }
-    const trackUri = info.uri || info.identifier;
-    const duplicate = [player.current, ...player.queue].some(item => (item?.info?.uri || item?.info?.identifier) === trackUri);
-    if (trackUri && duplicate) throw new Error('Esa canción ya está en reproducción o en la cola');
-
-    const item = { ...track, requesterId: interaction.user.id };
-    player.queue.push(item);
-    if (!player.current) await this.advance(interaction.guildId);
-    return { item, position: player.current === item ? 0 : player.queue.indexOf(item) + 1 };
   }
 
   async loadTrack(query) {
@@ -313,6 +324,13 @@ class MusicService {
     player.pausedAt = 0;
     player.elapsedBeforeSeek = seekSeconds;
     session.audio.play(resource);
+    handle.process.once('close', code => {
+      if (code && this.players.get(guildId)?.current === player.current) {
+        const message = sources.friendlyFfmpegError(handle.errorText());
+        this.lastError = message;
+        this.announce(player, `⚠️ El audio se interrumpió: ${message}`);
+      }
+    });
   }
 
   // Segundos reproducidos de la canción actual.

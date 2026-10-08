@@ -49,20 +49,10 @@ services:
         required: true
       - key: GUILD_CONFIG_CACHE_MS
         value: "30000"
-      - key: LAVALINK_URL
-        sync: false
-        required: false
-      - key: LAVALINK_PASSWORD
-        sync: false
-        required: false
-      - key: LAVALINK_EMBEDDED
-        value: "true"
-      - key: JAVA_TOOL_OPTIONS
-        value: "-Xms64m -Xmx256m -XX:+UseG1GC"
       - key: MUSIC_REQUIRED
         value: "false"
-      - key: LAVALINK_REQUEST_TIMEOUT_MS
-        value: "15000"
+      - key: MUSIC_RESOLVE_TIMEOUT_MS
+        value: "45000"
       - key: USE_GUILD_COMMANDS
         value: "false"
       - key: REGISTER_COMMANDS

@@ -54,7 +54,8 @@ Enviar los IDs existentes o indicar cuáles debe crear Vesper:
 - Bienvenida y despedida.
 - Reglas/verificación.
 - Logs generales y logs privados del bot.
-- Solicitudes de música y canal(es) de voz previstos.
+- Solicitudes de música, canal(es) de voz previstos y, si se usará TempVoice,
+  canal generador y categoría para las salas.
 - Tickets y transcripciones.
 - Sugerencias y starboard.
 - Alertas de TikTok, Twitch y YouTube, si se usarán.
@@ -77,8 +78,8 @@ Enviar los IDs existentes o indicar cuáles debe crear Vesper:
 
 ## Datos que no se deben enviar
 
-No hace falta compartir el token del bot, contraseñas, secretos OAuth ni la
-contraseña de Lavalink. Para preparar el perfil solamente se necesitan IDs,
+No hace falta compartir el token del bot, contraseñas ni secretos OAuth.
+Para preparar el perfil solamente se necesitan IDs,
 decisiones de comportamiento y recursos visuales.
 
 ## Entrega posterior

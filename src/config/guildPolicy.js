@@ -8,6 +8,7 @@ const MODULE_DEFAULTS = Object.freeze({
   boosts: true,
   deals: false,
   music: false,
+  tempvoice: false,
   moderation: false,
   tickets: false,
   suggestions: false,
@@ -40,7 +41,7 @@ const MODULE_DEFAULTS = Object.freeze({
 const PLAN_FEATURES = Object.freeze({
   free: [
     'welcome', 'goodbye', 'boosts', 'logs', 'alerts',
-    'moderation', 'tickets', 'suggestions', 'selfroles', 'starboard'
+    'moderation', 'tickets', 'suggestions', 'selfroles', 'starboard', 'tempvoice'
   ],
   // Lo que consume recursos, y escribir los textos del bot.
   premium: ['tiktok', 'twitch', 'youtube', 'deals', 'music', 'embeds', 'messageThemes'],

@@ -1,4 +1,4 @@
-# Vesper Bot 3.6.0
+# Vesper Bot 3.7.0
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión actual conserva la presentación visual original con
@@ -299,6 +299,10 @@ nunca llegaba a existir: Vesper intentaba conectarse a `127.0.0.1:2333` contra
 nada y la música no funcionaba jamás. Ahora no hay nada que levantar ni que
 configurar.
 
+Las versiones actuales de `yt-dlp` necesitan resolver los retos JavaScript de
+YouTube. Vesper habilita explícitamente el mismo Node.js 24 del contenedor para
+esa tarea; no hace falta instalar Deno ni volver a usar Lavalink.
+
 Acepta búsquedas por texto, enlaces de YouTube y SoundCloud, archivos de audio
 sueltos y emisoras de radio. Si una pista falla, se salta y la sesión sigue.
 
@@ -309,6 +313,18 @@ desactivada y lo dice con todas las letras. Se reintenta con:
 ```bash
 npm run music:setup
 ```
+
+## Canales de voz temporales
+
+El panel web incluye **Salas temporales**. Se elige un canal de voz generador y
+una categoría; al entrar, Vesper crea una sala, mueve al usuario y publica un
+panel con controles para renombrar, limitar, bloquear, ocultar o cerrar.
+
+- El propietario no recibe permisos administrativos peligrosos.
+- Si el propietario sale y quedan personas, la propiedad pasa a la siguiente.
+- Cuando queda vacía, la sala se elimina.
+- La propiedad se guarda en MongoDB y se reconcilia al reiniciar el bot.
+- El bot necesita **Ver canal**, **Gestionar canales** y **Mover miembros**.
 
 
 ## Pruebas

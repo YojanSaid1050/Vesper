@@ -22,6 +22,9 @@ const LOG_EVENTS = new Set([
 ]);
 
 function requiredModuleForEvent(eventName) {
+  // VoiceStateUpdate también alimenta TempVoice. Sus propios logs ya validan
+  // el módulo dentro de AlertRouter, por lo que no se debe cortar el evento.
+  if (eventName === Events.VoiceStateUpdate) return null;
   return LOG_EVENTS.has(eventName) ? 'logs' : null;
 }
 

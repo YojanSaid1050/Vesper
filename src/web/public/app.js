@@ -375,6 +375,10 @@ function formActions(label, extra = '') {
   return `<div class="form-actions"><button class="button" type="submit">${escapeHtml(label)}</button>${extra}<span class="dirty-flag" hidden>Cambios sin guardar</span></div>`;
 }
 
+function summaryRow(label, value) {
+  return `<div class="summary-row"><strong>${escapeHtml(label)}</strong><span>${escapeHtml(value)}</span></div>`;
+}
+
 /* ---------------------------------------------------------------- */
 /* Etiquetas de dominio                                              */
 /* ---------------------------------------------------------------- */
@@ -389,6 +393,7 @@ const MODULES = {
   boosts: ['Agradecimiento por boosts', 'Publica un mensaje cuando alguien mejora el servidor con Nitro.'],
   deals: ['Ofertas de juegos', 'Avisa de juegos gratis de Epic, rebajas de Steam y sorteos de llaves.'],
   music: ['Reproductor de música', 'Habilita /musica y la reproducción en canales de voz.'],
+  tempvoice: ['Canales de voz temporales', 'Crea una sala privada al entrar al canal generador y la borra al quedar vacía.'],
   moderation: ['Moderación automática', 'Filtra enlaces, invitaciones, menciones y mensajes repetidos.'],
   tickets: ['Tickets de soporte', 'Panel de tickets con categoría y transcripciones.'],
   suggestions: ['Buzón de sugerencias', 'Habilita /sugerir y su revisión desde el panel.'],
@@ -708,6 +713,13 @@ const SECTIONS = [
     needs: 'configure',
     feature: 'music',
     keywords: ['música', 'canción', 'voz', 'cola', 'volumen', 'dj', 'reproducir']
+  },
+  {
+    id: 'tempvoice', group: 'Comunidad', icon: '◌', label: 'Salas temporales',
+    title: 'Canales de voz temporales',
+    hint: 'Salas automáticas con propietario y controles.',
+    needs: 'configure',
+    keywords: ['tempvoice', 'temporal', 'voz', 'sala', 'privada', 'generador', 'canal']
   },
 
   {
@@ -1118,7 +1130,8 @@ const MODULE_CARDS = [
   { key: 'suggestions', icon: '💡', section: 'comunidad', title: 'Sugerencias', blurb: 'Buzón de ideas' },
   { key: 'selfroles', icon: '🎭', section: 'comunidad', title: 'Autorroles', blurb: 'Roles que se eligen solos' },
   { key: 'starboard', icon: '⭐', section: 'comunidad', title: 'Destacados', blurb: 'Tablón de mejores mensajes' },
-  { key: 'music', icon: '♪', section: 'musica', title: 'Música', blurb: 'Reproduce en canales de voz' }
+  { key: 'music', icon: '♪', section: 'musica', title: 'Música', blurb: 'Reproduce en canales de voz' },
+  { key: 'tempvoice', icon: '◌', section: 'tempvoice', title: 'Salas temporales', blurb: 'Crea salas al entrar' }
 ];
 
 function modulePlanState(key) {
@@ -2380,7 +2393,7 @@ function bindMensajes(root) {
 /* Publicaciones manuales                                            */
 /* ---------------------------------------------------------------- */
 
-const CUSTOM_DRAFT_VERSION = 1;
+const CUSTOM_DRAFT_VERSION = 2;
 
 function customDraftKey() {
   return `vesper.publicacion.${state.guildId}`;
@@ -2390,6 +2403,7 @@ function emptyCustomDraft() {
   return {
     version: CUSTOM_DRAFT_VERSION,
     channelId: '',
+    mentionRoleId: '',
     content: '',
     embed: {
       author: { name: '', url: '', iconUrl: '' },
@@ -2403,7 +2417,8 @@ function emptyCustomDraft() {
       footer: { text: '', iconUrl: '' },
       timestamp: false
     },
-    buttons: []
+    buttons: [],
+    roleMenu: { enabled: false, mode: 'toggle', placeholder: 'Elige tus roles', roles: [] }
   };
 }
 
@@ -2411,7 +2426,7 @@ function loadCustomDraft() {
   const base = emptyCustomDraft();
   try {
     const saved = JSON.parse(localStorage.getItem(customDraftKey()) || 'null');
-    if (!saved || saved.version !== CUSTOM_DRAFT_VERSION) return base;
+    if (!saved || ![1, CUSTOM_DRAFT_VERSION].includes(saved.version)) return base;
     return {
       ...base,
       ...saved,
@@ -2422,7 +2437,14 @@ function loadCustomDraft() {
         footer: { ...base.embed.footer, ...(saved.embed?.footer || {}) },
         fields: Array.isArray(saved.embed?.fields) ? saved.embed.fields.slice(0, 25) : []
       },
-      buttons: Array.isArray(saved.buttons) ? saved.buttons.slice(0, 5) : []
+      buttons: Array.isArray(saved.buttons) ? saved.buttons.slice(0, 20).map(button => ({ type: 'link', style: 'secondary', roleAction: 'toggle', ...button })) : [],
+      roleMenu: {
+        ...base.roleMenu,
+        ...(saved.roleMenu || {}),
+        roles: Array.isArray(saved.roleMenu?.roles)
+          ? saved.roleMenu.roles.map(role => typeof role === 'string' ? role : role.roleId).filter(Boolean).slice(0, 25)
+          : []
+      }
     };
   } catch {
     return base;
@@ -2450,23 +2472,52 @@ function customFieldMarkup(field = {}, index = 0) {
 }
 
 function customButtonMarkup(button = {}, index = 0) {
+  const type = ['link', 'channel', 'role', 'ticket'].includes(button.type) ? button.type : 'link';
+  const channels = state.data?.channels || [];
+  const roles = state.data?.assignableRoles || [];
   return `
     <div class="composer-row" data-custom-button>
       <div class="composer-row-main three">
         <div class="field">
+          <label for="custom-button-type-${index}">Función</label>
+          <select id="custom-button-type-${index}" data-button-type>
+            <option value="link"${type === 'link' ? ' selected' : ''}>Abrir enlace</option>
+            <option value="channel"${type === 'channel' ? ' selected' : ''}>Ir a un canal</option>
+            <option value="role"${type === 'role' ? ' selected' : ''}>Dar o quitar rol</option>
+            <option value="ticket"${type === 'ticket' ? ' selected' : ''}>Abrir ticket</option>
+          </select>
+        </div>
+        <div class="field">
           <label for="custom-button-label-${index}">Texto</label>
           <input id="custom-button-label-${index}" data-button-label type="text" maxlength="80" value="${escapeHtml(button.label || '')}" placeholder="Visitar sitio" required>
-        </div>
-        <div class="field grow">
-          <label for="custom-button-url-${index}">Enlace HTTPS</label>
-          <input id="custom-button-url-${index}" data-button-url type="url" maxlength="500" value="${escapeHtml(button.url || '')}" placeholder="https://…" pattern="https://.*" required>
         </div>
         <div class="field emoji-field">
           <label for="custom-button-emoji-${index}">Emoji</label>
           <input id="custom-button-emoji-${index}" data-button-emoji type="text" maxlength="100" value="${escapeHtml(button.emoji || '')}" placeholder="✨">
         </div>
       </div>
+      <div class="composer-row-main" data-button-panel="link">
+        <div class="field grow"><label for="custom-button-url-${index}">Enlace HTTPS</label><input id="custom-button-url-${index}" data-button-url type="url" maxlength="500" value="${escapeHtml(button.url || '')}" placeholder="https://…" pattern="https://.*"></div>
+      </div>
+      <div class="composer-row-main" data-button-panel="channel">
+        <div class="field grow"><label for="custom-button-channel-${index}">Canal</label><select id="custom-button-channel-${index}" data-button-channel>${selectOptions(channels, button.channelId, 'Elige un canal')}</select></div>
+      </div>
+      <div class="composer-row-main" data-button-panel="role">
+        <div class="field grow"><label for="custom-button-role-${index}">Rol autogestionable</label><select id="custom-button-role-${index}" data-button-role>${selectOptions(roles, button.roleId, 'Elige un rol')}</select></div>
+        <div class="field"><label for="custom-button-role-action-${index}">Acción</label><select id="custom-button-role-action-${index}" data-button-role-action>
+          <option value="toggle"${button.roleAction === 'toggle' || !button.roleAction ? ' selected' : ''}>Alternar</option>
+          <option value="add"${button.roleAction === 'add' ? ' selected' : ''}>Dar rol</option>
+          <option value="remove"${button.roleAction === 'remove' ? ' selected' : ''}>Quitar rol</option>
+        </select></div>
+      </div>
       <div class="composer-row-actions">
+        <div class="field compact" data-button-style-wrap>
+          <label for="custom-button-style-${index}">Color</label>
+          <select id="custom-button-style-${index}" data-button-style>
+            ${[['primary', 'Azul'], ['secondary', 'Gris'], ['success', 'Verde'], ['danger', 'Rojo']].map(([value, label]) => `<option value="${value}"${(button.style || 'secondary') === value ? ' selected' : ''}>${label}</option>`).join('')}
+          </select>
+        </div>
+        <span class="hint" data-button-ticket-hint>Usa la configuración actual de Tickets.</span>
         <button class="button ghost sm" type="button" data-remove-custom-button aria-label="Quitar botón">Quitar</button>
       </div>
     </div>`;
@@ -2480,14 +2531,14 @@ function renderPublicar() {
   return `
     <div class="callout info">
       <strong>Esta publicación es independiente de los mensajes automáticos.</strong>
-      <span>Se envía una vez al canal que elijas. El borrador queda guardado solo en este navegador y las menciones están desactivadas por seguridad.</span>
+      <span>Se envía una vez al canal que elijas. Puedes añadir enlaces, accesos a canales, tickets y autorroles. El borrador queda solo en este navegador.</span>
     </div>
     ${noChannels ? `<div class="callout danger"><strong>No hay canales disponibles.</strong><span>Vesper necesita Ver canal, Enviar mensajes e Insertar enlaces en al menos un canal de texto.</span></div>` : ''}
     ${card({
       eyebrow: 'Compositor',
       title: 'Nueva publicación',
-      description: 'Título, texto, imágenes, campos y hasta cinco botones de enlace.',
-      ayuda: 'Los botones abren enlaces HTTPS. Los botones que ejecutan acciones necesitan programación adicional y por eso no se ofrecen como si fueran a funcionar solos.',
+      description: 'Título, imágenes, campos, menciones controladas y componentes interactivos.',
+      ayuda: 'Los roles gestionables deben estar debajo del rol del bot. Discord admite cinco filas: hasta 20 botones si también usas un menú de roles, o 25 sin menú.',
       body: `
         <div class="editor-layout composer-layout">
           <form id="form-custom-embed" class="form">
@@ -2495,6 +2546,11 @@ function renderPublicar() {
               <label for="custom-channel">Canal de destino</label>
               <select id="custom-channel" required${noChannels ? ' disabled' : ''}>${selectOptions(channels, draft.channelId, 'Elige un canal')}</select>
               <span class="hint">Solo aparecen canales donde Vesper puede publicar embeds.</span>
+            </div>
+            <div class="field wide">
+              <label for="custom-mention-role">Mencionar un rol (opcional)</label>
+              <select id="custom-mention-role">${selectOptions(state.data.roles || [], draft.mentionRoleId, 'No mencionar ningún rol')}</select>
+              <span class="hint">Solo se permitirá esta mención; @everyone y menciones escritas dentro del texto quedan bloqueadas.</span>
             </div>
 
             <details class="more-options" open>
@@ -2576,9 +2632,33 @@ function renderPublicar() {
             </details>
 
             <details class="more-options"${draft.buttons.length ? ' open' : ''}>
-              <summary>Botones de enlace · <span id="custom-button-count">${draft.buttons.length}/5</span></summary>
+              <summary>Botones y acciones · <span id="custom-button-count">${draft.buttons.length}/20</span></summary>
               <div id="custom-buttons" class="composer-list">${draft.buttons.map(customButtonMarkup).join('')}</div>
-              <button id="add-custom-button" class="button quiet sm" type="button"${draft.buttons.length >= 5 ? ' disabled' : ''}>Añadir botón</button>
+              <button id="add-custom-button" class="button quiet sm" type="button"${draft.buttons.length >= 20 ? ' disabled' : ''}>Añadir botón</button>
+            </details>
+
+            <details class="more-options"${draft.roleMenu.enabled ? ' open' : ''}>
+              <summary>Menú desplegable de roles</summary>
+              <label class="check"><input id="custom-role-menu-enabled" type="checkbox"${draft.roleMenu.enabled ? ' checked' : ''}><span>Activar menú de autorroles</span></label>
+              <div class="form-row">
+                <div class="field">
+                  <label for="custom-role-menu-mode">Comportamiento</label>
+                  <select id="custom-role-menu-mode">
+                    <option value="toggle"${draft.roleMenu.mode === 'toggle' ? ' selected' : ''}>Alternar roles seleccionados</option>
+                    <option value="add"${draft.roleMenu.mode === 'add' ? ' selected' : ''}>Solo añadir</option>
+                    <option value="remove"${draft.roleMenu.mode === 'remove' ? ' selected' : ''}>Solo quitar</option>
+                    <option value="exclusive"${draft.roleMenu.mode === 'exclusive' ? ' selected' : ''}>Uno exclusivo</option>
+                  </select>
+                </div>
+                <div class="field grow">
+                  <label for="custom-role-menu-placeholder">Texto del menú</label>
+                  <input id="custom-role-menu-placeholder" maxlength="150" value="${escapeHtml(draft.roleMenu.placeholder || 'Elige tus roles')}">
+                </div>
+              </div>
+              <div class="field wide">
+                <label>Roles disponibles (máximo 25)</label>
+                ${multiPicker('custom-role-menu-roles', state.data.assignableRoles || [], draft.roleMenu.roles, { addLabel: 'Añadir rol', empty: 'No hay roles que el bot pueda gestionar.' })}
+              </div>
             </details>
 
             <div class="form-actions">
@@ -2605,14 +2685,22 @@ function customEmbedValues() {
     inline: row.querySelector('[data-field-inline]')?.checked === true
   })).filter(field => field.name || field.value);
   const buttons = [...document.querySelectorAll('[data-custom-button]')].map(row => ({
+    type: row.querySelector('[data-button-type]')?.value || 'link',
     label: row.querySelector('[data-button-label]')?.value.trim() || '',
     url: row.querySelector('[data-button-url]')?.value.trim() || '',
+    channelId: row.querySelector('[data-button-channel]')?.value || '',
+    roleId: row.querySelector('[data-button-role]')?.value || '',
+    roleAction: row.querySelector('[data-button-role-action]')?.value || 'toggle',
+    style: row.querySelector('[data-button-style]')?.value || 'secondary',
     emoji: row.querySelector('[data-button-emoji]')?.value.trim() || ''
-  })).filter(button => button.label || button.url || button.emoji);
+  })).filter(button => button.label || button.url || button.channelId || button.roleId || button.emoji);
+  const roleIds = selectedValues(document.querySelector('#custom-role-menu-roles')).slice(0, 25);
+  const rolesById = new Map((state.data.assignableRoles || []).map(role => [role.id, role]));
 
   return {
     version: CUSTOM_DRAFT_VERSION,
     channelId: value('#custom-channel'),
+    mentionRoleId: value('#custom-mention-role'),
     content: value('#custom-content'),
     embed: {
       author: { name: value('#custom-author-name'), url: value('#custom-author-url'), iconUrl: value('#custom-author-icon') },
@@ -2626,7 +2714,13 @@ function customEmbedValues() {
       footer: { text: value('#custom-footer'), iconUrl: value('#custom-footer-icon') },
       timestamp: document.querySelector('#custom-timestamp')?.checked === true
     },
-    buttons
+    buttons,
+    roleMenu: {
+      enabled: document.querySelector('#custom-role-menu-enabled')?.checked === true,
+      mode: value('#custom-role-menu-mode') || 'toggle',
+      placeholder: value('#custom-role-menu-placeholder') || 'Elige tus roles',
+      roles: roleIds.map(roleId => ({ roleId, label: rolesById.get(roleId)?.name || `Rol ${roleId}` }))
+    }
   };
 }
 
@@ -2652,8 +2746,12 @@ function refreshCustomPreview() {
     showThumb: Boolean(draft.embed.thumbnail),
     timestamp: draft.embed.timestamp
   };
+  const actionIcon = { link: '↗', channel: '#', role: '✓', ticket: '🎫' };
   const buttons = draft.buttons.length
-    ? `<div class="discord-components">${draft.buttons.map(button => `<span class="discord-button">${button.emoji ? `${escapeHtml(button.emoji)} ` : ''}${escapeHtml(button.label || 'Botón')} <span aria-hidden="true">↗</span></span>`).join('')}</div>`
+    ? `<div class="discord-components">${draft.buttons.map(button => `<span class="discord-button ${escapeHtml(button.style || 'secondary')}">${button.emoji ? `${escapeHtml(button.emoji)} ` : ''}${escapeHtml(button.label || 'Botón')} <span aria-hidden="true">${actionIcon[button.type] || '↗'}</span></span>`).join('')}</div>`
+    : '';
+  const roleMenu = draft.roleMenu.enabled
+    ? `<div class="discord-role-menu"><span>${escapeHtml(draft.roleMenu.placeholder || 'Elige tus roles')}</span><span>⌄</span></div>`
     : '';
   root.innerHTML = `${messageHeaderMarkup(identity)}
       ${draft.content ? `<div class="message-content">${renderMarkdown(draft.content)}</div>` : ''}
@@ -2663,6 +2761,7 @@ function refreshCustomPreview() {
         footerIcon: draft.embed.footer.iconUrl || null
       })}
       ${buttons}
+      ${roleMenu}
     </div>`;
   const embed = root.querySelector('.embed-preview');
   if (embed) embed.style.setProperty('--embed-accent', draft.embed.color);
@@ -2673,7 +2772,7 @@ function refreshCustomPreview() {
     .reduce((sum, text) => sum + text.length, 0);
   const usage = document.querySelector('#custom-embed-usage');
   if (usage) {
-    usage.textContent = `${total.toLocaleString('es-CO')} / 6.000 caracteres del embed · ${draft.embed.fields.length}/25 campos · ${draft.buttons.length}/5 botones`;
+    usage.textContent = `${total.toLocaleString('es-CO')} / 6.000 caracteres del embed · ${draft.embed.fields.length}/25 campos · ${draft.buttons.length}/20 botones · ${draft.roleMenu.enabled ? `${draft.roleMenu.roles.length}/25 roles` : 'sin menú de roles'}`;
     usage.classList.toggle('danger', total > 6000);
   }
 }
@@ -2684,11 +2783,26 @@ function refreshComposerCounts() {
   const fieldCount = document.querySelector('#custom-field-count');
   const buttonCount = document.querySelector('#custom-button-count');
   if (fieldCount) fieldCount.textContent = `${fields}/25`;
-  if (buttonCount) buttonCount.textContent = `${buttons}/5`;
+  if (buttonCount) buttonCount.textContent = `${buttons}/20`;
   const addField = document.querySelector('#add-custom-field');
   const addButton = document.querySelector('#add-custom-button');
   if (addField) addField.disabled = fields >= 25;
-  if (addButton) addButton.disabled = buttons >= 5;
+  if (addButton) addButton.disabled = buttons >= 20;
+}
+
+function syncCustomButtonRow(row) {
+  const type = row.querySelector('[data-button-type]')?.value || 'link';
+  row.querySelectorAll('[data-button-panel]').forEach(panel => { panel.hidden = panel.dataset.buttonPanel !== type; });
+  const url = row.querySelector('[data-button-url]');
+  const channel = row.querySelector('[data-button-channel]');
+  const role = row.querySelector('[data-button-role]');
+  if (url) url.required = type === 'link';
+  if (channel) channel.required = type === 'channel';
+  if (role) role.required = type === 'role';
+  const style = row.querySelector('[data-button-style-wrap]');
+  if (style) style.hidden = ['link', 'channel'].includes(type);
+  const ticketHint = row.querySelector('[data-button-ticket-hint]');
+  if (ticketHint) ticketHint.hidden = type !== 'ticket';
 }
 
 function bindPublicar(root) {
@@ -2702,7 +2816,11 @@ function bindPublicar(root) {
     saveTimer = setTimeout(saveCustomDraft, 250);
   };
   form.addEventListener('input', changed);
-  form.addEventListener('change', changed);
+  form.addEventListener('change', event => {
+    const row = event.target.closest('[data-custom-button]');
+    if (row && event.target.matches('[data-button-type]')) syncCustomButtonRow(row);
+    changed();
+  });
 
   root.querySelector('#add-custom-field')?.addEventListener('click', () => {
     const list = root.querySelector('#custom-fields');
@@ -2715,8 +2833,9 @@ function bindPublicar(root) {
   root.querySelector('#add-custom-button')?.addEventListener('click', () => {
     const list = root.querySelector('#custom-buttons');
     const index = list.querySelectorAll('[data-custom-button]').length;
-    if (index >= 5) return;
+    if (index >= 20) return;
     list.insertAdjacentHTML('beforeend', customButtonMarkup({}, index));
+    syncCustomButtonRow(list.lastElementChild);
     refreshComposerCounts();
     changed();
   });
@@ -2773,6 +2892,7 @@ function bindPublicar(root) {
     }
   });
 
+  root.querySelectorAll('[data-custom-button]').forEach(syncCustomButtonRow);
   refreshComposerCounts();
   refreshCustomPreview();
 }
@@ -3287,6 +3407,79 @@ function renderMusica() {
           </div>
           ${formActions('Guardar música')}
         </form>`
+    })}`;
+}
+
+/* ---------------------------------------------------------------- */
+/* Canales de voz temporales                                        */
+/* ---------------------------------------------------------------- */
+
+function renderTempVoice() {
+  const data = state.data;
+  const config = data.config;
+  const temp = config.tempVoice || {};
+  const enabled = config.features?.tempvoice === true;
+  const configured = Boolean(temp.generatorChannel);
+  const maxBitrate = Number(data.guild?.maximumBitrate || 96000);
+  return `
+    <div class="callout ${enabled && configured ? 'ok' : 'warn'}">
+      <strong>${enabled && configured ? 'Las salas temporales están listas.' : 'Falta completar la activación.'}</strong>
+      <span>${!enabled ? 'Activa «Canales de voz temporales» en Módulos y permisos. ' : ''}${!configured ? 'Elige un canal generador. ' : ''}El bot necesita Ver canal, Gestionar canales y Mover miembros.</span>
+    </div>
+    ${card({
+      eyebrow: 'TempVoice',
+      title: 'Canal «unirse para crear»',
+      description: 'Cuando alguien entra al canal generador, el bot crea su sala y lo mueve automáticamente.',
+      ayuda: 'La sala conserva la jerarquía de la categoría. El propietario recibe controles, pero nunca permisos como Gestionar canales o roles.',
+      body: `
+        <form id="form-tempvoice" class="form">
+          <div class="form-row">
+            <div class="field">
+              <label for="tempvoice-generator">Canal generador</label>
+              <select id="tempvoice-generator">${selectOptions((data.voiceChannels || []).filter(channel => !channel.stage), temp.generatorChannel, 'Elige un canal de voz')}</select>
+              <span class="hint">Usa un canal de voz normal; los escenarios no sirven como generador.</span>
+            </div>
+            <div class="field">
+              <label for="tempvoice-category">Categoría de las salas</label>
+              <select id="tempvoice-category">${selectOptions(data.categories || [], temp.category, 'La misma del generador')}</select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="field grow">
+              <label for="tempvoice-name">Nombre de la sala</label>
+              <input id="tempvoice-name" maxlength="80" value="${escapeHtml(temp.nameTemplate || 'Sala de {username}')}" required>
+              <span class="hint">Variables: {username} y {displayName}. Debe incluir al menos una.</span>
+            </div>
+            <div class="field">
+              <label for="tempvoice-limit">Límite inicial</label>
+              <input id="tempvoice-limit" type="number" min="0" max="99" value="${Number(temp.userLimit || 0)}">
+              <span class="hint">0 significa sin límite.</span>
+            </div>
+            <div class="field">
+              <label for="tempvoice-bitrate">Bitrate</label>
+              <select id="tempvoice-bitrate">${[8000, 16000, 32000, 48000, 64000, 96000, 128000, 256000, 384000].filter(value => value <= maxBitrate).map(value => `<option value="${value}"${Number(temp.bitrate || 64000) === value ? ' selected' : ''}>${Math.round(value / 1000)} kbps</option>`).join('')}</select>
+              <span class="hint">Máximo de este servidor: ${Math.round(maxBitrate / 1000)} kbps.</span>
+            </div>
+          </div>
+          <div class="switch-grid compact-grid">
+            <label class="switch"><input id="tempvoice-locked" type="checkbox"${temp.lockedByDefault ? ' checked' : ''}><span class="switch-copy"><strong>Nacer bloqueada</strong><small>Solo entran quienes ya tengan permiso.</small></span></label>
+            <label class="switch"><input id="tempvoice-hidden" type="checkbox"${temp.hiddenByDefault ? ' checked' : ''}><span class="switch-copy"><strong>Nacer oculta</strong><small>Solo la ven el propietario y quienes tengan permiso.</small></span></label>
+          </div>
+          ${formActions('Guardar TempVoice', '<button class="button quiet" type="button" data-goto="modulos">Abrir módulos</button>')}
+        </form>`
+    })}
+    ${card({
+      eyebrow: 'Controles del propietario',
+      title: 'Qué podrá hacer cada usuario',
+      description: 'El panel aparece en el chat de su canal de voz.',
+      body: `<div class="summary-list">
+        ${summaryRow('Renombrar', 'Cambiar el nombre de su sala')}
+        ${summaryRow('Límite', 'Elegir entre 0 y 99 personas')}
+        ${summaryRow('Bloquear', 'Impedir nuevas conexiones sin expulsar a quienes ya están')}
+        ${summaryRow('Ocultar', 'Quitar la sala de la vista general')}
+        ${summaryRow('Cerrar', 'Eliminar la sala manualmente')}
+        ${summaryRow('Transferencia', 'Si el dueño sale, pasa al siguiente miembro; vacía, se elimina')}
+      </div>`
     })}`;
 }
 
@@ -4025,6 +4218,21 @@ function bindMusica(root) {
   });
 }
 
+function bindTempVoice(root) {
+  root.querySelector('#form-tempvoice')?.addEventListener('submit', event => {
+    event.preventDefault();
+    saveConfig({ tempVoice: {
+      generatorChannel: $('#tempvoice-generator').value || null,
+      category: $('#tempvoice-category').value || null,
+      nameTemplate: $('#tempvoice-name').value.trim(),
+      userLimit: Number($('#tempvoice-limit').value),
+      bitrate: Number($('#tempvoice-bitrate').value),
+      lockedByDefault: $('#tempvoice-locked').checked,
+      hiddenByDefault: $('#tempvoice-hidden').checked
+    } }, 'Canales temporales configurados.', event.submitter);
+  });
+}
+
 function bindModulos(root) {
   root.querySelector('#form-features')?.addEventListener('submit', event => {
     event.preventDefault();
@@ -4324,6 +4532,7 @@ const RENDERERS = {
   moderacion: { render: renderModeracion, bind: bindModeracion },
   comunidad: { render: renderComunidad, bind: bindComunidad },
   musica: { render: renderMusica, bind: bindMusica },
+  tempvoice: { render: renderTempVoice, bind: bindTempVoice },
   modulos: { render: renderModulos, bind: bindModulos },
   resumen: { render: renderResumen, bind: bindResumen },
   auditoria: { render: renderAuditoria, bind: () => loadAudit() }
