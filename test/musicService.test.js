@@ -18,7 +18,7 @@ const sources = require('../src/core/music/sources');
 test('las herramientas de audio vienen con el bot', () => {
   const tools = sources.toolCheck();
   assert.equal(tools.ok, true, `faltan: ${tools.missing.join(', ')}`);
-  assert.match(tools.ytdlp, /yt-dlp$/);
+  assert.match(tools.ytdlp, /yt-dlp(_linux)?$/);
   assert.match(tools.ffmpeg, /ffmpeg$/);
 });
 
@@ -243,4 +243,88 @@ test('si ffmpeg-static no descargó su binario se usa el ffmpeg del sistema', t 
   t.after(() => { if (previous !== undefined) process.env.FFMPEG_PATH = previous; });
   t.mock.method(fs, 'existsSync', () => false);
   assert.equal(sources.ffmpegPath(), 'ffmpeg');
+});
+
+/* ------------------------------------------------------------------ */
+/* Camino rápido y respaldo de yt-dlp                                  */
+/* ------------------------------------------------------------------ */
+
+function fakeYtdlp(t, { fastFails = false } = {}) {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vesper-ytdlp-'));
+  const log = path.join(dir, 'calls.log');
+  const script = path.join(dir, 'yt-dlp');
+  fs.writeFileSync(script, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+require('node:fs').appendFileSync(${JSON.stringify(log)}, JSON.stringify(args) + '\\n');
+const fast = args.some(arg => arg.includes('player_client=visionos'));
+if (fast && ${fastFails}) { process.stderr.write('ERROR: algo falló\\n'); process.exit(1); }
+const video = { id: 'abc123def45', title: 'Canción de prueba', uploader: 'Artista', duration: 200, webpage_url: 'https://www.youtube.com/watch?v=abc123def45' };
+if (args.includes('-g')) { console.log('https://audio.example/' + (fast ? 'rapido' : 'completo')); process.exit(0); }
+if (args.includes('-J')) { console.log(JSON.stringify({ _type: 'playlist', entries: [{ ...video, formats: [{}], url: 'https://audio.example/directo', acodec: 'opus' }] })); process.exit(0); }
+console.log(JSON.stringify({ _type: 'playlist', entries: [{ ...video, url: video.webpage_url }] }));
+`, { mode: 0o755 });
+  const previous = process.env.YTDLP_PATH;
+  process.env.YTDLP_PATH = script;
+  t.after(() => {
+    if (previous === undefined) delete process.env.YTDLP_PATH;
+    else process.env.YTDLP_PATH = previous;
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  return () => fs.readFileSync(log, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+}
+
+test('el camino rápido busca y trae el audio en una sola llamada sin el reto JavaScript', async t => {
+  const calls = fakeYtdlp(t);
+  const [track] = await sources.search('mi canción');
+  assert.equal(track.streamUrl, 'https://audio.example/directo');
+  assert.equal(track.acodec, 'opus');
+  assert.equal(track.resolvedWith, 'fast');
+  assert.equal(calls().length, 1);
+  assert.ok(!calls()[0].includes('--js-runtimes'));
+  assert.equal(await sources.resolveStream(track), 'https://audio.example/directo');
+});
+
+test('si el camino rápido falla se busca el título y el audio sale del camino completo', async t => {
+  const calls = fakeYtdlp(t, { fastFails: true });
+  const [track] = await sources.search('mi canción');
+  assert.equal(track.title, 'Canción de prueba');
+  assert.equal(track.fastFailed, true);
+  assert.equal(await sources.resolveStream(track), 'https://audio.example/completo');
+  assert.equal(track.resolvedWith, 'full');
+  assert.ok(calls().at(-1).includes('--js-runtimes'));
+});
+
+test('forzar el camino completo ignora la dirección rápida en caché', async t => {
+  fakeYtdlp(t);
+  const [track] = await sources.search('mi canción');
+  assert.equal(await sources.resolveStream(track, { full: true }), 'https://audio.example/completo');
+});
+
+test('el camino rápido usa el cliente visionos y guarda caché en disco', () => {
+  const args = sources.FAST_ARGS.join(' ');
+  assert.match(args, /player_client=visionos/);
+  assert.doesNotMatch(args, /--js-runtimes/);
+  assert.ok(sources.FAST_ARGS.includes('--cache-dir'));
+});
+
+test('waitForAudio avisa cuando ffmpeg termina sin entregar audio', async () => {
+  const handle = sources.openStream('/tmp/vesper-no-existe.opus', {});
+  assert.equal(await sources.waitForAudio(handle, 10_000), false);
+});
+
+test('una pista Opus a volumen 100 se reempaqueta sin recodificar', async () => {
+  const { execFileSync } = require('node:child_process');
+  const os = require('node:os');
+  const path = require('node:path');
+  const file = path.join(os.tmpdir(), `vesper-copy-${process.pid}.webm`);
+  execFileSync(sources.ffmpegPath(), ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-c:a', 'libopus', file]);
+  const handle = sources.openStream(file, { volume: 100, codec: 'opus' });
+  const chunks = [];
+  for await (const chunk of handle.stream) chunks.push(chunk);
+  require('node:fs').rmSync(file, { force: true });
+  assert.equal(Buffer.concat(chunks).subarray(0, 4).toString(), 'OggS');
+  assert.ok(handle.process.spawnargs.includes('copy'));
 });

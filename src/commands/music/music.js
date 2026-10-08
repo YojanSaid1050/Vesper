@@ -3,9 +3,25 @@ const { CAPABILITIES, canWithGuildConfig } = require('../../core/PermissionServi
 const { getGuildConfig } = require('../../database/mongoManager');
 const { isModuleEnabledConfig } = require('../../config/guildPolicy');
 const { voicePermissionIssues } = require('../../core/MusicService');
+const sources = require('../../core/music/sources');
 
 function trackName(track) {
   return track?.info?.title || 'Canción desconocida';
+}
+
+// Prueba real contra YouTube: busca una canción y mide cuánto tarda en tener
+// el audio listo. Es la única forma de saber desde Discord si el alojamiento
+// puede reproducir, más allá de que las herramientas estén instaladas.
+async function probeYoutube() {
+  const started = Date.now();
+  try {
+    const [track] = await sources.search('lofi hip hop');
+    if (!track.streamUrl) await sources.resolveStream(track);
+    const seconds = ((Date.now() - started) / 1000).toFixed(1).replace('.', ',');
+    return `✅ ${seconds} s (${track.resolvedWith === 'full' ? 'camino completo' : 'camino rápido'})`;
+  } catch (error) {
+    return `❌ ${String(error.message || error).slice(0, 180)}`;
+  }
 }
 
 function sameVoice(interaction, player) {
@@ -39,9 +55,12 @@ module.exports = {
         const voiceChannel = interaction.member?.voice?.channel;
         const permissionIssues = voiceChannel ? voicePermissionIssues(interaction.guild, voiceChannel) : [];
         const moduleEnabled = isModuleEnabledConfig(config, 'music');
+        await interaction.editReply('🔎 Probando la conexión con YouTube…').catch(() => null);
+        const youtube = status.available ? await probeYoutube() : '⚠️ sin motor de audio';
         const rows = [
           `**Módulo:** ${moduleEnabled ? '✅ activo' : '❌ desactivado'}`,
           `**Motor de audio:** ${status.available ? '✅ integrado en el bot (yt-dlp + ffmpeg)' : '❌ no disponible'}`,
+          `**Prueba de YouTube:** ${youtube}`,
           `**Canal de solicitudes:** ${config.music?.requestChannel ? `<#${config.music.requestChannel}>` : 'cualquier canal de texto'}`,
           `**Canal de voz configurado:** ${config.music?.preferredVoiceChannel ? `<#${config.music.preferredVoiceChannel}>` : 'cualquier canal de voz'}`,
           `**Tu canal de voz:** ${voiceChannel || '❌ no estás en uno'}`,
@@ -59,6 +78,7 @@ module.exports = {
 
       if (subcommand === 'reproducir') {
         await interaction.deferReply();
+        await interaction.editReply('🔎 Buscando y preparando la canción…').catch(() => null);
         const result = await music.enqueue(interaction, interaction.options.getString('busqueda'));
         return interaction.editReply(`${result.position === 0 ? '▶️ Reproduciendo' : `➕ Añadida en posición ${result.position}`}: **${trackName(result.item)}**`);
       }
