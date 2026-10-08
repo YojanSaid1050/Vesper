@@ -18,6 +18,28 @@
 - `/musica reproducir` muestra «Buscando y preparando la canción…» y
   `/musica diagnostico` hace una prueba real contra YouTube y mide el tiempo.
 
+### Panel web pensado también para usuarios
+
+- **Inicio para miembros:** quien no administra ya no ve la rejilla de
+  interruptores del administrador (todos apagados y sin poder tocarlos). Ve
+  qué puede hacer en ese servidor —música, soporte, sugerencias, su propia
+  sala de voz, autorroles, destacados— con el comando exacto, que se copia
+  con un clic, y los canales donde se usa.
+- El servidor envía a los miembros solo un resumen de lo que está activo; la
+  configuración sigue siendo privada y nunca se nombra un canal que esa
+  persona no pueda ver en Discord.
+- «Moderación» se presenta como **Mis casos** para los miembros, sin la
+  columna de usuario, que siempre era la propia persona.
+- El selector de servidores dice si administras, moderas o eres miembro, y
+  ofrece «Abrir» en vez de «Configurar» cuando no puedes configurar.
+- La pantalla de acceso ya no dice que solo se ven servidores donde eres
+  administrador.
+- Los avisos de módulo apagado (música, moderación, ofertas, salas
+  temporales) traen un botón **Activar ahora**; antes mandaban a una sección
+  «Módulos y permisos» que en el menú se llama «Permisos y plan».
+- Corregidos dos campos de texto sin estilo (nombre de la sala temporal y
+  texto del menú de roles) y el icono roto cuando el avatar del bot no carga.
+
 ## 3.7.0 — Embeds interactivos, TempVoice y música reparada
 
 - El compositor web ahora admite hasta 20 botones con enlaces, accesos a
