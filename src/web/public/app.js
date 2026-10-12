@@ -384,7 +384,7 @@ function musicSourcesCallout(sources) {
   const order = (sources.order || []).map(key => SOURCE_NAMES[key] || key).join(' → ');
   const extras = [sources.cookies ? 'cookies de YouTube' : null, sources.proxy ? 'proxy' : null].filter(Boolean);
   const blocked = sources.youtubeBlocked
-    ? ` YouTube está bloqueando al alojamiento ahora mismo, así que las canciones salen de la siguiente fuente hasta las ${new Date(sources.youtubeBlockedUntil).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}.`
+    ? ` YouTube está bloqueando al alojamiento: hasta las ${new Date(sources.youtubeBlockedUntil).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false })} las canciones salen de la siguiente fuente.`
     : '';
   return `
     <div class="callout ${sources.youtubeBlocked ? 'warn' : 'info'}">

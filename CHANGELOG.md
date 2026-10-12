@@ -1,5 +1,38 @@
 # Changelog
 
+## 3.8.0 — Música multifuente y prueba completa del bot
+
+### Música
+- **Por qué no sonaba:** YouTube bloquea a los alojamientos en la nube
+  (Render incluido) con «confirma que no eres un bot». El error además se
+  mostraba como «restricción de edad», lo que despistaba.
+- **Varias fuentes con relevo automático:** YouTube → SoundCloud → Audius
+  (configurable con `MUSIC_SOURCES`). Si YouTube bloquea, se pausa 30 min y
+  las canciones salen directamente de la siguiente fuente.
+- Los enlaces de YouTube y Spotify siguen funcionando aunque YouTube esté
+  bloqueado: se lee el título y se busca en otra fuente.
+- SoundCloud descarta las muestras de 30 s, prefiere MP3 directo y exige que
+  el resultado se parezca a lo pedido.
+- Si el audio no abre, se reintenta y, como último recurso, se cambia de
+  fuente sin perder la canción.
+- Cookies (`YTDLP_COOKIES`) y proxy (`YTDLP_PROXY`) opcionales para YouTube.
+- ffmpeg-static se cae al leer MPEG-TS en algunos sistemas: se detecta con
+  una autoprueba, se explica y se evita ese formato.
+- **Corregido:** detener la música dejaba un temporizador que cortaba la
+  siguiente sesión del mismo servidor a los 3 minutos.
+- Cada canción nueva se anuncia; la respuesta dice de qué fuente suena.
+- `/musica diagnostico` y `npm run diagnostico musica` prueban cada fuente;
+  el panel muestra el orden de fuentes y si YouTube está bloqueado.
+
+### Prueba completa del bot
+- Se ejecutaron los 79 comandos y subcomandos como administrador y como
+  miembro, y los 18 eventos, contra un Discord simulado y MongoDB real.
+- `/caso ver` ya funciona para los miembros con sus propios casos (sin notas
+  internas, evidencia ni moderador); antes respondía «No tienes autorización»
+  aunque el comando se mostraba a todos.
+- `/clear` responde en español, explica por qué no se pueden borrar mensajes
+  de más de 14 días y avisa si falta el permiso.
+
 ## 3.7.1 — Música que funciona en el plan gratuito de Render
 
 - **Causa del fallo «La búsqueda tardó demasiado»:** con 0,1 CPU, yt-dlp de un

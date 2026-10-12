@@ -1,4 +1,4 @@
-# Vesper Bot 3.7.1
+# Vesper Bot 3.8.0
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión actual conserva la presentación visual original con
