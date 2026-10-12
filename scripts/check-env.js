@@ -57,6 +57,10 @@ const optionalEnvVars = [
   'FFMPEG_PATH',
   'MUSIC_RESOLVE_TIMEOUT_MS',
   'MUSIC_FULL_RESOLVE_TIMEOUT_MS',
+  'MUSIC_SOURCES',
+  'MUSIC_YOUTUBE_COOLDOWN_MS',
+  'YTDLP_COOKIES',
+  'YTDLP_PROXY',
   'MUSIC_REQUIRED'
 ];
 
@@ -67,7 +71,9 @@ const sensitiveEnvVars = new Set([
   'YOUTUBE_API_KEY',
   'WEB_SESSION_SECRET',
   'DISCORD_OAUTH_CLIENT_SECRET',
-  'GOOGLE_CLIENT_SECRET'
+  'GOOGLE_CLIENT_SECRET',
+  'YTDLP_COOKIES',
+  'YTDLP_PROXY'
 ]);
 
 function displayValue(envVar, value) {

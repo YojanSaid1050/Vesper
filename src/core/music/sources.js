@@ -26,8 +26,50 @@ const STREAM_TTL_MS = 5 * 60 * 1000;
 const AUDIO_EXTENSIONS = /\.(mp3|ogg|oga|opus|m4a|aac|flac|wav|webm)(\?|$)/i;
 const STREAM_HINTS = /(\/stream\b|\/listen\b|icecast|shoutcast|radio)/i;
 const AUDIO_FORMAT = 'bestaudio[acodec!=none]/bestaudio/best';
-const CACHE_DIR = path.join(process.env.DATA_PATH || path.join(__dirname, '..', '..', '..', 'data'), 'yt-dlp-cache');
-const COMMON_ARGS = Object.freeze(['--no-warnings', '--ignore-config', '--no-check-certificates', '--cache-dir', CACHE_DIR]);
+const DATA_DIR = process.env.DATA_PATH || path.join(__dirname, '..', '..', '..', 'data');
+const CACHE_DIR = path.join(DATA_DIR, 'yt-dlp-cache');
+
+// Proxy opcional (YTDLP_PROXY). Las direcciones de audio de YouTube quedan
+// atadas a la IP que las pidió, así que ffmpeg debe salir por el mismo proxy.
+function musicProxy() {
+  const value = String(process.env.YTDLP_PROXY || '').trim();
+  return /^(https?|socks5h?):\/\//i.test(value) ? value : null;
+}
+
+const COMMON_ARGS = Object.freeze([
+  '--no-warnings', '--ignore-config', '--no-check-certificates', '--cache-dir', CACHE_DIR,
+  ...(musicProxy() ? ['--proxy', musicProxy()] : [])
+]);
+
+// Cookies opcionales de una cuenta de YouTube (YTDLP_COOKIES), en formato
+// Netscape tal cual o en base64. Es lo único que suele saltarse el bloqueo
+// «confirma que no eres un bot» en IPs de centros de datos, con el riesgo de
+// que Google limite esa cuenta: por eso conviene una cuenta secundaria.
+let cookiesFile;
+function youtubeCookiesFile() {
+  if (cookiesFile !== undefined) return cookiesFile;
+  cookiesFile = null;
+  if (process.env.YTDLP_COOKIES_FILE && fs.existsSync(process.env.YTDLP_COOKIES_FILE)) {
+    cookiesFile = process.env.YTDLP_COOKIES_FILE;
+    return cookiesFile;
+  }
+  const raw = String(process.env.YTDLP_COOKIES || '').trim();
+  if (!raw) return cookiesFile;
+  let text = raw;
+  if (!/\t/.test(raw)) {
+    try { text = Buffer.from(raw, 'base64').toString('utf8'); } catch { text = raw; }
+  }
+  if (!/\t/.test(text)) return cookiesFile;
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    const file = path.join(DATA_DIR, 'youtube-cookies.txt');
+    fs.writeFileSync(file, text.endsWith('\n') ? text : `${text}\n`, { mode: 0o600 });
+    cookiesFile = file;
+  } catch {
+    cookiesFile = null;
+  }
+  return cookiesFile;
+}
 
 // Camino rápido. El cliente `visionos` de YouTube entrega el audio sin pedir
 // el reproductor JavaScript (~3 MB) ni resolver su reto, que es lo que más
@@ -36,6 +78,14 @@ const FAST_ARGS = Object.freeze([
   ...COMMON_ARGS,
   '--extractor-args', 'youtube:player_client=visionos'
 ]);
+
+// Con cookies no se fuerza `visionos` (no las admite): yt-dlp elige sus
+// clientes para sesiones iniciadas y necesita el runtime JS.
+function youtubeArgs({ full = false } = {}) {
+  const cookies = youtubeCookiesFile();
+  if (cookies) return [...COMMON_ARGS, '--cookies', cookies, '--js-runtimes', `node:${process.execPath}`];
+  return full ? [...YTDLP_BASE_ARGS] : [...FAST_ARGS];
+}
 
 // Camino completo, de respaldo si el rápido falla. Desde yt-dlp 2025.11
 // YouTube requiere un runtime JS externo. El bot ya corre sobre Node 24, pero
@@ -115,16 +165,28 @@ function run(binary, args, { timeoutMs = YTDLP_TIMEOUT_MS, timeoutMessage = 'La 
     child.on('close', code => {
       clearTimeout(timer);
       if (code === 0) return resolve(stdout);
-      reject(new Error(friendlyError(stderr) || `yt-dlp terminó con código ${code}`));
+      reject(Object.assign(new Error(friendlyError(stderr) || `yt-dlp terminó con código ${code}`), {
+        stderr,
+        stdout,
+        botCheck: isBotCheck(stderr)
+      }));
     });
   });
+}
+
+// YouTube no se fía de la IP del alojamiento (pasa en casi todos los centros
+// de datos: Render, Railway, Heroku…). No depende de la canción ni se arregla
+// reintentando: hay que usar otra fuente o cookies/proxy.
+function isBotCheck(stderr) {
+  return /not a bot|confirm you.?re not|LOGIN_REQUIRED|HTTP Error 429|Too Many Requests|Sign in to confirm(?! your age)/i.test(String(stderr || ''));
 }
 
 // yt-dlp escribe errores muy técnicos. Se traducen los habituales.
 function friendlyError(stderr) {
   const text = String(stderr || '');
+  if (isBotCheck(text)) return 'YouTube bloqueó la petición desde el alojamiento (pide confirmar que no es un bot).';
   if (/Private video|Video unavailable|This video is not available/i.test(text)) return 'Ese video es privado o no está disponible.';
-  if (/Sign in to confirm|age.?restricted|confirm your age/i.test(text)) return 'Ese video pide iniciar sesión o tiene restricción de edad.';
+  if (/age.?restricted|confirm your age|inappropriate for some users/i.test(text)) return 'Ese video tiene restricción de edad.';
   if (/Unable to connect to proxy|Tunnel connection failed|Network is unreachable|Temporary failure in name resolution/i.test(text)) {
     return 'El alojamiento no pudo conectarse a internet para buscar la canción.';
   }
@@ -197,7 +259,7 @@ function tracksFrom(parsed) {
 // eran dos procesos por canción (buscar y luego resolver), y en un
 // alojamiento con poca CPU cada arranque cuenta.
 async function searchAndResolve(target) {
-  const raw = await run(ytdlpPath(), [...FAST_ARGS, '--no-playlist', '-f', AUDIO_FORMAT, '-J', target]);
+  const raw = await run(ytdlpPath(), [...youtubeArgs(), '--no-playlist', '-f', AUDIO_FORMAT, '-J', target]);
   const [track] = tracksFrom(parseJson(raw));
   if (track) track.resolvedWith = 'fast';
   return track || null;
@@ -226,13 +288,16 @@ async function search(query, { limit = 1 } = {}) {
       const track = await searchAndResolve(isUrl ? clean : `ytsearch1:${clean}`);
       if (track?.streamUrl) return [track];
     } catch (error) {
-      // Un video privado o inexistente no se arregla con el camino completo.
-      if (!error.timedOut && /privado|no está disponible|iniciar sesión|No sé reproducir/.test(error.message)) throw error;
+      // Un video privado o inexistente no se arregla con el camino completo,
+      // y un bloqueo anti-bot de YouTube tampoco: se avisa ya para que otra
+      // fuente pueda tomar el relevo sin esperar.
+      if (error.botCheck) throw error;
+      if (!error.timedOut && /privado|no está disponible|restricción de edad|No sé reproducir/.test(error.message)) throw error;
       fastError = error;
     }
   }
 
-  const args = [...COMMON_ARGS, '--flat-playlist', '--dump-single-json'];
+  const args = [...COMMON_ARGS, ...(youtubeCookiesFile() ? ['--cookies', youtubeCookiesFile()] : []), '--flat-playlist', '--dump-single-json'];
   if (!isPlaylist) args.push('--no-playlist');
   args.push(target);
 
@@ -260,14 +325,15 @@ async function resolveStream(track, { full = false } = {}) {
   let url = null;
   let mode = 'fast';
   if (!full && !track.fastFailed) {
-    url = await resolveWith(FAST_ARGS, track).catch(error => {
-      if (!error.timedOut && /privado|no está disponible|iniciar sesión/.test(error.message)) throw error;
+    url = await resolveWith(youtubeArgs(), track).catch(error => {
+      if (error.botCheck) throw error;
+      if (!error.timedOut && /privado|no está disponible|restricción de edad/.test(error.message)) throw error;
       return null;
     });
   }
   if (!url) {
     mode = 'full';
-    url = await resolveWith(YTDLP_BASE_ARGS, track, {
+    url = await resolveWith(youtubeArgs({ full: true }), track, {
       timeoutMs: FULL_TIMEOUT_MS,
       timeoutMessage: 'Preparar el audio tardó demasiado. Vuelve a intentarlo en un momento: la siguiente vez será más rápido.'
     });
@@ -286,7 +352,7 @@ async function resolveStream(track, { full = false } = {}) {
  * hace falta ninguna librería nativa de codificación ni se gasta CPU de más:
  * importa, porque el bot y la música comparten la única máquina que hay.
  */
-function openStream(url, { seekSeconds = 0, volume = 100, live = false, codec = null } = {}) {
+function openStream(url, { seekSeconds = 0, volume = 100, live = false, codec = null, proxy = null } = {}) {
   const gain = Math.max(0, Math.min(200, Number(volume) || 100)) / 100;
   // Si el original ya es Opus y no hay que tocar el volumen, basta con
   // reempaquetarlo: recodificar consume ~1/3 de la CPU del plan gratuito.
@@ -296,6 +362,8 @@ function openStream(url, { seekSeconds = 0, volume = 100, live = false, codec = 
   // opciones del protocolo HTTP: si se le pasan a un archivo local, ffmpeg ni
   // siquiera abre la entrada.
   if (isHttpUrl(url)) args.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
+  // ffmpeg solo entiende proxies HTTP; uno SOCKS no se le puede pasar.
+  if (proxy && isHttpUrl(url) && /^http:\/\//i.test(proxy)) args.push('-http_proxy', proxy);
   if (seekSeconds > 0 && !live) args.push('-ss', String(Math.floor(seekSeconds)));
   args.push(
     '-i', url,
@@ -309,8 +377,35 @@ function openStream(url, { seekSeconds = 0, volume = 100, live = false, codec = 
   const child = spawn(ffmpegPath(), args, { stdio: ['ignore', 'pipe', 'pipe'] });
   let stderr = '';
   child.stderr.on('data', chunk => { stderr += chunk.toString().slice(0, 1000); });
+  // Si ffmpeg muere por una señal (un fallo interno, no un error de red) no
+  // escribe nada: se anota para poder explicarlo y probar otra fuente.
+  child.once('exit', (code, signal) => { if (signal) stderr += `\n[ffmpeg terminó por la señal ${signal}]`; });
   child.on('error', () => { /* lo gestiona quien consume el flujo */ });
   return { process: child, stream: child.stdout, errorText: () => stderr };
+}
+
+// Autoprueba de ffmpeg: codifica un segundo de audio en MPEG-TS (el formato
+// de las emisiones HLS) y lo vuelve a leer. Algunas compilaciones estáticas
+// se caen al leer MPEG-TS; saberlo explica fallos que si no parecen de red.
+let selfTestResult = null;
+function ffmpegSelfTest() {
+  if (selfTestResult) return selfTestResult;
+  selfTestResult = new Promise(resolve => {
+    const encoder = spawn(ffmpegPath(), ['-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=duration=1', '-c:a', 'aac', '-f', 'mpegts', 'pipe:1'], { stdio: ['ignore', 'pipe', 'ignore'] });
+    const decoder = spawn(ffmpegPath(), ['-hide_banner', '-loglevel', 'error', '-f', 'mpegts', '-i', 'pipe:0', '-c:a', 'libopus', '-f', 'opus', 'pipe:1'], { stdio: ['pipe', 'pipe', 'ignore'] });
+    let bytes = 0;
+    const timer = setTimeout(() => { encoder.kill('SIGKILL'); decoder.kill('SIGKILL'); }, 15_000);
+    encoder.on('error', () => null);
+    decoder.on('error', () => null);
+    decoder.stdin.on('error', () => null);
+    encoder.stdout.pipe(decoder.stdin);
+    decoder.stdout.on('data', chunk => { bytes += chunk.length; });
+    decoder.on('close', (code, signal) => {
+      clearTimeout(timer);
+      resolve({ mpegts: bytes > 0 && !signal, signal: signal || null });
+    });
+  });
+  return selfTestResult;
 }
 
 // Espera a que ffmpeg entregue el primer audio. Si se cierra antes —YouTube
@@ -335,6 +430,7 @@ function waitForAudio(handle, timeoutMs = 20_000) {
 
 function friendlyFfmpegError(stderr) {
   const text = String(stderr || '');
+  if (/señal SIG(SEGV|ILL|BUS|ABRT)/.test(text)) return 'ffmpeg no pudo abrir este formato de audio en el alojamiento.';
   if (/403 Forbidden|Server returned 403/i.test(text)) return 'El enlace de audio caducó o YouTube lo rechazó; vuelve a pedir la canción.';
   if (/404 Not Found/i.test(text)) return 'La fuente de audio ya no está disponible.';
   if (/Invalid data found|could not find codec parameters/i.test(text)) return 'El formato de audio no es compatible.';
@@ -352,7 +448,15 @@ module.exports = {
   ffmpegPath,
   friendlyError,
   friendlyFfmpegError,
+  isBotCheck,
+  run,
+  youtubeArgs,
+  youtubeCookiesFile,
+  musicProxy,
+  COMMON_ARGS,
   waitForAudio,
+  ffmpegSelfTest,
+  trackFromJson,
   isHttpUrl,
   STREAM_TTL_MS,
   YTDLP_BASE_ARGS,

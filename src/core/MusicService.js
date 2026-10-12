@@ -31,6 +31,7 @@ const { PermissionFlagsBits } = require('discord.js');
 const { getGuildConfig } = require('../database/mongoManager');
 const { isModuleEnabledConfig, featureAvailable } = require('../config/guildPolicy');
 const sources = require('./music/sources');
+const providers = require('./music/providers');
 
 const DEFAULTS = Object.freeze({
   volume: 50,
@@ -108,6 +109,11 @@ class MusicService {
     if (this.started) return;
     this.started = true;
     this.tools = sources.toolCheck();
+    if (this.tools.ok) {
+      sources.ffmpegSelfTest().then(result => {
+        if (!result.mpegts) console.warn(`[Música] ffmpeg no puede leer MPEG-TS en este alojamiento (${result.signal || 'sin audio'}); se priorizan formatos directos.`);
+      }).catch(() => null);
+    }
     this.client.on?.('voiceStateUpdate', (oldState, newState) => {
       const guildId = newState.guild?.id || oldState.guild?.id;
       if (guildId) setTimeout(() => this.checkAudience(guildId), 1000);
@@ -137,7 +143,9 @@ class MusicService {
       playing: [...this.players.values()].filter(player => player.current).length,
       ytdlp: this.tools.ytdlp,
       ffmpeg: this.tools.ffmpeg,
-      lastError: this.lastError
+      lastError: this.lastError,
+      // Sin los mensajes de error: este estado sale también en /health.
+      sources: (({ order, youtubeBlocked, youtubeBlockedUntil, cookies, proxy }) => ({ order, youtubeBlocked, youtubeBlockedUntil, cookies, proxy }))(providers.status())
     };
   }
 
@@ -256,6 +264,8 @@ class MusicService {
 
       const item = { ...track, requesterId: interaction.user.id };
       player.queue.push(item);
+      // La primera canción ya se anuncia en la respuesta del comando.
+      if (!player.current) item.quietStart = true;
       if (!player.current) {
         await this.advance(interaction.guildId);
         if (player.current !== item && !player.queue.includes(item)) {
@@ -270,7 +280,7 @@ class MusicService {
   }
 
   async loadTrack(query) {
-    const [track] = await sources.search(query, { limit: 1 });
+    const [track] = await providers.search(query, { limit: 1 });
     return track ? withLegacyShape(track) : null;
   }
 
@@ -293,8 +303,15 @@ class MusicService {
       return;
     }
 
+    const repeating = player.loop && player.queue.length === 0;
     try {
       await this.playCurrent(guildId);
+      const now = player.current;
+      if (now && !now.quietStart && !repeating) {
+        const via = now.provider && now.provider !== 'youtube' ? ` · desde ${providers.PROVIDER_LABELS[now.provider] || now.source}` : '';
+        this.announce(player, `🎶 Ahora suena: **${now.title || 'canción'}**${now.requesterId ? ` · pedida por <@${now.requesterId}>` : ''}${via}`);
+      }
+      if (now) now.quietStart = false;
     } catch (error) {
       this.lastError = error.message;
       this.announce(player, `⚠️ No pude reproducir **${player.current?.title || 'esa canción'}**: ${error.message}`);
@@ -315,18 +332,25 @@ class MusicService {
       seekSeconds,
       volume: player.volume,
       live: Boolean(track.live),
-      codec: track.acodec
+      codec: track.acodec,
+      proxy: track.provider === 'youtube' ? sources.musicProxy() : null
     });
 
-    let handle = open(await sources.resolveStream(track));
-    if (!await sources.waitForAudio(handle)) {
-      // La dirección del camino rápido puede ser rechazada por YouTube. Antes
-      // de dar la canción por perdida se pide otra con el camino completo.
-      const canRetry = track.pageUrl && track.source !== 'directo' && track.resolvedWith !== 'full';
-      if (!canRetry) throw new Error(sources.friendlyFfmpegError(handle.errorText()));
-      handle = open(await sources.resolveStream(track, { full: true }));
-      if (!await sources.waitForAudio(handle)) throw new Error(sources.friendlyFfmpegError(handle.errorText()));
+    // Hasta tres intentos: la dirección normal, una nueva (o el camino
+    // completo de YouTube) y, por último, la misma canción en otra fuente.
+    let handle = null;
+    let lastError = null;
+    for (let attempt = 0; attempt < 3 && !handle; attempt++) {
+      try {
+        const candidate = open(await providers.resolveStream(track, { attempt }));
+        if (await sources.waitForAudio(candidate)) handle = candidate;
+        else lastError = new Error(sources.friendlyFfmpegError(candidate.errorText()));
+      } catch (error) {
+        lastError = error;
+      }
+      if (!handle && !providers.canRetry(track, attempt)) break;
     }
+    if (!handle) throw lastError || new Error('No pude abrir el audio de esa canción.');
     if (this.players.get(guildId)?.current !== track) {
       handle.process.kill('SIGKILL');
       return;
@@ -421,7 +445,14 @@ class MusicService {
   async stop(guildId) {
     const player = this.players.get(guildId);
     const session = this.connections.get(guildId);
+    // Se sacan antes de parar el audio: `audio.stop()` dispara el evento de
+    // reposo, y con la sesión aún registrada `advance` programaba un
+    // temporizador de inactividad que, minutos después, cortaba la siguiente
+    // sesión de música del mismo servidor.
+    this.players.delete(guildId);
+    this.connections.delete(guildId);
     if (player?.idleTimer) clearTimeout(player.idleTimer);
+    if (player) player.idleTimer = null;
     player?.process?.kill?.('SIGKILL');
     if (session) {
       session.audio.stop(true);
@@ -429,8 +460,6 @@ class MusicService {
     } else {
       try { getVoiceConnection(guildId)?.destroy(); } catch { /* nada que cerrar */ }
     }
-    this.connections.delete(guildId);
-    this.players.delete(guildId);
   }
 
   async shutdown() {

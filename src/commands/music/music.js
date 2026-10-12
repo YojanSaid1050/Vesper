@@ -3,25 +3,29 @@ const { CAPABILITIES, canWithGuildConfig } = require('../../core/PermissionServi
 const { getGuildConfig } = require('../../database/mongoManager');
 const { isModuleEnabledConfig } = require('../../config/guildPolicy');
 const { voicePermissionIssues } = require('../../core/MusicService');
+const providers = require('../../core/music/providers');
 const sources = require('../../core/music/sources');
 
 function trackName(track) {
   return track?.info?.title || 'Canción desconocida';
 }
 
-// Prueba real contra YouTube: busca una canción y mide cuánto tarda en tener
-// el audio listo. Es la única forma de saber desde Discord si el alojamiento
-// puede reproducir, más allá de que las herramientas estén instaladas.
-async function probeYoutube() {
-  const started = Date.now();
-  try {
-    const [track] = await sources.search('lofi hip hop');
-    if (!track.streamUrl) await sources.resolveStream(track);
-    const seconds = ((Date.now() - started) / 1000).toFixed(1).replace('.', ',');
-    return `✅ ${seconds} s (${track.resolvedWith === 'full' ? 'camino completo' : 'camino rápido'})`;
-  } catch (error) {
-    return `❌ ${String(error.message || error).slice(0, 180)}`;
-  }
+// Prueba real de cada fuente: busca una canción y mide cuánto tarda en
+// tener el audio listo. Es la única forma de saber desde Discord qué puede
+// reproducir el alojamiento, más allá de que las herramientas estén.
+async function probeSources() {
+  const results = await providers.probe('lofi hip hop');
+  return results.map(result => {
+    const seconds = (result.ms / 1000).toFixed(1).replace('.', ',');
+    if (result.ok) return `✅ **${result.label}** · ${seconds} s`;
+    const hint = result.botCheck ? ' (bloqueo anti-bot de YouTube a este alojamiento)' : '';
+    return `❌ **${result.label}** · ${String(result.detail).slice(0, 140)}${hint}`;
+  });
+}
+
+function sourceSuffix(track) {
+  if (!track?.provider || track.provider === 'youtube') return '';
+  return ` · desde ${providers.PROVIDER_LABELS[track.provider] || track.source}`;
 }
 
 function sameVoice(interaction, player) {
@@ -55,12 +59,18 @@ module.exports = {
         const voiceChannel = interaction.member?.voice?.channel;
         const permissionIssues = voiceChannel ? voicePermissionIssues(interaction.guild, voiceChannel) : [];
         const moduleEnabled = isModuleEnabledConfig(config, 'music');
-        await interaction.editReply('🔎 Probando la conexión con YouTube…').catch(() => null);
-        const youtube = status.available ? await probeYoutube() : '⚠️ sin motor de audio';
+        await interaction.editReply('🔎 Probando cada fuente de música desde el alojamiento… (puede tardar un minuto)').catch(() => null);
+        const sourceRows = status.available ? await probeSources() : ['⚠️ sin motor de audio'];
+        const ffmpegTest = status.available ? await sources.ffmpegSelfTest() : null;
+        const sourceState = providers.status();
+        const anyWorking = sourceRows.some(row => row.startsWith('✅'));
         const rows = [
           `**Módulo:** ${moduleEnabled ? '✅ activo' : '❌ desactivado'}`,
           `**Motor de audio:** ${status.available ? '✅ integrado en el bot (yt-dlp + ffmpeg)' : '❌ no disponible'}`,
-          `**Prueba de YouTube:** ${youtube}`,
+          `**Fuentes de música** (en orden de uso):\n${sourceRows.map(row => `> ${row}`).join('\n')}`,
+          ...(sourceState.youtubeBlocked ? [`**YouTube:** en pausa hasta <t:${Math.floor(sourceState.youtubeBlockedUntil / 1000)}:t> por el bloqueo anti-bot; mientras tanto suenan las otras fuentes.`] : []),
+          ...(ffmpegTest && !ffmpegTest.mpegts ? ['**ffmpeg:** ⚠️ no puede leer MPEG-TS en este alojamiento; se usan formatos directos (MP3/WebM) y las emisiones HLS pueden fallar.'] : []),
+          `**Cookies de YouTube:** ${sourceState.cookies ? '✅ configuradas' : 'no configuradas'} · **Proxy:** ${sourceState.proxy ? '✅ configurado' : 'no'}`,
           `**Canal de solicitudes:** ${config.music?.requestChannel ? `<#${config.music.requestChannel}>` : 'cualquier canal de texto'}`,
           `**Canal de voz configurado:** ${config.music?.preferredVoiceChannel ? `<#${config.music.preferredVoiceChannel}>` : 'cualquier canal de voz'}`,
           `**Tu canal de voz:** ${voiceChannel || '❌ no estás en uno'}`,
@@ -72,7 +82,8 @@ module.exports = {
         else if (status.reason) rows.push(`\n${status.reason}`);
         else if (!voiceChannel) rows.push('\nEntra a un canal de voz y repite este diagnóstico.');
         else if (permissionIssues.length) rows.push('\nConcede esos permisos al rol de Vesper en ese canal o categoría.');
-        else rows.push('\n✅ Todo está listo para `/musica reproducir`.');
+        else if (!anyWorking) rows.push('\n❌ Ninguna fuente respondió desde el alojamiento. Revisa los registros de Render.');
+        else rows.push('\n✅ Todo está listo para `/musica reproducir`. Se usa la primera fuente que funcione.');
         return interaction.editReply(rows.join('\n'));
       }
 
@@ -80,7 +91,7 @@ module.exports = {
         await interaction.deferReply();
         await interaction.editReply('🔎 Buscando y preparando la canción…').catch(() => null);
         const result = await music.enqueue(interaction, interaction.options.getString('busqueda'));
-        return interaction.editReply(`${result.position === 0 ? '▶️ Reproduciendo' : `➕ Añadida en posición ${result.position}`}: **${trackName(result.item)}**`);
+        return interaction.editReply(`${result.position === 0 ? '▶️ Reproduciendo' : `➕ Añadida en posición ${result.position}`}: **${trackName(result.item)}**${sourceSuffix(result.item)}`);
       }
 
       const player = music.queue(interaction.guildId);
