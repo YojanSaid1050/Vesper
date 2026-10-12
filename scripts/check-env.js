@@ -56,6 +56,7 @@ const optionalEnvVars = [
   'YTDLP_PATH',
   'FFMPEG_PATH',
   'MUSIC_RESOLVE_TIMEOUT_MS',
+  'MUSIC_FULL_RESOLVE_TIMEOUT_MS',
   'MUSIC_REQUIRED'
 ];
 

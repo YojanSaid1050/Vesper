@@ -310,12 +310,27 @@ class MusicService {
     const session = this.connections.get(guildId);
     if (!player?.current || !session) return;
 
-    const url = await sources.resolveStream(player.current);
-    const handle = sources.openStream(url, {
+    const track = player.current;
+    const open = url => sources.openStream(url, {
       seekSeconds,
       volume: player.volume,
-      live: Boolean(player.current.live)
+      live: Boolean(track.live),
+      codec: track.acodec
     });
+
+    let handle = open(await sources.resolveStream(track));
+    if (!await sources.waitForAudio(handle)) {
+      // La dirección del camino rápido puede ser rechazada por YouTube. Antes
+      // de dar la canción por perdida se pide otra con el camino completo.
+      const canRetry = track.pageUrl && track.source !== 'directo' && track.resolvedWith !== 'full';
+      if (!canRetry) throw new Error(sources.friendlyFfmpegError(handle.errorText()));
+      handle = open(await sources.resolveStream(track, { full: true }));
+      if (!await sources.waitForAudio(handle)) throw new Error(sources.friendlyFfmpegError(handle.errorText()));
+    }
+    if (this.players.get(guildId)?.current !== track) {
+      handle.process.kill('SIGKILL');
+      return;
+    }
 
     const resource = createAudioResource(handle.stream, { inputType: StreamType.OggOpus });
     player.process?.kill?.('SIGKILL');
