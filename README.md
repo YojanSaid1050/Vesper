@@ -1,4 +1,4 @@
-# Vesper Bot 3.8.0
+# Vesper Bot 3.8.1
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión actual conserva la presentación visual original con
@@ -290,7 +290,7 @@ del propio bot:
 | Pieza | Qué hace | De dónde sale |
 | --- | --- | --- |
 | `yt-dlp` | Busca la canción y da la dirección del audio | Se descarga en `bin/` al instalar |
-| `ffmpeg` | Convierte ese audio a Opus, que es lo que Discord quiere | Paquete `ffmpeg-static` |
+| `ffmpeg` | Convierte ese audio a Opus, que es lo que Discord quiere | Paquete `ffmpeg-static`; si en el alojamiento no lee MPEG-TS, `npm install` descarga una compilación compatible en `bin/ffmpeg-btbn` |
 | `@discordjs/voice` | Lo manda al canal de voz | Dependencia de npm |
 
 Esto sustituye a Lavalink, que era un servidor de Java independiente. En un

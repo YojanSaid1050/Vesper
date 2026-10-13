@@ -1,6 +1,6 @@
 {
   "name": "vesper-bot",
-  "version": "3.8.0",
+  "version": "3.8.1",
   "description": "Vesper - Discord Bot for streaming monitoring",
   "main": "src/index.js",
   "scripts": {
@@ -12,7 +12,7 @@
     "delete:local": "cross-env DELETE_GUILD_COMMANDS=true node scripts/delete-commands.js",
     "deploy:all": "npm run delete && npm run deploy",
     "deploy:local:all": "npm run delete:local && npm run deploy:local",
-    "postinstall": "node scripts/create-data-dirs.js && node scripts/ensure-ytdlp.js",
+    "postinstall": "node scripts/create-data-dirs.js && node scripts/ensure-ytdlp.js && node scripts/ensure-ffmpeg.js",
     "setup": "npm install && node scripts/create-data-dirs.js",
     "clean": "node scripts/clean-cache.js",
     "clean:all": "node scripts/clean-cache.js --all",
@@ -36,7 +36,7 @@
     "env:check": "node scripts/check-env.js",
     "help": "echo 'Comandos disponibles: start, dev, deploy, clean, logs, status, mongo:stats, mongo:clean, tiktok-test'",
     "lint": "eslint src scripts test",
-    "music:setup": "node scripts/ensure-ytdlp.js",
+    "music:setup": "node scripts/ensure-ytdlp.js && node scripts/ensure-ffmpeg.js",
     "diagnostico": "node scripts/diagnose.js",
     "mensajes": "node scripts/apply-theme.js"
   },

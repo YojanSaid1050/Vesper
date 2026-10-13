@@ -180,4 +180,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { extractZip, ONEDIR_TARGET };
+module.exports = { extractZip, download, ONEDIR_TARGET };

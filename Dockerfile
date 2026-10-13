@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     fonts-liberation \
     git \
     tini \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
 ENV TIKTOK_BROWSER_PATH=/usr/bin/chromium

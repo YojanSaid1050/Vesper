@@ -115,3 +115,42 @@ test('detener la música no deja un temporizador que corte la siguiente sesión'
   assert.equal(music.players.has(GUILD_ID), false);
   assert.equal(music.connections.has(GUILD_ID), false);
 });
+
+test('si el audio de SoundCloud no abre, el error cuenta la causa del primer intento', async t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vesper-e2e-'));
+  const server = http.createServer((req, res) => { res.writeHead(404); res.end(); });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  const broken = `http://127.0.0.1:${server.address().port}/no-existe.mp3`;
+  const script = path.join(dir, 'yt-dlp');
+  fs.writeFileSync(script, `#!/usr/bin/env node
+const args = process.argv.slice(2);
+const target = args.at(-1);
+if (!target.startsWith('scsearch') && !target.includes('soundcloud.com')) {
+  process.stderr.write("ERROR: [youtube] x: Sign in to confirm you’re not a bot.\\n");
+  process.exit(1);
+}
+if (args.includes('-g')) { console.log(${JSON.stringify(broken)}); process.exit(0); }
+console.log(JSON.stringify({ entries: [{ id: '9', title: 'Hola (Remix)', uploader: 'Alguien', duration: 180,
+  webpage_url: 'https://soundcloud.com/a/hola-remix', formats: [{}], url: ${JSON.stringify(broken)}, acodec: 'mp3' }] }));
+`, { mode: 0o755 });
+  const previous = { YTDLP_PATH: process.env.YTDLP_PATH, MUSIC_SOURCES: process.env.MUSIC_SOURCES };
+  process.env.YTDLP_PATH = script;
+  process.env.MUSIC_SOURCES = 'youtube,soundcloud';
+  providers.reset();
+  const music = new MusicService({ channels: { cache: new Map() } });
+  t.after(async () => {
+    await music.shutdown();
+    server.close();
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+    providers.reset();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  await assert.rejects(music.enqueue(fakeInteraction(), 'hola remix'), error => {
+    assert.match(error.message, /^SoundCloud: /, 'la causa real va primero');
+    assert.match(error.message, /no está disponible|404/);
+    return true;
+  });
+});

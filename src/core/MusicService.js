@@ -339,18 +339,25 @@ class MusicService {
     // Hasta tres intentos: la dirección normal, una nueva (o el camino
     // completo de YouTube) y, por último, la misma canción en otra fuente.
     let handle = null;
-    let lastError = null;
+    const failures = [];
     for (let attempt = 0; attempt < 3 && !handle; attempt++) {
+      const from = providers.PROVIDER_LABELS[track.provider] || track.source || 'la fuente';
       try {
         const candidate = open(await providers.resolveStream(track, { attempt }));
         if (await sources.waitForAudio(candidate)) handle = candidate;
-        else lastError = new Error(sources.friendlyFfmpegError(candidate.errorText()));
+        else failures.push(`${from}: ${sources.friendlyFfmpegError(candidate.errorText())}`);
       } catch (error) {
-        lastError = error;
+        failures.push(error.message);
       }
+      if (!handle) console.warn(`[Música] Intento ${attempt + 1} de «${track.title}» falló: ${failures.at(-1)}`);
       if (!handle && !providers.canRetry(track, attempt)) break;
     }
-    if (!handle) throw lastError || new Error('No pude abrir el audio de esa canción.');
+    // Se cuenta lo que falló primero: el último intento solo dice que la
+    // canción no estaba en otras fuentes y escondía la causa real.
+    if (!handle) {
+      const detail = failures.length > 1 ? `${failures[0]} · Último intento: ${failures.at(-1)}` : failures[0];
+      throw new Error(String(detail || 'No pude abrir el audio de esa canción.').slice(0, 400));
+    }
     if (this.players.get(guildId)?.current !== track) {
       handle.process.kill('SIGKILL');
       return;

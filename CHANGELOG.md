@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.8.1 — El audio de SoundCloud ya se puede abrir
+
+- **Causa:** en Render, SoundCloud encontraba la canción pero el audio no
+  llegaba a sonar. Muchas pistas solo se ofrecen en HLS con segmentos
+  MPEG-TS, y el ffmpeg de `ffmpeg-static` se cae (SIGSEGV) al leer ese
+  formato en algunos sistemas.
+- Nuevo `scripts/ensure-ffmpeg.js` en la instalación: comprueba si ffmpeg lee
+  MPEG-TS y, si no, descarga la compilación de BtbN (los builds de FFmpeg en
+  GitHub), deja solo lo necesario y la verifica. Nunca rompe la instalación.
+- SoundCloud prefiere MP3 directo y, en HLS, Opus o MP3 antes que AAC.
+- El error de una canción que no abre muestra la causa real del primer
+  intento, en vez de solo «no encontré esa canción en ninguna fuente».
+- Cada intento fallido queda en los registros con la línea `[Música]`.
+- El Dockerfile instala `xz-utils` para poder descomprimir ffmpeg.
+
 ## 3.8.0 — Música multifuente y prueba completa del bot
 
 ### Música
