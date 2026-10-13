@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { CAPABILITIES } = require('../../core/PermissionService');
+const { CAPABILITIES, canWithGuildConfig, requireCapability } = require('../../core/PermissionService');
 const {
   getCase,
   transitionCase,
@@ -36,12 +36,30 @@ function caseEmbed(record) {
     .setTimestamp(record.updatedAt || record.createdAt);
 }
 
+// Lo que ve la persona sancionada de su propio caso: sin notas internas,
+// evidencia ni quién lo registró, igual que en el panel web.
+function ownCaseEmbed(record) {
+  return new EmbedBuilder()
+    .setTitle(`Tu caso #${caseIdentifier(record)}`)
+    .setColor(record.status === 'active' || (!record.status && record.active) ? 0xFEE75C : record.status === 'revoked' ? 0x747F8D : 0x57F287)
+    .addFields(
+      { name: 'Acción', value: ACTION_LABELS[record.action] || record.action, inline: true },
+      { name: 'Estado', value: STATUS_LABELS[record.status] || (record.active ? '🟠 Activo' : '🟢 Resuelto'), inline: true },
+      { name: 'Creado', value: `<t:${Math.floor(new Date(record.createdAt).getTime() / 1000)}:f>`, inline: true },
+      { name: 'Expira', value: record.expiresAt ? `<t:${Math.floor(new Date(record.expiresAt).getTime() / 1000)}:R>` : 'No aplica', inline: true },
+      { name: 'Motivo', value: String(record.reason || 'Sin motivo').slice(0, 1024) }
+    )
+    .setFooter({ text: 'Solo tú puedes ver este mensaje. Si no estás de acuerdo, abre un ticket.' })
+    .setTimestamp(record.createdAt);
+}
+
 function idOption(option) {
   return option.setName('id').setDescription('ID visible del caso').setRequired(true).setMinLength(6).setMaxLength(24);
 }
 
 module.exports = {
-  capability: CAPABILITIES.MODERATE,
+  // Sin capacidad global: `ver` también lo usa cada miembro para sus propios
+  // casos; el resto de subcomandos exige moderación más abajo.
   data: new SlashCommandBuilder()
     .setName('caso')
     .setDescription('Consulta y administra casos de moderación.')
@@ -63,6 +81,18 @@ module.exports = {
     const subcommand = interaction.options.getSubcommand();
     const identifier = interaction.options.getString('id');
     let record;
+
+    const moderator = await canWithGuildConfig(interaction, CAPABILITIES.MODERATE);
+    if (subcommand === 'ver' && !moderator) {
+      record = await getCase(interaction.guildId, identifier);
+      // A quien no modera se le responde igual exista o no un caso ajeno,
+      // para no revelar qué identificadores corresponden a otras personas.
+      if (!record || record.userId !== interaction.user.id) {
+        return interaction.reply({ content: `No tienes ningún caso **#${identifier.toUpperCase()}** en este servidor. Tus casos también están en /panel.`, flags: 64 });
+      }
+      return interaction.reply({ embeds: [ownCaseEmbed(record)], flags: 64, allowedMentions: { parse: [] } });
+    }
+    if (!moderator) return requireCapability(interaction, CAPABILITIES.MODERATE);
 
     if (subcommand === 'ver') record = await getCase(interaction.guildId, identifier);
     if (subcommand === 'resolver') {
@@ -94,3 +124,4 @@ module.exports = {
 };
 
 module.exports.caseEmbed = caseEmbed;
+module.exports.ownCaseEmbed = ownCaseEmbed;

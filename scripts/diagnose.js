@@ -128,16 +128,27 @@ async function probarMusica() {
     herramientas.ok ? `${herramientas.ytdlp} · ${herramientas.ffmpeg}` : `faltan: ${herramientas.missing.join(', ')}`);
   if (!herramientas.ok) return;
 
-  try {
-    const { valor, ms } = await medir(() => sources.search(process.env.DIAGNOSTICO_MUSICA || 'lofi hip hop radio', { limit: 1 }));
-    const pista = valor[0];
-    anotar('musica', 'Búsqueda', 'ok', `«${pista.title.slice(0, 40)}» de ${pista.author} en ${ms} ms`);
+  const providers = require('../src/core/music/providers');
+  const ffmpeg = await sources.ffmpegSelfTest();
+  anotar('musica', 'ffmpeg lee MPEG-TS', ffmpeg.mpegts ? 'ok' : 'aviso',
+    ffmpeg.mpegts ? 'sí' : `no (${ffmpeg.signal || 'sin audio'}): se usan formatos directos, las emisiones HLS pueden fallar`);
 
-    const { valor: url, ms: ms2 } = await medir(() => sources.resolveStream(pista));
+  // Cada fuente por separado, igual que /musica diagnostico.
+  for (const resultado of await providers.probe(process.env.DIAGNOSTICO_MUSICA || 'lofi hip hop')) {
+    anotar('musica', `Fuente ${resultado.label}`, resultado.ok ? 'ok' : 'fallo',
+      resultado.ok ? `«${resultado.detail.slice(0, 40)}» en ${resultado.ms} ms` : resultado.detail.slice(0, 120));
+  }
+
+  try {
+    const { valor, ms } = await medir(() => providers.search(process.env.DIAGNOSTICO_MUSICA || 'lofi hip hop', { limit: 1 }));
+    const pista = valor[0];
+    anotar('musica', 'Búsqueda con relevo', 'ok', `«${pista.title.slice(0, 40)}» desde ${providers.PROVIDER_LABELS[pista.provider] || pista.source} en ${ms} ms`);
+
+    const { valor: url, ms: ms2 } = await medir(() => providers.resolveStream(pista));
     anotar('musica', 'Dirección del audio', /^https?:/.test(url) ? 'ok' : 'fallo', `resuelta en ${ms2} ms`);
 
     // Se abre el flujo de verdad y se comprueba que llega audio Opus válido.
-    const handle = sources.openStream(url, { volume: 50 });
+    const handle = sources.openStream(url, { volume: 50, codec: pista.acodec });
     const trozos = [];
     await new Promise((resolve, reject) => {
       const corte = setTimeout(() => { handle.process.kill('SIGKILL'); resolve(); }, 12_000);
@@ -145,14 +156,15 @@ async function probarMusica() {
         trozos.push(trozo);
         if (Buffer.concat(trozos).length > 60_000) { clearTimeout(corte); handle.process.kill('SIGKILL'); resolve(); }
       });
+      handle.stream.on('end', () => { clearTimeout(corte); resolve(); });
       handle.process.on('error', error => { clearTimeout(corte); reject(error); });
     });
     const audio = Buffer.concat(trozos);
     const valido = audio.subarray(0, 4).toString('latin1') === 'OggS';
     anotar('musica', 'Audio reproducible', valido ? 'ok' : 'fallo',
-      valido ? `${(audio.length / 1024).toFixed(0)} KB de Ogg/Opus, listo para Discord` : `flujo inesperado: ${handle.errorText().slice(0, 80)}`);
+      valido ? `${(audio.length / 1024).toFixed(0)} KB de Ogg/Opus, listo para Discord` : `flujo inesperado: ${sources.friendlyFfmpegError(handle.errorText()).slice(0, 80)}`);
   } catch (error) {
-    anotar('musica', 'Música', 'fallo', error.message.slice(0, 120));
+    anotar('musica', 'Música', 'fallo', error.message.slice(0, 160));
   }
 }
 

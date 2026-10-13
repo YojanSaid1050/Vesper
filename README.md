@@ -1,4 +1,4 @@
-# Vesper Bot 3.7.1
+# Vesper Bot 3.8.0
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión actual conserva la presentación visual original con
@@ -299,12 +299,36 @@ nunca llegaba a existir: Vesper intentaba conectarse a `127.0.0.1:2333` contra
 nada y la música no funcionaba jamás. Ahora no hay nada que levantar ni que
 configurar.
 
-Las versiones actuales de `yt-dlp` necesitan resolver los retos JavaScript de
-YouTube. Vesper habilita explícitamente el mismo Node.js 24 del contenedor para
-esa tarea; no hace falta instalar Deno ni volver a usar Lavalink.
+### Varias fuentes, con relevo automático
 
-Acepta búsquedas por texto, enlaces de YouTube y SoundCloud, archivos de audio
-sueltos y emisoras de radio. Si una pista falla, se salta y la sesión sigue.
+YouTube bloquea a casi todos los alojamientos en la nube (Render, Railway,
+Heroku…) con «confirma que no eres un bot». No depende de la canción ni se
+arregla reintentando. Por eso Vesper hace lo mismo que los bots de música que
+siguen funcionando: **saca el título de donde sea y el audio de donde se pueda**.
+
+| Orden | Fuente | Notas |
+| --- | --- | --- |
+| 1 | YouTube | Cliente `visionos` (sin reto JavaScript) y, si hace falta, el camino completo con Node 24 |
+| 2 | SoundCloud | Sin verificación para servidores; se descartan las muestras de 30 s |
+| 3 | Audius | Música completa y gratuita con API abierta |
+
+- Si YouTube bloquea al alojamiento, se deja de intentar durante 30 minutos
+  y las canciones salen directamente de la siguiente fuente, sin esperas.
+- Un enlace de **YouTube** o de **Spotify** se sigue aceptando: se lee su
+  título y se busca en la fuente que funcione.
+- Si el audio de una fuente no abre, se reintenta y, como último recurso, se
+  busca la misma canción en otra fuente.
+- La respuesta indica de dónde suena («· desde SoundCloud»).
+
+`/musica diagnostico` prueba **cada fuente de verdad** desde el alojamiento y
+dice cuánto tarda o por qué falla. Es lo primero que hay que mirar.
+
+| Variable | Para qué |
+| --- | --- |
+| `MUSIC_SOURCES` | Orden de fuentes, por ejemplo `soundcloud,youtube,audius` |
+| `MUSIC_YOUTUBE_COOLDOWN_MS` | Cuánto se pausa YouTube tras un bloqueo (30 min por defecto) |
+| `YTDLP_COOKIES` | Cookies de YouTube en formato Netscape o base64. Suele saltarse el bloqueo, pero usa **una cuenta secundaria**: Google puede limitarla |
+| `YTDLP_PROXY` | Proxy (por ejemplo, residencial) para YouTube; ffmpeg sale por el mismo |
 
 Si la descarga de `yt-dlp` falla durante el despliegue (una red restringida, un
 corte), **la instalación no se rompe**: el bot arranca, la música queda

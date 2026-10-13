@@ -377,6 +377,22 @@ function moduleOffCallout(key, title, detail) {
     </div>`;
 }
 
+// De dónde sale el audio y si YouTube está bloqueando al alojamiento.
+const SOURCE_NAMES = { youtube: 'YouTube', soundcloud: 'SoundCloud', audius: 'Audius' };
+function musicSourcesCallout(sources) {
+  if (!sources) return '';
+  const order = (sources.order || []).map(key => SOURCE_NAMES[key] || key).join(' → ');
+  const extras = [sources.cookies ? 'cookies de YouTube' : null, sources.proxy ? 'proxy' : null].filter(Boolean);
+  const blocked = sources.youtubeBlocked
+    ? ` YouTube está bloqueando al alojamiento: hasta las ${new Date(sources.youtubeBlockedUntil).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false })} las canciones salen de la siguiente fuente.`
+    : '';
+  return `
+    <div class="callout ${sources.youtubeBlocked ? 'warn' : 'info'}">
+      <strong>Fuentes de audio: ${escapeHtml(order)}</strong>
+      <span>Se usa la primera que responda; si una falla, la siguiente toma el relevo.${escapeHtml(blocked)}${extras.length ? ` Configurado: ${escapeHtml(extras.join(' y '))}.` : ''} En Discord, /musica diagnostico prueba cada una.</span>
+    </div>`;
+}
+
 function emptyBlock(title, detail) {
   return `<div class="empty"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}</span></div>`;
 }
@@ -3502,6 +3518,7 @@ function renderMusica() {
     ${health.music?.available === false
       ? `<div class="callout warn"><strong>El reproductor no está disponible.</strong><span>${escapeHtml(health.music.reason || 'Faltan las herramientas de audio en el alojamiento.')}</span></div>`
       : '<div class="callout ok"><strong>El reproductor está listo.</strong><span>Vesper busca y reproduce por su cuenta, dentro del mismo proceso. No hace falta ningún servidor de música aparte ni pagar nada.</span></div>'}
+    ${musicSourcesCallout(health.music?.sources)}
 
     ${card({
       eyebrow: 'Música',
