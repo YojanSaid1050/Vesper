@@ -110,6 +110,10 @@ function ytdlpPath() {
 // sistema en vez de apuntar a un archivo que no existe.
 function ffmpegPath() {
   if (process.env.FFMPEG_PATH) return process.env.FFMPEG_PATH;
+  // La compilación de BtbN solo existe si `npm run music:setup` comprobó que
+  // la incluida no lee MPEG-TS en este sistema: entonces manda ella.
+  const btbn = path.join(__dirname, '..', '..', '..', 'bin', 'ffmpeg-btbn', 'bin', 'ffmpeg');
+  if (process.platform === 'linux' && fs.existsSync(btbn)) return btbn;
   try {
     const bundled = require('ffmpeg-static');
     return bundled && fs.existsSync(bundled) ? bundled : 'ffmpeg';

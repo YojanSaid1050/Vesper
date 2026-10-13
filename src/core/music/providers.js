@@ -20,9 +20,11 @@ const KNOWN_PROVIDERS = ['youtube', 'soundcloud', 'audius'];
 const YOUTUBE_COOLDOWN_MS = Math.max(60_000, Number(process.env.MUSIC_YOUTUBE_COOLDOWN_MS || 30 * 60_000));
 const HTTP_TIMEOUT_MS = 12_000;
 // Las pistas de pago de SoundCloud solo ofrecen 30 s de muestra: se excluyen.
-// Se prefiere el MP3 progresivo al HLS: es más ligero de abrir y nunca pasa
-// por MPEG-TS, el formato con el que algunas compilaciones de ffmpeg se caen.
-const SOUNDCLOUD_FORMAT = 'bestaudio[protocol^=http][format_id!*=preview]/bestaudio[format_id!*=preview]/best[format_id!*=preview]';
+// Orden: MP3 progresivo, luego HLS en Opus o MP3 y, por último, el resto
+// (AAC suele ir en MPEG-TS, el formato con el que algunas compilaciones de
+// ffmpeg se caen).
+const SOUNDCLOUD_FORMAT = ['protocol^=http', 'format_id*=opus', 'format_id*=mp3', null]
+  .map(filter => `bestaudio${filter ? `[${filter}]` : ''}[format_id!*=preview]`).join('/') + '/best[format_id!*=preview]';
 const STREAM_TTL_MS = sources.STREAM_TTL_MS;
 
 const state = {
