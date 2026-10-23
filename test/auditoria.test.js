@@ -119,3 +119,19 @@ test('resuelve al ejecutor por executorId si Discord no adjunta el usuario', asy
   };
   assert.equal(await resolveAuditExecutor(guild, { executorId: '456', executor: null }), 'Moderadora');
 });
+
+test('cuando Discord no da el responsable se muestra «Desconocido»', () => {
+  assert.equal(SIN_DATO, 'Desconocido');
+  assert.equal(ERROR_AUDITORIA, 'Desconocido');
+  assert.match(SIN_PERMISO, /^Desconocido/);
+});
+
+test('el rol de un bot retirado no figura como borrado por nadie desconocido', async () => {
+  const { whoDeleted } = require('../src/events/guild/roleDelete');
+  const kick = { targetId: '762217899355013120', executorId: '649059737635258389', executor: { username: 'yojan' }, createdTimestamp: Date.now() };
+  const base = { id: '1506606989914931223', name: 'TempVoice', managed: true, tags: { botId: '762217899355013120' } };
+  const conExpulsion = { ...base, guild: servidorFalso({ entradas: [kick] }) };
+  assert.equal(await whoDeleted(conExpulsion), 'yojan (al retirar el bot)');
+  const sinEntrada = { ...base, guild: servidorFalso({ entradas: [] }) };
+  assert.equal(await whoDeleted(sinEntrada), 'Automático (Discord lo borra al retirar su bot)');
+});

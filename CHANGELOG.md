@@ -1,5 +1,22 @@
 # Changelog
 
+## 3.8.2 — Registros más claros y YouTube de último
+
+### Registros
+- Cuando Discord no dice quién hizo algo, el registro muestra «Desconocido»
+  en vez de «Discord no indicó quién realizó la acción».
+- El rol propio de un bot (por ejemplo, el de TempVoice) lo borra Discord
+  solo al retirar ese bot. Ahora el registro dice quién retiró el bot o,
+  si no consta, «Automático (Discord lo borra al retirar su bot)».
+
+### Música
+- Nuevo orden por defecto: SoundCloud → Audius → YouTube. YouTube queda
+  como último recurso porque bloquea a los alojamientos en la nube.
+- Un enlace de YouTube ya no se le pide primero a YouTube: se lee su título
+  y se busca en SoundCloud o Audius. YouTube solo se usa si lo demás falla.
+- Para quitar YouTube por completo, deja `youtube` fuera de `MUSIC_SOURCES`.
+- `/musica diagnostico` muestra el nombre de tu canal de voz.
+
 ## 3.8.1 — El audio de SoundCloud ya se puede abrir
 
 - **Causa:** en Render, SoundCloud encontraba la canción pero el audio no

@@ -17,6 +17,9 @@ const sources = require('./sources');
 
 const PROVIDER_LABELS = Object.freeze({ youtube: 'YouTube', soundcloud: 'SoundCloud', audius: 'Audius', directo: 'enlace directo' });
 const KNOWN_PROVIDERS = ['youtube', 'soundcloud', 'audius'];
+// YouTube va de último: bloquea a casi todos los alojamientos en la nube y
+// probarlo primero solo retrasaba cada canción.
+const DEFAULT_ORDER = ['soundcloud', 'audius', 'youtube'];
 const YOUTUBE_COOLDOWN_MS = Math.max(60_000, Number(process.env.MUSIC_YOUTUBE_COOLDOWN_MS || 30 * 60_000));
 const HTTP_TIMEOUT_MS = 12_000;
 // Las pistas de pago de SoundCloud solo ofrecen 30 s de muestra: se excluyen.
@@ -34,9 +37,9 @@ const state = {
 };
 
 function providerOrder() {
-  const configured = String(process.env.MUSIC_SOURCES || KNOWN_PROVIDERS.join(','))
+  const configured = String(process.env.MUSIC_SOURCES || DEFAULT_ORDER.join(','))
     .split(',').map(item => item.trim().toLowerCase()).filter(item => KNOWN_PROVIDERS.includes(item));
-  return configured.length ? [...new Set(configured)] : [...KNOWN_PROVIDERS];
+  return configured.length ? [...new Set(configured)] : [...DEFAULT_ORDER];
 }
 
 function youtubeAvailable() {
@@ -228,6 +231,43 @@ async function searchText(text, { exclude = [] } = {}) {
   throw combinedError(errors);
 }
 
+// Un enlace de YouTube se respeta según el orden de fuentes: si YouTube va
+// primero se intenta directo; si no, se lee su título y se busca en las demás,
+// y YouTube solo entra como último recurso.
+async function fromYoutubeLink(url, limit) {
+  const playlist = /[?&]list=/.test(url) && !/[?&]v=/.test(url);
+  const order = providerOrder();
+  const tryYoutube = async () => {
+    if (!order.includes('youtube') || !youtubeAvailable()) return null;
+    try {
+      return await fromYoutube(url, { limit });
+    } catch (error) {
+      if (!error.botCheck && !error.timedOut) throw error;
+      return null;
+    }
+  };
+
+  if (order[0] === 'youtube' || playlist) {
+    const tracks = await tryYoutube();
+    if (tracks?.length) return tracks;
+    if (playlist) throw new Error('YouTube no deja reproducir listas desde este alojamiento. Pide las canciones por su nombre.');
+  }
+
+  const title = await titleFromLink(url).catch(() => null);
+  if (title) {
+    try {
+      return await searchText(title, { exclude: ['youtube'] });
+    } catch (error) {
+      const tracks = order[0] === 'youtube' ? null : await tryYoutube();
+      if (tracks?.length) return tracks;
+      throw error;
+    }
+  }
+  const tracks = order[0] === 'youtube' ? null : await tryYoutube();
+  if (tracks?.length) return tracks;
+  throw new Error('No pude leer ese enlace de YouTube. Escribe el nombre de la canción.');
+}
+
 /**
  * Convierte lo que pidió la persona en una o varias pistas listas para sonar.
  */
@@ -248,23 +288,7 @@ async function search(query, { limit = 1 } = {}) {
     return searchText(title);
   }
 
-  if (isYoutubeUrl(clean)) {
-    let youtubeError = null;
-    if (youtubeAvailable()) {
-      try {
-        return await fromYoutube(clean, { limit });
-      } catch (error) {
-        youtubeError = error;
-        if (!error.botCheck && !error.timedOut) throw error;
-      }
-    }
-    if (/[?&]list=/.test(clean) && !/[?&]v=/.test(clean)) {
-      throw new Error('YouTube no deja reproducir listas desde este alojamiento ahora mismo. Pide las canciones por su nombre.');
-    }
-    const title = await titleFromLink(clean).catch(() => null);
-    if (!title) throw youtubeError || new Error('No pude leer ese enlace de YouTube.');
-    return searchText(title, { exclude: ['youtube'] });
-  }
+  if (isYoutubeUrl(clean)) return fromYoutubeLink(clean, limit);
 
   // Cualquier otro sitio que soporte yt-dlp (Bandcamp, Vimeo…).
   const tracks = await sources.search(clean, { limit });

@@ -73,7 +73,7 @@ module.exports = {
           `**Cookies de YouTube:** ${sourceState.cookies ? '✅ configuradas' : 'no configuradas'} · **Proxy:** ${sourceState.proxy ? '✅ configurado' : 'no'}`,
           `**Canal de solicitudes:** ${config.music?.requestChannel ? `<#${config.music.requestChannel}>` : 'cualquier canal de texto'}`,
           `**Canal de voz configurado:** ${config.music?.preferredVoiceChannel ? `<#${config.music.preferredVoiceChannel}>` : 'cualquier canal de voz'}`,
-          `**Tu canal de voz:** ${voiceChannel || '❌ no estás en uno'}`,
+          `**Tu canal de voz:** ${voiceChannel ? `🔊 ${voiceChannel.name}` : '❌ no estás en uno'}`,
           `**Permisos de Vesper:** ${!voiceChannel ? '⚠️ entra a un canal para comprobarlos' : permissionIssues.length ? `❌ faltan ${permissionIssues.join(', ')}` : '✅ Ver canal, Conectar y Hablar'}`,
           `**Sesiones activas:** ${status.players}`
         ];

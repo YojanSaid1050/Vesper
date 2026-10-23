@@ -1,4 +1,4 @@
-# Vesper Bot 3.8.1
+# Vesper Bot 3.8.2
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión actual conserva la presentación visual original con
@@ -308,9 +308,9 @@ siguen funcionando: **saca el título de donde sea y el audio de donde se pueda*
 
 | Orden | Fuente | Notas |
 | --- | --- | --- |
-| 1 | YouTube | Cliente `visionos` (sin reto JavaScript) y, si hace falta, el camino completo con Node 24 |
-| 2 | SoundCloud | Sin verificación para servidores; se descartan las muestras de 30 s |
-| 3 | Audius | Música completa y gratuita con API abierta |
+| 1 | SoundCloud | Sin verificación para servidores; se descartan las muestras de 30 s |
+| 2 | Audius | Música completa y gratuita con API abierta |
+| 3 | YouTube | Último recurso: bloquea a casi todos los alojamientos en la nube |
 
 - Si YouTube bloquea al alojamiento, se deja de intentar durante 30 minutos
   y las canciones salen directamente de la siguiente fuente, sin esperas.
@@ -325,7 +325,7 @@ dice cuánto tarda o por qué falla. Es lo primero que hay que mirar.
 
 | Variable | Para qué |
 | --- | --- |
-| `MUSIC_SOURCES` | Orden de fuentes, por ejemplo `soundcloud,youtube,audius` |
+| `MUSIC_SOURCES` | Orden de fuentes (por defecto `soundcloud,audius,youtube`; quita `youtube` para no usarlo nunca) |
 | `MUSIC_YOUTUBE_COOLDOWN_MS` | Cuánto se pausa YouTube tras un bloqueo (30 min por defecto) |
 | `YTDLP_COOKIES` | Cookies de YouTube en formato Netscape o base64. Suele saltarse el bloqueo, pero usa **una cuenta secundaria**: Google puede limitarla |
 | `YTDLP_PROXY` | Proxy (por ejemplo, residencial) para YouTube; ffmpeg sale por el mismo |

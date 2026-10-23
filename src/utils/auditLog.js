@@ -12,9 +12,11 @@ const { PermissionFlagsBits } = require('discord.js');
 const INTENTOS_MS = [0, 750, 2_000, 4_500, 8_000];
 const DISCORD_EPOCH = 1_420_070_400_000;
 
-const SIN_PERMISO = 'El bot no puede ver la auditoría';
-const SIN_DATO = 'Discord no indicó quién realizó la acción';
-const ERROR_AUDITORIA = 'No se pudo consultar la auditoría de Discord';
+// Cuando Discord no da el responsable se muestra «Desconocido». Solo la
+// falta de permiso añade el motivo, porque es lo único que se puede arreglar.
+const SIN_PERMISO = 'Desconocido (el bot no tiene «Ver registro de auditoría»)';
+const SIN_DATO = 'Desconocido';
+const ERROR_AUDITORIA = 'Desconocido';
 
 const esperar = ms => new Promise(resolve => setTimeout(resolve, ms));
 
