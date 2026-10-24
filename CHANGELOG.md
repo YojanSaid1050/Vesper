@@ -15,6 +15,10 @@
   filtro de enlaces no salta con enlaces de canciones y las peticiones
   borradas no llenan el registro.
 - Banners propios para cada tema (Void, Limones y Estándar).
+- **Corregido:** con las compilaciones nuevas de ffmpeg una canción no
+  terminaba nunca: al llegar al final la volvía a pedir y la repetía sin
+  parar, y la cola se quedaba atascada. `-reconnect_streamed` queda solo para
+  emisiones en directo.
 
 ### Salas de voz
 - **Interfaz de salas** con 15 botones dentro del bloque: nombre, límite,

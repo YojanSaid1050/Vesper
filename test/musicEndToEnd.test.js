@@ -59,7 +59,9 @@ function fakeInteraction() {
   };
 }
 
-test('/musica reproducir suena desde SoundCloud cuando YouTube bloquea al alojamiento', async t => {
+// Con límite de tiempo: si ffmpeg no termina, la prueba falla en vez de
+// dejar colgada la integración continua.
+test('/musica reproducir suena desde SoundCloud cuando YouTube bloquea al alojamiento', { timeout: 30_000 }, async t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vesper-e2e-'));
   const mp3 = path.join(dir, 'cancion.mp3');
   execFileSync(sources.ffmpegPath(), ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2', '-c:a', 'libmp3lame', mp3]);
@@ -116,7 +118,9 @@ test('detener la música no deja un temporizador que corte la siguiente sesión'
   assert.equal(music.connections.has(GUILD_ID), false);
 });
 
-test('si el audio de SoundCloud no abre, el error cuenta la causa del primer intento', async t => {
+// Con límite de tiempo: si ffmpeg no termina, la prueba falla en vez de
+// dejar colgada la integración continua.
+test('si el audio de SoundCloud no abre, el error cuenta la causa del primer intento', { timeout: 30_000 }, async t => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vesper-e2e-'));
   const server = http.createServer((req, res) => { res.writeHead(404); res.end(); });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -153,4 +157,25 @@ console.log(JSON.stringify({ entries: [{ id: '9', title: 'Hola (Remix)', uploade
     assert.match(error.message, /no está disponible|404/);
     return true;
   });
+});
+
+test('una canción termina aunque el servidor no diga su longitud', { timeout: 30_000 }, async t => {
+  // Las compilaciones nuevas de ffmpeg, con -reconnect_streamed, volvían a
+  // pedir la canción al llegar al final y la repetían sin parar.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vesper-eof-'));
+  const mp3 = path.join(dir, 'corta.mp3');
+  execFileSync(sources.ffmpegPath(), ['-hide_banner', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=duration=1', '-c:a', 'libmp3lame', mp3]);
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'audio/mpeg' });
+    fs.createReadStream(mp3).pipe(res);
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => { server.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+
+  const handle = sources.openStream(`http://127.0.0.1:${server.address().port}/corta.mp3`, { volume: 50 });
+  const chunks = [];
+  for await (const chunk of handle.stream) chunks.push(chunk);
+  const size = Buffer.concat(chunks).length;
+  assert.ok(size > 2_000, 'sale audio');
+  assert.ok(size < 200_000, `un segundo de audio no puede ocupar ${size} bytes: se está repitiendo`);
 });
