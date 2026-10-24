@@ -141,7 +141,11 @@ async function executeEventWithPolicy(event, args, client) {
 
   if (event.name === Events.MessageCreate && guildId) {
     const handled = await handleMessage(subject);
-    if (handled || !isMainGuild(guildId)) return;
+    if (handled) return;
+    // Lo escrito en el canal del controlador de música es una canción.
+    const { handleMusicRequest } = require('./music/controller');
+    if (await handleMusicRequest(subject, client).catch(() => false)) return;
+    if (!isMainGuild(guildId)) return;
   }
 
   if ((event.name === Events.GuildMemberAdd || event.name === Events.GuildMemberRemove) && guildId) {

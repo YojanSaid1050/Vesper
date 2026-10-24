@@ -24,7 +24,7 @@ test('el modo web oculta comandos administrativos pero conserva los de uso diari
     assert.equal(commandVisible({ data: { name: 'twitch-add' } }), false);
     assert.equal(commandVisible({ data: { name: 'musica' } }), true);
     assert.equal(commandVisible({ data: { name: 'ticket' } }), true);
-    assert.equal(WEB_MANAGED_COMMANDS.size, 40);
+    assert.equal(WEB_MANAGED_COMMANDS.size, 41);
   } finally {
     for (const name of names) {
       if (previous[name] === undefined) delete process.env[name];

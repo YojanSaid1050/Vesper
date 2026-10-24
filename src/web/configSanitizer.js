@@ -385,8 +385,8 @@ function sanitizeGuildPatch(input, guild) {
     }
     if (source.nameTemplate !== undefined) {
       target.nameTemplate = shortText(source.nameTemplate, 80, 'tempVoice.nameTemplate');
-      if (!target.nameTemplate.includes('{username}') && !target.nameTemplate.includes('{displayName}')) {
-        throw new ValidationError('tempVoice.nameTemplate debe incluir {username} o {displayName}.');
+      if (!['{username}', '{displayName}', '{handle}'].some(token => target.nameTemplate.includes(token))) {
+        throw new ValidationError('tempVoice.nameTemplate debe incluir {username}, {displayName} o {handle}.');
       }
     }
     if (source.userLimit !== undefined) target.userLimit = integerValue(source.userLimit, 0, 99, 'tempVoice.userLimit');

@@ -222,8 +222,9 @@ function applyTheme() {
 
   // El color del servidor sigue tiñendo el panel: es lo que hace que se
   // reconozca de un vistazo dónde estás. Lo que ya no decide es si el fondo
-  // es blanco o negro.
-  const accentHex = profile.primaryColor || '#9D63FF';
+  // es blanco o negro. Los miembros no reciben la configuración, así que
+  // para ellos sale de la identidad del bot.
+  const accentHex = profile.primaryColor || state.data?.identity?.accent || '#9D63FF';
   const rgb = parseHex(accentHex) || parseHex('#9D63FF');
 
   root.style.setProperty('--accent', accentHex);
@@ -352,6 +353,13 @@ function selectedValues(select) {
 // `ayuda` es el texto que se esconde tras el «?». Va aparte de `description`
 // porque la descripción se escapa: si se le incrustaba el botón, el usuario
 // veía el HTML en crudo en mitad de la tarjeta.
+// El bot se presenta con otro nombre en algunos servidores (AnkeBot en
+// Ankerie Dimension). Los textos del panel usan ese nombre. Se quitan los
+// caracteres de HTML para poder meterlo tal cual en cualquier plantilla.
+function botLabel() {
+  return String(state.data?.identity?.webhook?.name || 'Vesper').replace(/[<>&"'`]/g, '') || 'Vesper';
+}
+
 function card({ eyebrow, title, description, ayuda = '', actions = '', body, id = '' }) {
   return `
     <section class="card"${id ? ` id="${id}"` : ''}>
@@ -450,6 +458,14 @@ const TIER_LABELS = {
 
 const STATUS_LABELS = { active: 'Activo', resolved: 'Resuelto', revoked: 'Revocado' };
 const ACTION_LABELS = { warning: 'Advertencia', timeout: 'Aislamiento', filter: 'Filtro automático' };
+// Lo que se hizo desde el panel, en palabras.
+const AUDIT_LABELS = {
+  'config.update': 'Cambió la configuración',
+  'config.messageTheme': 'Aplicó un paquete de mensajes',
+  'fixedPanel.publish': 'Publicó un panel con botones',
+  'fixedPanel.remove': 'Quitó un panel con botones'
+};
+const AUDIT_TARGETS = { 'music-controller': 'Controlador de música', 'tempvoice-interface': 'Interfaz de salas' };
 const SUGGESTION_LABELS = { open: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada' };
 
 /* ---------------------------------------------------------------- */
@@ -533,7 +549,18 @@ const SAMPLE = {
   worth: '14,99 €',
   platforms: 'PC, Steam',
   store: 'Epic Games',
-  platform: 'Twitch'
+  platform: 'Twitch',
+  author: 'Joji',
+  duration: '3:29',
+  requester: '@Yojan',
+  source: 'SoundCloud',
+  volume: '50',
+  queue: '2',
+  loop: '',
+  generator: '#➕ Crear sala',
+  ownerName: 'xyojansaidx',
+  handle: 'xyojansaidx',
+  assets: `${location.origin}/panel/assets`
 };
 
 // `plain` imita lo que hace el bot en los huecos donde Discord no convierte
@@ -636,6 +663,45 @@ function embedPreviewMarkup(values, options) {
       ${image}
       ${footerRow}
     </div>`;
+}
+
+// Los botones que el bot mete dentro del bloque en los mensajes fijos. Solo
+// sirven para la vista previa: se pintan como en Discord, sin acción.
+const FIXED_BUTTONS = {
+  music: [
+    [['🔉', 'Bajar'], ['⏮️', 'Anterior'], ['⏸️', 'Pausar', 'success'], ['⏭️', 'Saltar'], ['🔊', 'Subir']],
+    [['🔀', 'Mezclar'], ['🔁', 'Bucle'], ['⏹️', 'Detener', 'danger'], ['📜', 'Cola'], ['🧭', 'Panel', 'link']]
+  ],
+  tempvoice: [
+    [['✏️', 'Nombre'], ['👥', 'Límite'], ['🛡️', 'Privacidad'], ['💬', 'Chat'], ['🌐', 'Región']],
+    [['✅', 'Permitir'], ['➖', 'Quitar'], ['📨', 'Invitar'], ['👢', 'Expulsar'], ['ℹ️', 'Info']],
+    [['⛔', 'Bloquear'], ['♻️', 'Desbloquear'], ['👑', 'Reclamar'], ['🔁', 'Transferir'], ['🗑️', 'Eliminar', 'danger']]
+  ]
+};
+
+function fixedButtonsKind(kind) {
+  if (/^music_/.test(kind)) return 'music';
+  if (/^tempvoice_/.test(kind)) return 'tempvoice';
+  return null;
+}
+
+function fixedButtonsMarkup(kind) {
+  const rows = FIXED_BUTTONS[fixedButtonsKind(kind)];
+  if (!rows) return '';
+  // En espera no suena nada: Discord enseña los controles apagados.
+  const idle = kind === 'music_controller';
+  return `<div class="embed-divider"></div><div class="v2-buttons" aria-hidden="true">${rows.map(row => `
+    <div class="v2-row">${row.map(([emoji, label, style = '']) => {
+      const off = idle && style !== 'link';
+      const shown = off ? '' : style;
+      return `<span class="v2-button ${shown}${off ? ' off' : ''}" title="${escapeHtml(label)}"><span>${emoji}</span><em>${escapeHtml(label)}${style === 'link' ? ' ↗' : ''}</em></span>`;
+    }).join('')}</div>`).join('')}</div>`;
+}
+
+// Mete los botones al final del bloque V2 que pinta embedPreviewMarkup.
+function withFixedButtons(markup, kind) {
+  const buttons = fixedButtonsMarkup(kind);
+  return buttons ? markup.replace(/<\/div>\s*$/, `${buttons}</div>`) : markup;
 }
 
 // Si una imagen remota falla, se sustituye por una nota explicativa en vez de
@@ -910,7 +976,7 @@ function guiaInicioCard() {
 
   return card({
     eyebrow: 'Empieza por aquí',
-    title: `Pon Vesper en marcha · ${hechos} de ${pasos.length}`,
+    title: `Pon ${botLabel()} en marcha · ${hechos} de ${pasos.length}`,
     description: 'Elige lo que quieras que haga. No hace falta configurarlo todo, ni hacerlo en orden.',
     body: `
       <div class="steps">
@@ -951,7 +1017,7 @@ function healthIssues() {
     issues.push({
       level: 'bad',
       title: 'La base de datos está desconectada',
-      detail: 'Vesper no puede guardar ni leer la configuración mientras siga así. Suele arreglarse solo en unos minutos.',
+      detail: `${botLabel()} no puede guardar ni leer la configuración mientras siga así. Suele arreglarse solo en unos minutos.`,
       action: null
     });
   }
@@ -1013,7 +1079,7 @@ function healthIssues() {
       issues.push({
         level: 'warn',
         title: `Vigilas ${cuentas} ${cuentas === 1 ? 'cuenta' : 'cuentas'} de ${platform} sin canal de destino`,
-        detail: 'Vesper comprueba si hay novedades, pero no tiene dónde anunciarlas.',
+        detail: `${botLabel()} comprueba si hay novedades, pero no tiene dónde anunciarlas.`,
         action: { section: 'avisos', label: 'Elegir canal' }
       });
     }
@@ -1033,7 +1099,7 @@ function healthIssues() {
     issues.push({
       level: 'info',
       title: `Falta configurar: ${check.label}`,
-      detail: 'Vesper funciona sin esto, pero le falta una pieza.',
+      detail: `${botLabel()} funciona sin esto, pero le falta una pieza.`,
       action: null
     });
   }
@@ -1170,8 +1236,8 @@ const MODULE_CARDS = [
   { key: 'suggestions', icon: '💡', section: 'comunidad', title: 'Sugerencias', blurb: 'Buzón de ideas' },
   { key: 'selfroles', icon: '🎭', section: 'comunidad', title: 'Autorroles', blurb: 'Roles que se eligen solos' },
   { key: 'starboard', icon: '⭐', section: 'comunidad', title: 'Destacados', blurb: 'Tablón de mejores mensajes' },
-  { key: 'music', icon: '♪', section: 'musica', title: 'Música', blurb: 'Reproduce en canales de voz' },
-  { key: 'tempvoice', icon: '◌', section: 'tempvoice', title: 'Salas temporales', blurb: 'Crea salas al entrar' }
+  { key: 'music', icon: '🎶', section: 'musica', title: 'Música', blurb: 'Reproduce en canales de voz' },
+  { key: 'tempvoice', icon: '🔊', section: 'tempvoice', title: 'Salas temporales', blurb: 'Crea salas al entrar' }
 ];
 
 function modulePlanState(key) {
@@ -1231,7 +1297,7 @@ const MEMBER_FEATURES = [
   },
   {
     key: 'tempvoice', icon: '🔊', title: 'Tu propia sala de voz',
-    blurb: 'Entra al canal generador y Vesper crea una sala para ti, con botones para renombrarla, limitarla, bloquearla u ocultarla.',
+    blurb: `Entra al canal generador y ${botLabel()} crea una sala para ti. Con los botones de la interfaz le cambias el nombre, el límite, la privacidad y quién puede entrar.`,
     commands: [],
     where: info => [info.generator ? `Entra a 🔊 ${info.generator.name}.` : null]
   },
@@ -1316,7 +1382,7 @@ function renderInicio() {
       </div>` : ''}
 
     <div class="module-head">
-      <h2>¿Qué quieres que haga Vesper aquí?</h2>
+      <h2>¿Qué quieres que haga ${escapeHtml(data.identity?.webhook?.name || data.bot?.username || 'Vesper')} aquí?</h2>
       <p>${activos} de ${MODULE_CARDS.length} funciones activas. Enciende lo que te interese y oprime para configurarlo.</p>
     </div>
 
@@ -1406,7 +1472,7 @@ function renderIdentidad() {
       <div class="field wide">
         <label for="profile-member-role">Rol automático para miembros nuevos</label>
         <select id="profile-member-role">${selectOptions(data.assignableRoles || [], profile.memberRole, 'Sin rol automático')}</select>
-        <span class="hint">Solo aparecen roles que Vesper puede asignar por jerarquía.</span>
+        <span class="hint">Solo aparecen roles que ${botLabel()} puede asignar por jerarquía.</span>
       </div>
       ${formActions('Guardar identidad')}
     </form>` : `
@@ -1449,8 +1515,8 @@ function renderIdentidad() {
     ${card({
       eyebrow: 'Identidad',
       title: `Identidad en ${data.guild.name}`,
-      description: 'Solo afecta a este servidor. En los demás, Vesper sigue igual.',
-      ayuda: 'El nombre se aplica de verdad: Vesper se cambia el apodo en este servidor, así que en la lista de miembros aparece como lo pongas aquí. La imagen solo cambia en los mensajes que publica, porque Discord no deja que un bot tenga un avatar distinto en cada servidor: el de la lista de miembros es el de su cuenta y es el mismo en todas partes.',
+      description: `Solo afecta a este servidor. En los demás, ${botLabel()} sigue igual.`,
+      ayuda: `El nombre se aplica de verdad: ${botLabel()} se cambia el apodo en este servidor, así que en la lista de miembros aparece como lo pongas aquí. La imagen solo cambia en los mensajes que publica, porque Discord no deja que un bot tenga un avatar distinto en cada servidor: el de la lista de miembros es el de su cuenta y es el mismo en todas partes.`,
       body: identityForm
     })}
 
@@ -1500,7 +1566,7 @@ function refreshIdentityPreview() {
 
   preview.innerHTML = `
     ${messageHeaderMarkup(values)}
-      <div class="embed-desc">Ejemplo de mensaje publicado por Vesper en este servidor.</div>
+      <div class="embed-desc">Ejemplo de mensaje publicado por ${botLabel()} en este servidor.</div>
     </div>`;
   wireImageFallbacks(preview);
 
@@ -2032,7 +2098,7 @@ function renderBienvenidas() {
     ${card({
       eyebrow: 'Dónde se publican',
       title: 'Canales de bienvenida y despedida',
-      description: 'Solo aparecen canales de texto donde Vesper puede escribir e insertar enlaces.',
+      description: `Solo aparecen canales de texto donde ${botLabel()} puede escribir e insertar enlaces.`,
       body: `
         <form id="form-welcome-channels" class="form">
           <div class="form-row">
@@ -2047,7 +2113,7 @@ function renderBienvenidas() {
             <div class="field">
               <label for="channel-boost">Canal de agradecimiento por boosts</label>
               <select id="channel-boost">${selectOptions(data.channels, config.general?.boostChannel, 'Usar el de bienvenida')}</select>
-              <span class="hint">Donde Vesper da las gracias cuando alguien mejora el servidor.</span>
+              <span class="hint">Donde ${botLabel()} da las gracias cuando alguien mejora el servidor.</span>
             </div>
           </div>
           ${formActions('Guardar canales')}
@@ -2134,7 +2200,9 @@ function messageEditorMarkup(item) {
 
   const layoutField = item.plainText
     ? ''
-    : layoutChooser('msg', 'data-msg', item.id, saved.layout, item.defaultLayout);
+    : item.fixedLayout
+      ? '<p class="hint">Este mensaje siempre sale como contenedor V2, porque es la única forma de llevar los botones dentro del bloque.</p>'
+      : layoutChooser('msg', 'data-msg', item.id, saved.layout, item.defaultLayout);
 
   // Discord no aplica formato al título de un embed clásico: sale tal cual. En
   // el contenedor V2 sí, y por eso ahí es donde se puede agrandar la letra.
@@ -2303,17 +2371,18 @@ function refreshMessagePreview(item) {
     message: body,
     fields: body ? [] : (factory.fields || []),
     footer: values.footer ?? factory.footer ?? null,
-    image: values.image ?? factory.image ?? null,
+    image: sampleValues(values.image ?? factory.image ?? '') || null,
     thumbnail: values.thumbnail !== false && item.supports.thumbnail,
     author: values.author ?? factory.author ?? null,
     showThumb: false
   };
   const color = values.color || factory.color || '#5865F2';
 
-  container.innerHTML = `${messageHeaderMarkup(author)}${embedPreviewMarkup(resolved, {
-    componentsV2: (values.layout || item.defaultLayout) === 'components_v2',
+  const preview = embedPreviewMarkup(resolved, {
+    componentsV2: item.fixedLayout === 'components_v2' || (values.layout || item.defaultLayout) === 'components_v2',
     memberAvatar: state.session.user.discord?.avatar || null
-  })}</div>`;
+  });
+  container.innerHTML = `${messageHeaderMarkup(author)}${withFixedButtons(preview, item.id)}</div>`;
 
   const embed = container.querySelector('.embed-preview');
   if (embed) embed.style.setProperty('--embed-accent', color);
@@ -2328,8 +2397,10 @@ function refreshMessagePreview(item) {
 // todos de golpe en una misma voz, y luego se retoca lo que haga falta.
 function themeCardMarkup(theme) {
   const sample = theme.sample?.welcome || {};
+  const active = state.data.activeMessageTheme === theme.id;
   return `
-    <button type="button" class="theme-card" data-apply-theme="${escapeHtml(theme.id)}">
+    <button type="button" class="theme-card${active ? ' active' : ''}" data-apply-theme="${escapeHtml(theme.id)}"${active ? ' aria-current="true"' : ''}>
+      ${active ? '<span class="tag accent theme-active">En uso</span>' : ''}
       <span class="theme-swatches" aria-hidden="true">
         ${(theme.swatches || []).map(color => `<span data-swatch="${escapeHtml(color)}"></span>`).join('')}
       </span>
@@ -2348,19 +2419,19 @@ function themePickerCard() {
     eyebrow: 'De una vez',
     title: 'Paquetes de mensajes',
     description: 'Escribe todos los mensajes de golpe, en un mismo tono.',
-    ayuda: 'Aplicar un paquete sobrescribe los 38 mensajes. Se deshace eligiendo otro o volviendo a «Sin paquete», y después puedes retocar los que quieras uno a uno.',
+    ayuda: 'Aplicar un paquete reescribe todos los mensajes. Los que no hayas tocado siguen al paquete en uso, también los que se añadan más adelante. Se deshace eligiendo otro o «Sin paquete».',
     body: `
       <div class="theme-grid">
         ${themes.map(themeCardMarkup).join('')}
-        <button type="button" class="theme-card plain" data-apply-theme="ninguno">
+        <button type="button" class="theme-card plain${state.data.activeMessageTheme ? '' : ' active'}" data-apply-theme="ninguno">
           <span class="theme-swatches" aria-hidden="true">${['#5865F2', '#57F287', '#ED4245', '#FAA61A'].map(color => `<span data-swatch="${color}"></span>`).join('')}</span>
           <strong>Sin paquete</strong>
-          <small>Los textos originales de Vesper, sin ninguna personalización.</small>
+          <small>Los textos originales de ${botLabel()}, sin ninguna personalización.</small>
           <span class="theme-sample">📥 Miembro entró</span>
           <span class="theme-count">vuelve a lo de fábrica</span>
         </button>
       </div>
-      <p class="hint">Sobrescribe los 38 mensajes. Se puede deshacer.</p>`
+      <p class="hint">Reescribe todos los mensajes. Se puede deshacer.</p>`
   });
 }
 
@@ -2380,8 +2451,8 @@ function bindThemePicker(root) {
       if (!await confirmDialog({
         title: id === 'ninguno' ? 'Quitar la personalización' : `Aplicar el paquete «${nombre}»`,
         message: id === 'ninguno'
-          ? 'Los 38 mensajes volverán a su texto original y se perderá lo que hayas escrito.'
-          : `Se reescribirán los 38 mensajes con el tono de «${nombre}». Se perderá lo que hayas escrito en ellos.`,
+          ? 'Todos los mensajes volverán a su texto original y se perderá lo que hayas escrito.'
+          : `Se reescribirán todos los mensajes con el tono de «${nombre}». Se perderá lo que hayas escrito en ellos.`,
         confirmLabel: id === 'ninguno' ? 'Quitar' : 'Aplicar',
         danger: true
       })) return;
@@ -2668,7 +2739,7 @@ function renderPublicar() {
       <strong>Esta publicación es independiente de los mensajes automáticos.</strong>
       <span>Se envía una vez al canal que elijas. Puedes añadir enlaces, accesos a canales, tickets y autorroles. El borrador queda solo en este navegador.</span>
     </div>
-    ${noChannels ? `<div class="callout danger"><strong>No hay canales disponibles.</strong><span>Vesper necesita Ver canal, Enviar mensajes e Insertar enlaces en al menos un canal de texto.</span></div>` : ''}
+    ${noChannels ? `<div class="callout danger"><strong>No hay canales disponibles.</strong><span>${botLabel()} necesita Ver canal, Enviar mensajes e Insertar enlaces en al menos un canal de texto.</span></div>` : ''}
     ${card({
       eyebrow: 'Compositor',
       title: 'Nueva publicación',
@@ -2680,7 +2751,7 @@ function renderPublicar() {
             <div class="field wide">
               <label for="custom-channel">Canal de destino</label>
               <select id="custom-channel" required${noChannels ? ' disabled' : ''}>${selectOptions(channels, draft.channelId, 'Elige un canal')}</select>
-              <span class="hint">Solo aparecen canales donde Vesper puede publicar embeds.</span>
+              <span class="hint">Solo aparecen canales donde ${botLabel()} puede publicar embeds.</span>
             </div>
             <div class="field wide">
               <label for="custom-mention-role">Mencionar un rol (opcional)</label>
@@ -3067,7 +3138,7 @@ function renderAvisos() {
     return card({
       eyebrow: platform.name,
       title: `${accounts.length} ${accounts.length === 1 ? 'cuenta vigilada' : 'cuentas vigiladas'}`,
-      description: `Vesper comprueba estas cuentas periódicamente y avisa en el canal que elijas.`,
+      description: `${botLabel()} comprueba estas cuentas periódicamente y avisa en el canal que elijas.`,
       actions: `<span class="tag ${enabled ? 'ok' : 'warn'}">${enabled ? 'Módulo activo' : 'Módulo apagado'}</span>`,
       body: `
         ${noChannel ? '<div class="callout warn"><strong>Falta el canal de destino.</strong><span>Tienes cuentas vigiladas pero los avisos no tienen dónde publicarse.</span></div>' : ''}
@@ -3080,7 +3151,7 @@ function renderAvisos() {
                 <input id="add-${platform.id}" type="text" name="account" maxlength="200" placeholder="${escapeHtml(platform.placeholder)}" required>
                 <button class="button" type="submit">Añadir</button>
               </div>
-              <span class="hint">Vesper verifica que la cuenta existe antes de guardarla.</span>
+              <span class="hint">${botLabel()} verifica que la cuenta existe antes de guardarla.</span>
             </div>
           </div>
         </form>` : ''}
@@ -3128,12 +3199,12 @@ function renderOfertas() {
   const chosen = new Set(deals.giveawayPlatforms || ['steam', 'epic-games-store', 'gog']);
 
   return `
-    ${!enabled ? moduleOffCallout('deals', 'El módulo de ofertas está apagado.', 'Mientras siga apagado, Vesper no publica juegos gratis ni sorteos.') : ''}
+    ${!enabled ? moduleOffCallout('deals', 'El módulo de ofertas está apagado.', `Mientras siga apagado, ${botLabel()} no publica juegos gratis ni sorteos.`) : ''}
 
     ${card({
       eyebrow: 'Cómo funciona',
       title: 'Tres fuentes, ninguna de pago',
-      description: 'Vesper consulta cada media hora y publica solo lo que no haya publicado antes en este servidor.',
+      description: `${botLabel()} consulta cada media hora y publica solo lo que no haya publicado antes en este servidor.`,
       body: `
         <div class="grid-3">
           <div class="stat"><small>Epic Games</small><strong>Juegos gratis</strong><span class="stat-note">El regalo semanal y el de la semana siguiente. Endpoint público de su tienda.</span></div>
@@ -3255,7 +3326,7 @@ function renderModeracion() {
     eyebrow: 'Automático',
     title: 'Filtros de mensajes',
     description: 'Qué se filtra automáticamente.',
-    ayuda: 'Vesper revisa cada mensaje y actúa solo cuando se cumple una de estas reglas. Los administradores y los roles excluidos nunca se filtran.',
+    ayuda: `${botLabel()} revisa cada mensaje y actúa solo cuando se cumple una de estas reglas. Los administradores y los roles excluidos nunca se filtran.`,
     actions: `<span class="tag ${moderationOn ? 'ok' : 'warn'}">${moderationOn ? 'Módulo activo' : 'Módulo apagado'}</span>`,
     body: `
       <form id="form-automod" class="form">
@@ -3392,7 +3463,7 @@ function renderComunidad() {
     ${card({
       eyebrow: 'Tickets',
       title: 'Soporte por tickets',
-      description: 'Los miembros abren un ticket desde un panel y Vesper crea un canal privado con el equipo.',
+      description: `Los miembros abren un ticket desde un panel y ${botLabel()} crea un canal privado con el equipo.`,
       actions: `<span class="tag ${features.tickets ? 'ok' : 'warn'}">${features.tickets ? 'Activo' : 'Apagado'}</span>
                 <button class="button quiet sm" type="button" id="publish-tickets">Publicar panel</button>`,
       body: `
@@ -3447,7 +3518,7 @@ function renderComunidad() {
     ${card({
       eyebrow: 'Autorroles',
       title: 'Roles que los miembros eligen',
-      description: 'Solo se ofrecen roles que Vesper puede asignar por jerarquía.',
+      description: `Solo se ofrecen roles que ${botLabel()} puede asignar por jerarquía.`,
       actions: `<span class="tag ${features.selfroles ? 'ok' : 'warn'}">${features.selfroles ? 'Activo' : 'Apagado'}</span>
                 <button class="button quiet sm" type="button" id="publish-selfroles">Publicar panel</button>`,
       body: `
@@ -3469,7 +3540,7 @@ function renderComunidad() {
     ${card({
       eyebrow: 'Destacados',
       title: 'Mensajes destacados',
-      description: 'Cuando un mensaje supera el número de reacciones, Vesper lo copia al canal de destacados.',
+      description: `Cuando un mensaje supera el número de reacciones, ${botLabel()} lo copia al canal de destacados.`,
       actions: `<span class="tag ${features.starboard ? 'ok' : 'warn'}">${features.starboard ? 'Activo' : 'Apagado'}</span>`,
       body: `
         <form id="form-starboard" class="form">
@@ -3497,6 +3568,109 @@ function renderComunidad() {
 }
 
 /* ---------------------------------------------------------------- */
+/* Paneles fijos con botones                                          */
+/* ---------------------------------------------------------------- */
+
+function catalogItem(kind) {
+  for (const group of state.data.messageCatalog || []) {
+    const item = group.items.find(entry => entry.id === kind);
+    if (item) return item;
+  }
+  return null;
+}
+
+// Vista previa de un mensaje fijo tal y como sale hoy: lo guardado en el
+// editor encima del texto del paquete del servidor.
+function fixedPanelPreview(kind) {
+  const item = catalogItem(kind);
+  if (!item) return '';
+  const factory = item.factory || {};
+  const saved = state.data.config.embeds?.[kind] || {};
+  const pick = field => (saved[field] ? saved[field] : factory[field] ?? null);
+  const preview = embedPreviewMarkup({
+    title: pick('title'), message: pick('message'), footer: pick('footer'), image: sampleValues(pick('image') || '') || null, fields: []
+  }, { componentsV2: true });
+  return `
+    <div class="preview-shell fixed-preview" data-fixed-color="${escapeHtml(pick('color') || '#5865F2')}">
+      <div class="discord-message">${messageHeaderMarkup(identityValues())}${withFixedButtons(preview, kind)}</div></div>
+    </div>`;
+}
+
+function fixedPanelCard({ panel, kind, extraKind = null, eyebrow, title, description, channelId, messageId, channels, place }) {
+  const published = Boolean(channelId && messageId);
+  const channel = (channels || []).find(item => item.id === channelId);
+  return card({
+    eyebrow,
+    title,
+    description,
+    body: `
+      <div class="fixed-panel">
+        <div class="fixed-panel-side">
+          <div class="callout ${published ? 'ok' : 'info'}">
+            <strong>${published ? `Publicado en #${escapeHtml(channel?.name || 'canal')}` : 'Todavía no está publicado'}</strong>
+            <span>${escapeHtml(place)}</span>
+          </div>
+          <div class="field">
+            <label for="fixed-${panel}-channel">Canal</label>
+            <select id="fixed-${panel}-channel">${selectOptions(channels || [], channelId, 'Elige un canal de texto')}</select>
+          </div>
+          <div class="form-actions">
+            <button class="button" type="button" data-fixed-publish="${panel}">${published ? 'Volver a publicar' : 'Publicar'}</button>
+            ${published ? `<button class="button ghost" type="button" data-fixed-remove="${panel}">Quitar</button>` : ''}
+            <button class="button quiet" type="button" data-goto="mensajes" data-goto-message="${escapeHtml(kind)}">Editar textos</button>
+          </div>
+          <p class="hint">Los textos siguen el paquete de mensajes del servidor${extraKind ? '; mientras suena una canción se usa «Controlador de música · sonando»' : ''}. Al guardarlos, el mensaje publicado se actualiza solo.</p>
+        </div>
+        <div class="fixed-panel-preview">
+          <p class="eyebrow">Vista previa</p>
+          ${fixedPanelPreview(kind)}
+        </div>
+      </div>`
+  });
+}
+
+function bindFixedPanels(root) {
+  root.querySelectorAll('[data-fixed-color]').forEach(shell => {
+    shell.querySelector('.embed-preview')?.style.setProperty('--embed-accent', shell.dataset.fixedColor);
+  });
+  wireImageFallbacks(root);
+  root.querySelectorAll('[data-fixed-publish]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const panel = button.dataset.fixedPublish;
+      const channelId = root.querySelector(`#fixed-${panel}-channel`)?.value;
+      if (!channelId) { toast('Elige primero un canal.', 'bad'); return; }
+      button.disabled = true;
+      try {
+        const result = await api(`/guilds/${state.guildId}/fixed-panels/${panel}`, { method: 'POST', body: JSON.stringify({ channelId }) });
+        state.data.config = result.config;
+        toast(result.canManageMessages === false
+          ? `Publicado. Dale a ${botLabel()} «Gestionar mensajes» en ese canal para que borre las peticiones.`
+          : 'Publicado en Discord.', result.canManageMessages === false ? 'bad' : 'ok');
+        await selectGuild(state.guildId, { keepSection: true, silent: true });
+      } catch (error) {
+        toast(error.message, 'bad');
+        button.disabled = false;
+      }
+    });
+  });
+  root.querySelectorAll('[data-fixed-remove]').forEach(button => {
+    button.addEventListener('click', async () => {
+      if (!await confirmDialog({ title: 'Quitar el mensaje', message: 'Se borra el mensaje de Discord. Puedes volver a publicarlo cuando quieras.', confirmLabel: 'Quitar', danger: true })) return;
+      button.disabled = true;
+      try {
+        const result = await api(`/guilds/${state.guildId}/fixed-panels/${button.dataset.fixedRemove}`, { method: 'DELETE' });
+        state.data.config = result.config;
+        toast('Mensaje quitado.', 'ok');
+        await selectGuild(state.guildId, { keepSection: true, silent: true });
+      } catch (error) {
+        toast(error.message, 'bad');
+        button.disabled = false;
+      }
+    });
+  });
+}
+
+/* ---------------------------------------------------------------- */
 /* Música                                                            */
 /* ---------------------------------------------------------------- */
 
@@ -3510,15 +3684,28 @@ function renderMusica() {
     ['maxQueue', 'Máximo de canciones en cola', 1, 500, ''],
     ['maxPerUser', 'Máximo por persona', 1, 25, 'Canciones en cola que puede tener cada uno.'],
     ['maxTrackMinutes', 'Duración máxima por pista', 1, 180, ''],
-    ['idleSeconds', 'Salir tras (segundos)', 30, 3600, 'Cuánto espera Vesper si se queda solo en el canal.']
+    ['idleSeconds', 'Salir tras (segundos)', 30, 3600, `Cuánto espera ${botLabel()} si se queda solo en el canal.`]
   ];
 
   return `
     ${!config.features?.music ? moduleOffCallout('music', 'El módulo de música está apagado.', 'Mientras siga apagado, /musica no responde en este servidor.') : ''}
     ${health.music?.available === false
       ? `<div class="callout warn"><strong>El reproductor no está disponible.</strong><span>${escapeHtml(health.music.reason || 'Faltan las herramientas de audio en el alojamiento.')}</span></div>`
-      : '<div class="callout ok"><strong>El reproductor está listo.</strong><span>Vesper busca y reproduce por su cuenta, dentro del mismo proceso. No hace falta ningún servidor de música aparte ni pagar nada.</span></div>'}
+      : `<div class="callout ok"><strong>El reproductor está listo.</strong><span>${botLabel()} busca y reproduce por su cuenta, dentro del mismo proceso. No hace falta ningún servidor de música aparte ni pagar nada.</span></div>`}
     ${musicSourcesCallout(health.music?.sources)}
+
+    ${fixedPanelCard({
+      panel: 'music-controller',
+      kind: 'music_controller',
+      extraKind: 'music_playing',
+      eyebrow: 'Controlador',
+      title: 'Controlador de música',
+      description: 'Un mensaje fijo con los botones del reproductor dentro. En su canal, la gente pide canciones escribiendo el nombre o el enlace.',
+      channelId: music.controllerChannel,
+      messageId: music.controllerMessage,
+      channels: data.channels,
+      place: `Lo ideal es un canal solo para música. ${botLabel()} necesita Ver canal, Enviar mensajes, Leer el historial y Gestionar mensajes (para borrar las peticiones).`
+    })}
 
     ${card({
       eyebrow: 'Música',
@@ -3589,7 +3776,7 @@ function renderTempVoice() {
             <div class="field grow">
               <label for="tempvoice-name">Nombre de la sala</label>
               <input id="tempvoice-name" type="text" maxlength="80" value="${escapeHtml(temp.nameTemplate || 'Sala de {username}')}" required>
-              <span class="hint">Variables: {username} y {displayName}. Debe incluir al menos una.</span>
+              <span class="hint">{username}: el nombre visible del perfil · {displayName}: el apodo del servidor · {handle}: el @usuario. Usa al menos uno.</span>
             </div>
             <div class="field">
               <label for="tempvoice-limit">Límite inicial</label>
@@ -3609,17 +3796,31 @@ function renderTempVoice() {
           ${formActions('Guardar TempVoice')}
         </form>`
     })}
+    ${fixedPanelCard({
+      panel: 'tempvoice-interface',
+      kind: 'tempvoice_interface',
+      eyebrow: 'Interfaz',
+      title: 'Interfaz de salas',
+      description: 'Un mensaje fijo con 15 botones para que cada uno gestione su sala: nombre, límite, privacidad, chat, región, quién entra, reclamar, transferir y eliminar.',
+      channelId: temp.interfaceChannel,
+      messageId: temp.interfaceMessage,
+      channels: data.channels,
+      place: 'Los botones actúan sobre la sala en la que esté quien los pulsa. Cada sala nueva recibe además su propia copia en el chat de voz.'
+    })}
     ${card({
       eyebrow: 'Controles del propietario',
-      title: 'Qué podrá hacer cada usuario',
-      description: 'El panel aparece en el chat de su canal de voz.',
+      title: 'Qué hace cada botón',
+      description: 'Solo el dueño de la sala puede usarlos, salvo Info y Reclamar.',
       body: `<div class="summary-list">
-        ${summaryRow('Renombrar', 'Cambiar el nombre de su sala')}
-        ${summaryRow('Límite', 'Elegir entre 0 y 99 personas')}
-        ${summaryRow('Bloquear', 'Impedir nuevas conexiones sin expulsar a quienes ya están')}
-        ${summaryRow('Ocultar', 'Quitar la sala de la vista general')}
-        ${summaryRow('Cerrar', 'Eliminar la sala manualmente')}
-        ${summaryRow('Transferencia', 'Si el dueño sale, pasa al siguiente miembro; vacía, se elimina')}
+        ${summaryRow('Nombre y Límite', 'Cambiar el nombre (2 veces cada 10 minutos, por Discord) y el máximo de personas')}
+        ${summaryRow('Privacidad', 'Cerrar, abrir, ocultar o mostrar la sala')}
+        ${summaryRow('Chat', 'Cerrar el chat de la sala para que solo escriba el dueño')}
+        ${summaryRow('Región', 'Elegir el servidor de voz de Discord (o automático)')}
+        ${summaryRow('Permitir y Quitar', 'Dejar entrar a alguien aunque la sala esté cerrada')}
+        ${summaryRow('Invitar', 'Le da permiso y le manda un mensaje privado con el enlace')}
+        ${summaryRow('Expulsar, Bloquear y Desbloquear', 'Sacar a alguien o impedir que vea y entre a la sala')}
+        ${summaryRow('Reclamar y Transferir', 'Quedarse la sala si el dueño se fue, o pasársela a otro de dentro')}
+        ${summaryRow('Eliminar', 'Borrar la sala; también se borra sola al quedar vacía')}
       </div>`
     })}`;
 }
@@ -3679,7 +3880,7 @@ function renderModulos() {
 
     ${card({
       eyebrow: 'Módulos',
-      title: 'Qué hace Vesper en este servidor',
+      title: `Qué hace ${botLabel()} en este servidor`,
       description: 'Apagar un módulo detiene su función al instante, sin perder la configuración.',
       body: `<form id="form-features" class="form"><div class="switch-list">${switches}</div>${formActions('Guardar módulos')}</form>`
     })}
@@ -3715,7 +3916,7 @@ function renderModulos() {
     ${card({
       eyebrow: 'Canales generales',
       title: 'Registros y rol de bots',
-      description: 'Dónde deja Vesper el rastro de lo que pasa en el servidor.',
+      description: `Dónde deja ${botLabel()} el rastro de lo que pasa en el servidor.`,
       body: `
         <form id="form-general" class="form">
           <div class="form-row">
@@ -3899,8 +4100,8 @@ async function loadAudit() {
       <tr>
         <td>${escapeHtml(formatDate(item.createdAt))}</td>
         <td class="mono">${escapeHtml(item.actorDiscordId || item.actorGoogleEmail || 'Desconocido')}</td>
-        <td>${escapeHtml(item.action)}</td>
-        <td class="wrap">${escapeHtml(item.target || '—')}</td>
+        <td>${escapeHtml(AUDIT_LABELS[item.action] || item.action)}</td>
+        <td class="wrap">${escapeHtml(item.target || AUDIT_TARGETS[item.metadata?.panel] || item.metadata?.theme || '—')}</td>
         <td class="wrap">${escapeHtml((item.metadata?.fields || []).join(', ') || '—')}</td>
       </tr>`).join('');
 
@@ -3991,7 +4192,16 @@ function bindCommon(root) {
   bindHelp(root);
 
   root.querySelectorAll('[data-goto]').forEach(button => {
-    button.addEventListener('click', () => showSection(button.dataset.goto));
+    button.addEventListener('click', () => {
+      showSection(button.dataset.goto);
+      // «Editar textos» abre directamente el mensaje que toca.
+      const kind = button.dataset.gotoMessage;
+      const item = kind && document.querySelector(`[data-message="${CSS.escape(kind)}"]`);
+      if (item) {
+        item.open = true;
+        setTimeout(() => item.scrollIntoView({ block: 'start', behavior: 'smooth' }), 80);
+      }
+    });
   });
 
   root.querySelectorAll('[data-enable-module]').forEach(button => {
@@ -4137,7 +4347,7 @@ function bindAvisos(root) {
       const account = button.dataset.removeAccount;
       if (!await confirmDialog({
         title: 'Dejar de vigilar la cuenta',
-        message: `Vesper dejará de avisar cuando ${account} publique o empiece directo.`,
+        message: `${botLabel()} dejará de avisar cuando ${account} publique o empiece directo.`,
         confirmLabel: 'Dejar de vigilar',
         danger: true
       })) return;
@@ -4362,6 +4572,7 @@ function bindComunidad(root) {
 }
 
 function bindMusica(root) {
+  bindFixedPanels(root);
   root.querySelector('#form-music')?.addEventListener('submit', event => {
     event.preventDefault();
     saveConfig({ music: {
@@ -4377,6 +4588,7 @@ function bindMusica(root) {
 }
 
 function bindTempVoice(root) {
+  bindFixedPanels(root);
   root.querySelector('#form-tempvoice')?.addEventListener('submit', event => {
     event.preventDefault();
     saveConfig({ tempVoice: {
@@ -4661,7 +4873,7 @@ function bindRegistros(root) {
       const labels = { on: 'Encender todos los avisos', off: 'Apagar todos los avisos', reset: 'Volver a lo de fábrica' };
       const detail = {
         on: 'Se encenderán los avisos de todos los módulos que estén activos.',
-        off: 'Vesper dejará de anotar nada en los canales de registro.',
+        off: `${botLabel()} dejará de anotar nada en los canales de registro.`,
         reset: 'Cada aviso volverá a depender de su módulo, y se olvidarán los canales y menciones que hayas puesto uno a uno.'
       };
       if (!await confirmDialog({ title: labels[mode], message: detail[mode], confirmLabel: labels[mode], danger: mode !== 'on' })) return;
@@ -4977,7 +5189,9 @@ async function refreshStatus() {
     const health = await api('/status');
     state.health = health;
     const ready = health.ready ?? health.healthy;
-    pill.textContent = ready ? 'Vesper operativo' : healthSummary(health);
+    // El bot se llama distinto en cada servidor (Vesper, AnkeBot…).
+    const botName = state.data?.identity?.webhook?.name || 'Vesper';
+    pill.textContent = ready ? `${botName} operativo` : healthSummary(health);
     pill.className = `pill ${ready ? 'ok' : health.botReady ? 'warn' : 'bad'}`;
   } catch {
     state.health = null;
@@ -5004,6 +5218,7 @@ async function selectGuild(guildId, { keepSection = false, silent = false } = {}
     renderBrand();
     renderNav();
     renderView();
+    refreshStatus();
   } catch (error) {
     state.data = null;
     $('#view').innerHTML = card({

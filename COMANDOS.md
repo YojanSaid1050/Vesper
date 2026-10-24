@@ -27,7 +27,7 @@ Solo estos cinco. Todo lo demás está oculto por permisos de Discord:
 | Comando | Para qué sirve |
 | --- | --- |
 | `/panel` | Abre el panel de control (el enlace al panel web). |
-| `/musica` | Reproductor: poner, saltar, cola, volumen. |
+| `/musica` | Reproductor: poner, saltar, cola, volumen. Con `/musica controlador` (Gestionar servidor) se publica el controlador con botones. |
 | `/ticket` | Abre un ticket de soporte. |
 | `/sugerir` | Envía una sugerencia al buzón. |
 | `/caso` | Consulta un caso de moderación por su identificador (`/caso ver`). |
@@ -60,6 +60,7 @@ y la administración pasa a hacerse solo desde el panel.
 | YouTube | `youtube-add`, `youtube-remove`, `youtube-list`, `youtube-clear`, `youtube-setchannel`, `youtube-setpingrole` | Configuración → Cuentas monitoreadas |
 | Configuración general | `vesper-setup`, `serverconfig`, `resetconfig`, `config-dashboard`, `vesper-modulo` | Configuración → Módulos y resumen |
 | Moderación y música | `vesper-mod-config`, `vesper-musica-config` | Configuración → Automod / Música |
+| Salas de voz | `salas` | Salas temporales → Interfaz de salas |
 | Comunidad | `vesper-comunidad` | Configuración → Tickets, sugerencias y destacados |
 | Mantenimiento | `cache`, `forcecheck`, `resetalldb`, `vesper-historial` | Panel → Resumen y Auditoría |
 
@@ -90,6 +91,6 @@ control dentro de Discord y sirve de respaldo si el panel se cae, y
 ## Resumen de lo que puedes retirar
 
 Si el panel ya te funciona, pon `WEB_ADMIN_MODE=true` y vuelve a desplegar
-comandos (`npm run deploy`). Pasas de 51 comandos a 11, que es un menú que un
+comandos (`npm run deploy`). Pasas de 52 comandos a 11, que es un menú que un
 miembro puede leer de un vistazo. Y de esos 11, un miembro sin permisos solo
 ve cinco: `/panel`, `/musica`, `/ticket`, `/sugerir` y `/caso`.

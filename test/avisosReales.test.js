@@ -84,7 +84,11 @@ const APORTA = {
   notify_tiktok_video: { creator: 'yojan', title: 'Vídeo', url: 'https://tiktok.com/@y', server: 'Ankerie Dimension', views: 4320 },
   deal_epic_free: { title: 'Un juego', url: 'https://store.epicgames.com', store: 'Epic', endsAt: 'el 30 de enero', originalPrice: '19,99 €' },
   deal_steam_special: { title: 'Un juego', url: 'https://store.steampowered.com', discount: 75, price: '4,99 €', originalPrice: '19,99 €', endsAt: 'el 30 de enero' },
-  deal_giveaway: { title: 'Una llave', url: 'https://ejemplo.com', worth: '14,99 €', platforms: 'PC', endsAt: 'el 30 de enero' }
+  deal_giveaway: { title: 'Una llave', url: 'https://ejemplo.com', worth: '14,99 €', platforms: 'PC', endsAt: 'el 30 de enero' },
+  music_controller: { server: 'Ankerie Dimension', channel: '<#1>' },
+  music_playing: { title: 'Slow Dancing', url: 'https://soundcloud.com/x', author: 'Joji', duration: '3:29', requester: '<@1>', source: 'SoundCloud', volume: 50, queue: 2, loop: '', server: 'Ankerie Dimension' },
+  tempvoice_interface: { server: 'Ankerie Dimension', generator: '<#2>' },
+  tempvoice_room: { owner: '<@1>', ownerName: 'xyojansaidx', channel: '<#3>', server: 'Ankerie Dimension' }
 };
 
 test('todos los avisos salen sin huecos sin rellenar', () => {

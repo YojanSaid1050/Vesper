@@ -1,5 +1,48 @@
 # Changelog
 
+## 3.9.0 — Controlador de música, interfaz de salas y mensajes con tema
+
+### Música
+- **Controlador de música:** un mensaje fijo con los botones dentro del bloque
+  (Components V2): bajar/subir volumen, anterior, pausar/reanudar, saltar,
+  mezclar, bucle, detener, cola y enlace al panel. En su canal, lo que se
+  escribe se toma como una canción y se borra para dejarlo limpio.
+- Mientras suena enseña título, artista, duración, quién la pidió, la fuente y
+  la portada; se repinta solo en cada cambio y al reiniciar el bot.
+- Nuevos «Anterior», «Mezclar» y bucle desde los botones. Sin rol DJ los usa
+  quien pidió la canción o quien está solo con el bot; saltar va por votos.
+- Se publica desde el panel o con `/musica controlador`. En ese canal el
+  filtro de enlaces no salta con enlaces de canciones y las peticiones
+  borradas no llenan el registro.
+- Banners propios para cada tema (Void, Limones y Estándar).
+
+### Salas de voz
+- **Interfaz de salas** con 15 botones dentro del bloque: nombre, límite,
+  privacidad, chat, región, permitir, quitar, invitar, expulsar, info,
+  bloquear, desbloquear, reclamar, transferir y eliminar. Con nombre propio:
+  *Cámaras del Vacío*, *Salitas Limón* o *Salas de voz*.
+- Se publica desde el panel o con `/salas interfaz`; actúa sobre la sala en
+  la que esté quien pulsa. Cada sala nueva recibe su copia en el chat de voz.
+- El nombre de la sala usa el **nombre visible del perfil** (antes salía el
+  @usuario). `{displayName}` respeta el apodo y `{handle}` es el @usuario.
+
+### Mensajes con tema
+- Embers Void y Ankerie Dimension usan su paquete (Void y Limones) por
+  defecto en todo mensaje que no se haya tocado, también en los nuevos. Lo
+  escrito en el panel manda; «Sin paquete» vuelve a los de fábrica.
+- Cuatro mensajes nuevos en el catálogo, con su versión en los tres paquetes.
+
+### Panel
+- Tarjetas para publicar, volver a publicar o quitar el controlador y la
+  interfaz, con vista previa que incluye los botones (en móvil, solo emoji).
+- El paquete en uso se marca con «En uso».
+- Los textos usan el nombre del bot en cada servidor (AnkeBot en Ankerie
+  Dimension), también en la píldora de estado.
+- El historial dice en palabras qué se hizo; las notas sueltas ya no salen
+  con letra grande; iconos de Música y Salas a juego con el resto.
+- Los miembros sin permisos también ven el panel con el color del servidor
+  (antes les salía siempre el morado de Vesper).
+
 ## 3.8.2 — Registros más claros y YouTube de último
 
 ### Registros

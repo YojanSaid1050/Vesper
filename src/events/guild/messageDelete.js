@@ -16,6 +16,10 @@ module.exports = {
 
     const guildConfig = await getGuildConfig(message.guild.id); // Añadir await
 
+    // En el canal del controlador de música el bot borra cada petición para
+    // dejarlo limpio; anotarlas llenaría el registro con una línea por canción.
+    if (guildConfig?.music?.controllerChannel && guildConfig.music.controllerChannel === message.channelId) return;
+
     if (!createLog(`delete-${message.id}`)) return;
 
     // Si no aparece en la auditoría, lo normal es que lo borrara su propio

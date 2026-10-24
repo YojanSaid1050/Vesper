@@ -56,6 +56,11 @@ async function handleButton(interaction, client) {
   const customId = String(interaction.customId ?? '');
   if (!customId) return;
 
+  if (customId.startsWith('music:')) {
+    const { handleMusicButton } = require('../core/music/controller');
+    if (await handleMusicButton(interaction, client)) return;
+  }
+
   if (customId.startsWith('tempvoice:')) {
     const { handleTempVoiceButton } = require('../core/TempVoiceService');
     if (await handleTempVoiceButton(interaction)) return;

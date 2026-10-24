@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, ChannelType, PermissionFlagsBits } = require('discord.js');
 const { CAPABILITIES, canWithGuildConfig } = require('../../core/PermissionService');
 const { getGuildConfig } = require('../../database/mongoManager');
 const { isModuleEnabledConfig } = require('../../config/guildPolicy');
@@ -38,6 +38,8 @@ module.exports = {
     .setName('musica')
     .setDescription('Reproductor musical gratuito de Vesper.')
     .addSubcommand(command => command.setName('diagnostico').setDescription('Comprueba configuración, conexión y permisos de voz'))
+    .addSubcommand(command => command.setName('controlador').setDescription('Publica el controlador de música con botones (Gestionar servidor)')
+      .addChannelOption(option => option.setName('canal').setDescription('Canal de texto; por defecto, este').addChannelTypes(ChannelType.GuildText)))
     .addSubcommand(command => command.setName('reproducir').setDescription('Busca o reproduce una canción').addStringOption(option => option.setName('busqueda').setDescription('Título o URL').setRequired(true)))
     .addSubcommand(command => command.setName('pausar').setDescription('Pausa la canción actual'))
     .addSubcommand(command => command.setName('continuar').setDescription('Continúa la reproducción'))
@@ -87,6 +89,18 @@ module.exports = {
         return interaction.editReply(rows.join('\n'));
       }
 
+      if (subcommand === 'controlador') {
+        if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+          return interaction.reply({ content: 'Publicar el controlador requiere el permiso Gestionar servidor.', flags: 64 });
+        }
+        await interaction.deferReply({ flags: 64 });
+        const { publishController } = require('../../core/music/controller');
+        const channel = interaction.options.getChannel('canal') || interaction.channel;
+        const result = await publishController(client, interaction.guildId, channel.id);
+        const tip = result.canManageMessages ? '' : '\n⚠️ Dale a Vesper «Gestionar mensajes» en ese canal para que borre las peticiones y el canal quede limpio.';
+        return interaction.editReply(`✅ Controlador publicado en <#${result.channelId}>. Desde ahora, lo que se escriba allí se toma como una canción.${tip}`);
+      }
+
       if (subcommand === 'reproducir') {
         await interaction.deferReply();
         await interaction.editReply('🔎 Buscando y preparando la canción…').catch(() => null);
@@ -120,7 +134,7 @@ module.exports = {
       if (subcommand === 'saltar') { await music.skip(interaction.guildId); return interaction.reply('⏭️ Canción saltada.'); }
       if (subcommand === 'pausar') { await music.pause(interaction.guildId, true); return interaction.reply('⏸️ Reproducción pausada.'); }
       if (subcommand === 'continuar') { await music.pause(interaction.guildId, false); return interaction.reply('▶️ Reproducción reanudada.'); }
-      if (subcommand === 'bucle') { music.players.get(interaction.guildId).loop = interaction.options.getBoolean('activo'); return interaction.reply(`🔁 Bucle ${interaction.options.getBoolean('activo') ? 'activado' : 'desactivado'}.`); }
+      if (subcommand === 'bucle') { music.setLoop(interaction.guildId, interaction.options.getBoolean('activo')); return interaction.reply(`🔁 Bucle ${interaction.options.getBoolean('activo') ? 'activado' : 'desactivado'}.`); }
       if (subcommand === 'volumen') { const level = interaction.options.getInteger('nivel'); await music.setVolume(interaction.guildId, level); return interaction.reply(`🔊 Volumen ajustado a ${level}%.`); }
       if (subcommand === 'detener') { await music.stop(interaction.guildId); return interaction.reply('⏹️ Reproducción detenida y sesión cerrada.'); }
     } catch (error) {
