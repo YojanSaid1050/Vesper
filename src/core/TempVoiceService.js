@@ -144,15 +144,26 @@ async function fetchChannel(guild, channelId) {
   return guild?.channels?.cache?.get(channelId) || await guild?.channels?.fetch(channelId).catch(() => null);
 }
 
+// Un aviso para quien pulsa (no está en su sala, no es el dueño…), que no es
+// un fallo del bot y se muestra tal cual.
+function notice(message) {
+  return Object.assign(new Error(message), { notice: true });
+}
+
+function failureText(error) {
+  const detail = String(error?.message || error).slice(0, 250);
+  return error?.notice ? detail : `No pude cambiar la sala: ${detail}`;
+}
+
 // La sala sobre la que actúa un botón: la del chat donde se pulsó o, desde la
 // interfaz fija, aquella en la que está quien lo pulsa.
 async function roomContext(interaction, { ownerOnly = true } = {}) {
   const room = await findRoom(interaction.channelId) || await findRoom(interaction.member?.voice?.channelId);
-  if (!room) throw new Error('Entra a tu sala temporal para usar estos botones. Si aún no tienes una, entra al canal para crear salas.');
+  if (!room) throw notice('Entra a tu sala temporal para usar estos botones. Si aún no tienes una, entra al canal para crear salas.');
   const channel = await fetchChannel(interaction.guild, room.channelId);
-  if (!channel || channel.type !== ChannelType.GuildVoice) throw new Error('La sala ya no existe.');
+  if (!channel || channel.type !== ChannelType.GuildVoice) throw notice('Esa sala ya no existe.');
   if (ownerOnly && interaction.user.id !== room.ownerId && !interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
-    throw new Error(`Solo el dueño de la sala (<@${room.ownerId}>) puede usar este botón. Si se fue, usa «Reclamar».`);
+    throw notice(`Solo el dueño de la sala (<@${room.ownerId}>) puede usar este botón. Si se fue, usa «Reclamar».`);
   }
   return { room, channel };
 }
@@ -508,7 +519,7 @@ async function handleTempVoiceButton(interaction) {
       return true;
     }
   } catch (error) {
-    await ephemeral(interaction, `No pude cambiar la sala: ${String(error.message || error).slice(0, 250)}`).catch(() => null);
+    await ephemeral(interaction, failureText(error)).catch(() => null);
   }
   return true;
 }
@@ -531,7 +542,7 @@ async function handleTempVoiceSelect(interaction) {
       await settleMenu(interaction, await applyPick(interaction, action, channel, room));
     }
   } catch (error) {
-    await settleMenu(interaction, `No pude cambiar la sala: ${String(error.message || error).slice(0, 250)}`).catch(() => null);
+    await settleMenu(interaction, failureText(error)).catch(() => null);
   }
   return true;
 }
@@ -548,12 +559,12 @@ async function handleTempVoiceModal(interaction) {
     } else if (action === 'limit') {
       const raw = interaction.fields.getTextInputValue('limit').trim();
       const limit = Number(raw);
-      if (!Number.isInteger(limit) || limit < 0 || limit > 99) throw new Error('El límite debe ser un número entero entre 0 y 99.');
+      if (!Number.isInteger(limit) || limit < 0 || limit > 99) throw notice('El límite debe ser un número entero entre 0 y 99.');
       await channel.setUserLimit(limit, `Límite temporal cambiado por ${interaction.user.tag}`);
       await ephemeral(interaction, limit ? `👥 Límite ajustado a ${limit} personas.` : '👥 La sala quedó sin límite de personas.');
     }
   } catch (error) {
-    await ephemeral(interaction, `No pude cambiar la sala: ${String(error.message || error).slice(0, 250)}`).catch(() => null);
+    await ephemeral(interaction, failureText(error)).catch(() => null);
   }
   return true;
 }

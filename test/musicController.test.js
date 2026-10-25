@@ -51,7 +51,7 @@ test('en espera: un único bloque V2 con los botones dentro y el banner del tema
   assert.equal(payload.flags, 32768);
   assert.equal(payload.components.length, 1);
   assert.doesNotThrow(() => new ContainerBuilder(payload.components[0]).toJSON());
-  assert.match(textos(payload), /Rockolita Limón/);
+  assert.match(textos(payload), /Rockolita/);
   const galeria = partes(payload).find(part => part.type === 12);
   assert.equal(galeria.items[0].media.url, 'https://vesper-q5jv.onrender.com/panel/assets/img/musica-limones.png');
 
@@ -65,7 +65,7 @@ test('en espera: un único bloque V2 con los botones dentro y el banner del tema
 test('cada Main tiene su propio controlador', () => {
   const titulo = guildId => textos(controllerPayload({ guild: { id: guildId, name: 'x' }, config: { guildId } }));
   assert.match(titulo(MAIN), /𝑅𝑒𝑠𝑜𝑛𝑎𝑛𝑐𝑖𝑎 𝑑𝑒𝑙 𝑉𝑎𝑐𝑖́𝑜/);
-  assert.match(titulo(THEMED), /Rockolita Limón/);
+  assert.match(titulo(THEMED), /Rockolita/);
   assert.match(titulo('999999999999999999'), /Controlador de música/);
 });
 
@@ -140,4 +140,25 @@ test('un botón sin estar en el canal de voz explica qué hacer', async () => {
   };
   assert.equal(await handleMusicButton(interaction, { music }), true);
   assert.match(respuestas[0], /Entra a <#900000000000000010>/);
+});
+
+test('al arrancar, el controlador y la interfaz publicados se repintan', async () => {
+  configs.set(THEMED, {
+    guildId: THEMED, features: { music: true, tempvoice: true },
+    music: { controllerChannel: 'c1', controllerMessage: 'm1' },
+    tempVoice: { interfaceChannel: 'c2', interfaceMessage: 'm2', generatorChannel: 'v1' }
+  });
+  const edits = {};
+  const channel = id => ({ messages: { fetch: async messageId => ({ id: messageId, edit: async payload => { edits[`${id}/${messageId}`] = payload; } }) } });
+  const guild = { id: THEMED, name: 'Ankerie Dimension' };
+  const client = {
+    guilds: { cache: new Map([[THEMED, guild]]) },
+    channels: { cache: new Map(), fetch: async id => channel(id) },
+    music: { queue: () => null, paused: () => false }
+  };
+  const { refreshFixedPanels } = require('../src/core/FixedPanels');
+  assert.equal(await refreshFixedPanels(client), 2);
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.match(JSON.stringify(edits['c1/m1']), /Rockolita/);
+  assert.match(JSON.stringify(edits['c2/m2']), /Equipos Limón/);
 });

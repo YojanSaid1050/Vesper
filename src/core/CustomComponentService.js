@@ -43,11 +43,14 @@ async function handleCustomRoleButton(interaction) {
     const { member, roles: [role] } = await assignableContext(interaction, [roleId]);
     const hasRole = member.roles.cache.has(role.id);
     if (action === 'remove' || (action === 'toggle' && hasRole)) {
-      if (hasRole) await member.roles.remove(role, 'Rol autogestionado desde un embed de Vesper');
-      await ephemeral(interaction, `Se retiró el rol **${role.name}**.`);
+      if (!hasRole) return ephemeral(interaction, `No tenías el rol **${role.name}**.`).then(() => true);
+      await member.roles.remove(role, 'Rol autogestionado desde un embed de Vesper');
+      await ephemeral(interaction, `Te quité el rol **${role.name}**.`);
+    } else if (hasRole) {
+      await ephemeral(interaction, `Ya tenías el rol **${role.name}**.`);
     } else {
-      if (!hasRole) await member.roles.add(role, 'Rol autogestionado desde un embed de Vesper');
-      await ephemeral(interaction, `Ya tienes el rol **${role.name}**.`);
+      await member.roles.add(role, 'Rol autogestionado desde un embed de Vesper');
+      await ephemeral(interaction, `✅ Ahora tienes el rol **${role.name}**.`);
     }
   } catch (error) {
     await ephemeral(interaction, `No pude cambiar ese rol: ${String(error.message || error).slice(0, 250)}`).catch(() => null);

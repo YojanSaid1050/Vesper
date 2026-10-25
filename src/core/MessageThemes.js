@@ -359,7 +359,7 @@ const LIMONES_MESSAGES = {
   },
 
   music_controller: {
-    title: '## 🍋 Rockolita Limón',
+    title: '## 🍋 Rockolita',
     message: 'Esperando una canción… :3\nEscribe aquí el nombre o el enlace de una canción y la pongo a sonar.\n\n-# Entra antes a un canal de voz.',
     footer: 'Rockolita de {server}',
     image: '{assets}/img/musica-limones.png',

@@ -310,7 +310,7 @@ fuente sale y la portada.
 
 Se publica desde el panel (Música → Controlador de música) o con
 `/musica controlador`. Cada servidor lo ve con su tema: *Resonancia del Vacío*,
-*Rockolita Limón* o *Controlador de música*, con su banner. Sin rol DJ, los botones
+*Rockolita* o *Controlador de música*, con su banner. Sin rol DJ, los botones
 los puede usar quien pidió la canción o quien está solo con el bot; saltar
 funciona por votos. Vesper necesita Ver canal, Enviar mensajes, Leer el
 historial y Gestionar mensajes en ese canal.
