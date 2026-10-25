@@ -99,8 +99,14 @@ const YTDLP_BASE_ARGS = Object.freeze([...COMMON_ARGS, '--js-runtimes', `node:${
 function ytdlpPath() {
   if (process.env.YTDLP_PATH) return process.env.YTDLP_PATH;
   const bin = path.join(__dirname, '..', '..', '..', 'bin');
-  const onedir = path.join(bin, 'yt-dlp-onedir', 'yt-dlp_linux');
-  if (process.platform === 'linux' && fs.existsSync(onedir)) return onedir;
+  // La versión en carpeta: `yt-dlp_linux` en Intel/AMD, `yt-dlp_linux_aarch64`
+  // en ARM (Oracle Cloud).
+  if (process.platform === 'linux') {
+    for (const name of ['yt-dlp_linux', 'yt-dlp_linux_aarch64']) {
+      const onedir = path.join(bin, 'yt-dlp-onedir', name);
+      if (fs.existsSync(onedir)) return onedir;
+    }
+  }
   const local = path.join(bin, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
   return fs.existsSync(local) ? local : 'yt-dlp';
 }

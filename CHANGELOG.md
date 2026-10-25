@@ -1,5 +1,19 @@
 # Changelog
 
+## 3.9.2 — Listo para Oracle Cloud gratis (ARM)
+
+- **Instalador para Oracle Cloud Always Free** (`deploy/oracle/install.sh`):
+  Node 24, Caddy con HTTPS automático, Chromium para TikTok, el servicio
+  `vesper` que arranca solo, los puertos del firewall de Ubuntu y DuckDNS
+  para una dirección propia. Se puede repetir sin perder la configuración.
+- Comandos en el servidor: `vesper-logs`, `sudo vesper-update` y
+  `vesper-duckdns`.
+- Guía paso a paso en `ORACLE_SETUP.md`.
+- **Corregido para ARM:** yt-dlp se descargaba siempre en su versión
+  Intel/AMD, que en un servidor ARM no arranca, y ffmpeg no tenía versión de
+  respaldo para ARM. Ahora ambos se descargan para el procesador del
+  servidor.
+
 ## 3.9.1 — Tipografía de Embers Void, Rockolita y QA completo
 
 ### Temas

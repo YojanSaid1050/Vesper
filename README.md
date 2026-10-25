@@ -1,4 +1,4 @@
-# Vesper Bot 3.9.1
+# Vesper Bot 3.9.2
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión actual conserva la presentación visual original con
@@ -222,6 +222,20 @@ y monitores sanos. La música solo bloquea `/ready` si `MUSIC_REQUIRED=true`.
 
 El alojamiento queda a elección del propietario. Vesper requiere un proceso
 persistente y acceso a MongoDB. La música no necesita ningún servicio extra.
+
+### Oracle Cloud gratis (recomendado)
+
+[`ORACLE_SETUP.md`](ORACLE_SETUP.md) explica paso a paso cómo dejarlo en un
+servidor **Always Free** de Oracle: no se duerme como el plan gratuito de
+Render, tiene memoria de sobra para la música y da una dirección propia con
+DuckDNS. Un solo comando lo instala todo:
+
+```bash
+sudo DOMAIN=tunombre.duckdns.org bash deploy/oracle/install.sh
+```
+
+Funciona en los servidores ARM (Ampere) y en los x86: yt-dlp y ffmpeg se
+descargan en la versión de cada procesador.
 
 ## Seguridad
 

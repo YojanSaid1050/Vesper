@@ -1,0 +1,6 @@
+# /etc/caddy/Caddyfile — lo instala deploy/oracle/install.sh con tu dominio.
+# Caddy pide y renueva solo el certificado HTTPS de Let's Encrypt.
+{DOMAIN} {
+	encode gzip
+	reverse_proxy 127.0.0.1:3000
+}
