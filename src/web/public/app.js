@@ -824,7 +824,7 @@ const SECTIONS = [
   {
     id: 'resumen', group: 'Ajustes', icon: '≡', label: 'Configuración',
     title: 'Configuración',
-    hint: 'Todo lo guardado.',
+    hint: 'Qué está listo, qué falta y todo lo guardado.',
     needs: 'configure',
     keywords: ['todo', 'exportar', 'copia', 'json', 'resumen']
   },
@@ -3954,6 +3954,119 @@ function namesOf(collection, ids, empty = 'Ninguno') {
   return list.length ? list.join(', ') : empty;
 }
 
+// Valores internos traducidos a lo que significan.
+const MOD_ACTION_LABELS = { warn: 'Advertir', timeout: 'Aislar 5 minutos', delete: 'Solo borrar el mensaje' };
+const PROFILE_THEME_LABELS = { cinnamoroll: 'Cinnamoroll (pastel)', void: 'Void', neutral: 'Neutro', custom: 'Personalizado' };
+const STORE_LABELS = { steam: 'Steam', 'epic-games-store': 'Epic Games', gog: 'GOG', 'itch.io': 'itch.io', ubisoft: 'Ubisoft', origin: 'EA', battlenet: 'Battle.net', 'xbox-one': 'Xbox', ps4: 'PlayStation', 'nintendo-switch': 'Nintendo Switch' };
+
+// Lo que necesita cada función para estar lista, en una línea. Devuelve el
+// estado y los datos clave que se enseñan en su tarjeta.
+function areaStatus(card) {
+  const data = state.data;
+  const config = data.config || {};
+  const features = config.features || {};
+  const channels = data.channels || [];
+  const voice = data.voiceChannels || [];
+  const general = config.general || {};
+  const community = config.community || {};
+  const pick = (collection, id, empty) => nameOf(collection, id, empty);
+  const missing = [];
+  let facts = [];
+
+  switch (card.key) {
+    case 'welcome':
+      if (!general.welcomeChannel) missing.push('elegir el canal');
+      facts = [['Canal', pick(channels, general.welcomeChannel)]];
+      break;
+    case 'goodbye':
+      if (!general.goodbyeChannel) missing.push('elegir el canal');
+      facts = [['Canal', pick(channels, general.goodbyeChannel)]];
+      break;
+    case 'boosts':
+      facts = [['Canal', pick(channels, general.boostChannel, 'El de bienvenida')]];
+      break;
+    case 'logs':
+      if (!general.logChannel) missing.push('elegir el canal de registro');
+      facts = [['Registro', pick(channels, general.logChannel)], ['Bots', pick(channels, general.botLogChannel, 'El general')]];
+      break;
+    case 'twitch': case 'youtube': case 'tiktok': {
+      const settings = config[card.key] || {};
+      const accounts = settings.users?.length || 0;
+      const destinations = [settings.liveChannel, settings.videoChannel, settings.shortChannel].filter(Boolean);
+      if (!accounts) missing.push('añadir una cuenta');
+      if (!destinations.length) missing.push('elegir dónde avisar');
+      facts = [['Cuentas', accounts ? String(accounts) : 'Ninguna'], ['Avisa en', destinations.length ? destinations.map(id => pick(channels, id)).join(', ') : 'Sin canal']];
+      break;
+    }
+    case 'deals':
+      if (!config.deals?.channel) missing.push('elegir el canal');
+      facts = [['Canal', pick(channels, config.deals?.channel)], ['Tiendas', (config.deals?.giveawayPlatforms || []).map(id => STORE_LABELS[id] || id).join(', ') || 'Todas']];
+      break;
+    case 'moderation': {
+      const rules = [config.moderation?.blockInvites !== false && 'invitaciones', config.moderation?.filterLinks && 'enlaces', 'menciones', 'repeticiones'].filter(Boolean);
+      facts = [['Vigila', rules.join(', ')], ['Qué hace', MOD_ACTION_LABELS[config.moderation?.action] || 'Advertir']];
+      break;
+    }
+    case 'tickets':
+      if (!community.tickets?.panelChannel) missing.push('publicar el panel de tickets');
+      facts = [['Panel', pick(channels, community.tickets?.panelChannel)], ['Equipo', namesOf(data.roles || [], community.tickets?.staffRoles, 'Sin roles')]];
+      break;
+    case 'suggestions':
+      if (!community.suggestions?.channel) missing.push('elegir el canal');
+      facts = [['Canal', pick(channels, community.suggestions?.channel)]];
+      break;
+    case 'selfroles':
+      if (!(community.selfRoles?.roles || []).length) missing.push('elegir los roles');
+      if (!community.selfRoles?.panelChannel) missing.push('publicar el panel');
+      facts = [['Roles', String((community.selfRoles?.roles || []).length)], ['Panel', pick(channels, community.selfRoles?.panelChannel)]];
+      break;
+    case 'starboard':
+      if (!community.starboard?.channel) missing.push('elegir el canal');
+      facts = [['Canal', pick(channels, community.starboard?.channel)], ['Con', `${community.starboard?.threshold ?? 3} ${community.starboard?.emoji || '⭐'}`]];
+      break;
+    case 'music':
+      if (!config.music?.controllerMessage) missing.push('publicar el controlador');
+      facts = [['Controlador', config.music?.controllerMessage ? pick(channels, config.music.controllerChannel) : 'Sin publicar'], ['Voz', pick(voice, config.music?.preferredVoiceChannel, 'Cualquier canal')]];
+      break;
+    case 'tempvoice':
+      if (!config.tempVoice?.generatorChannel) missing.push('elegir el canal generador');
+      if (!config.tempVoice?.interfaceMessage) missing.push('publicar la interfaz');
+      facts = [['Generador', pick(voice, config.tempVoice?.generatorChannel)], ['Salas', data.roomNameTemplate || config.tempVoice?.nameTemplate || 'Sala de {username}']];
+      break;
+    default:
+      break;
+  }
+
+  const locked = modulePlanState(card.key);
+  const on = Boolean(features[card.key]) && !locked;
+  const status = locked ? 'locked' : !on ? 'off' : missing.length ? 'warn' : 'ok';
+  return { status, missing, facts };
+}
+
+const AREA_STATUS_TEXT = { ok: 'Listo', warn: 'Falta algo', off: 'Apagado', locked: 'Necesita plan' };
+
+function areaCardMarkup(card) {
+  const { status, missing, facts } = areaStatus(card);
+  return `
+    <article class="area-card ${status}">
+      <header class="area-head">
+        <span class="module-icon" aria-hidden="true">${card.icon}</span>
+        <strong>${escapeHtml(card.title)}</strong>
+        <span class="tag ${status === 'ok' ? 'ok' : status === 'warn' ? 'warn' : ''}">${AREA_STATUS_TEXT[status]}</span>
+      </header>
+      <dl class="area-facts">${facts.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`).join('')}</dl>
+      ${status === 'warn' ? `<p class="area-missing">Falta: ${escapeHtml(missing.join(' y '))}.</p>` : ''}
+      <div class="area-actions">
+        ${status === 'off'
+    ? `<button class="button sm" type="button" data-enable-module="${escapeHtml(card.key)}">Activar</button>
+           <button class="button quiet sm" type="button" data-goto="${escapeHtml(card.section)}">Ver</button>`
+    : status === 'locked'
+      ? '<button class="button quiet sm" type="button" data-goto="modulos">Ver plan</button>'
+      : `<button class="button ${status === 'warn' ? '' : 'quiet'} sm" type="button" data-goto="${escapeHtml(card.section)}">${status === 'warn' ? 'Arreglar' : 'Editar'}</button>`}
+      </div>
+    </article>`;
+}
+
 function renderResumen() {
   const data = state.data;
   const config = data.config;
@@ -3962,6 +4075,16 @@ function renderResumen() {
   const voice = data.voiceChannels || [];
   const categories = data.categories || [];
   const yesNo = value => (value ? 'Sí' : 'No');
+
+  const statuses = MODULE_CARDS.map(card => ({ card, ...areaStatus(card) }));
+  const ready = statuses.filter(item => item.status === 'ok').length;
+  const active = statuses.filter(item => item.status === 'ok' || item.status === 'warn').length;
+  const pending = statuses.filter(item => item.status === 'warn');
+  const theme = (data.messageThemes || []).find(item => item.id === data.activeMessageTheme);
+  const groups = [
+    ['Cuando pasa algo', ['welcome', 'goodbye', 'boosts', 'logs', 'twitch', 'youtube', 'tiktok', 'deals']],
+    ['Comunidad', ['moderation', 'tickets', 'suggestions', 'selfroles', 'starboard', 'music', 'tempvoice']]
+  ];
 
   const embedSummary = kind => {
     const saved = config.embeds?.[kind] || {};
@@ -3974,7 +4097,8 @@ function renderResumen() {
       ['Nombre visible', config.profile?.displayName || `El de la cuenta (${data.identity?.account?.username || 'Vesper'})`],
       ['Autor de los mensajes', data.identity?.webhook?.name || '—'],
       ['Apodo en el servidor', data.identity?.nickname || 'Sin apodo'],
-      ['Tema', config.profile?.theme || 'neutral'],
+      ['Tema', PROFILE_THEME_LABELS[config.profile?.theme] || 'Neutro'],
+      ['Paquete de mensajes', theme?.name || 'Textos de fábrica'],
       ['Color principal', config.profile?.primaryColor || '—'],
       ['Color secundario', config.profile?.secondaryColor || '—'],
       ['Rol automático de miembros', nameOf(roles, config.profile?.memberRole, 'Sin rol')]
@@ -4016,7 +4140,7 @@ function renderResumen() {
       ['Epic gratis', config.deals?.epicFree === false ? 'No' : 'Sí'],
       ['Sorteos', config.deals?.giveaways === false ? 'No' : 'Sí'],
       ['Rebajas de Steam', config.deals?.steamSpecials === true ? `Sí (desde ${config.deals?.minDiscount ?? 50}%)` : 'No'],
-      ['Tiendas de sorteos', (config.deals?.giveawayPlatforms || []).join(', ') || 'Todas']
+      ['Tiendas de sorteos', (config.deals?.giveawayPlatforms || []).map(id => STORE_LABELS[id] || id).join(', ') || 'Todas']
     ]],
     ['Permisos', [
       ['Gestión de redes', namesOf(roles, config.permissions?.socialManagerRoles)],
@@ -4028,7 +4152,7 @@ function renderResumen() {
       ['Bloquear invitaciones', yesNo(config.moderation?.blockInvites)],
       ['Máximo de menciones', config.moderation?.maxMentions ?? 5],
       ['Repeticiones permitidas', config.moderation?.repeatLimit ?? 4],
-      ['Acción', config.moderation?.action || 'warn'],
+      ['Acción', MOD_ACTION_LABELS[config.moderation?.action] || 'Advertir'],
       ['Dominios permitidos', (config.moderation?.allowedDomains || []).join(', ') || 'Ninguno'],
       ['Canales excluidos', namesOf(channels, config.moderation?.exemptChannels)],
       ['Roles excluidos', namesOf(roles, config.moderation?.exemptRoles)]
@@ -4040,7 +4164,15 @@ function renderResumen() {
       ['Cola máxima', config.music?.maxQueue ?? 100],
       ['Por usuario', config.music?.maxPerUser ?? 3],
       ['Minutos por pista', config.music?.maxTrackMinutes ?? 15],
-      ['Inactividad (s)', config.music?.idleSeconds ?? 180]
+      ['Inactividad (s)', config.music?.idleSeconds ?? 180],
+      ['Controlador', config.music?.controllerMessage ? nameOf(channels, config.music.controllerChannel) : 'Sin publicar']
+    ]],
+    ['Salas de voz', [
+      ['Canal generador', nameOf(voice, config.tempVoice?.generatorChannel)],
+      ['Categoría', nameOf(categories, config.tempVoice?.category, 'La del generador')],
+      ['Nombre de las salas', data.roomNameTemplate || config.tempVoice?.nameTemplate || 'Sala de {username}'],
+      ['Límite inicial', config.tempVoice?.userLimit ? `${config.tempVoice.userLimit} personas` : 'Sin límite'],
+      ['Interfaz', config.tempVoice?.interfaceMessage ? nameOf(channels, config.tempVoice.interfaceChannel) : 'Sin publicar']
     ]],
     ['Comunidad', [
       ['Panel de tickets', nameOf(channels, config.community?.tickets?.panelChannel)],
@@ -4057,25 +4189,60 @@ function renderResumen() {
     ]]
   ];
 
-  return card({
-    eyebrow: 'Resumen',
-    title: `Todo lo guardado de ${data.guild.name}`,
-    description: 'Vista de solo lectura con los identificadores ya traducidos a nombres.',
+  const percent = active ? Math.round((ready / active) * 100) : 0;
+  const overview = card({
+    eyebrow: `${TIER_LABELS[data.guild.tier] || data.guild.tier} · ${formatNumber(data.guild.memberCount)} miembros`,
+    title: active ? `${ready} de ${active} funciones activas están listas` : 'No hay funciones activas',
+    description: pending.length
+      ? 'Estas están encendidas pero les falta algo para funcionar del todo.'
+      : active ? 'Todo lo que tienes encendido está bien configurado.' : 'Enciende lo que quieras usar desde Inicio o desde cada pantalla.',
+    body: `
+      <div class="overview-meter" role="img" aria-label="${percent}% listo"><span data-meter="${percent}"></span></div>
+      ${pending.length ? `<div class="pending-list">${pending.map(item => `
+        <div class="pending-row">
+          <span class="module-icon" aria-hidden="true">${item.card.icon}</span>
+          <span><strong>${escapeHtml(item.card.title)}</strong><small>Falta ${escapeHtml(item.missing.join(' y '))}</small></span>
+          <button class="button sm" type="button" data-goto="${escapeHtml(item.card.section)}">Arreglar</button>
+        </div>`).join('')}</div>` : ''}`
+  });
+
+  const areas = groups.map(([title, keys]) => card({
+    eyebrow: 'Funciones',
+    title,
+    body: `<div class="area-grid">${keys.map(key => MODULE_CARDS.find(item => item.key === key)).filter(Boolean).map(areaCardMarkup).join('')}</div>`
+  })).join('');
+
+  const identity = card({
+    eyebrow: 'Identidad',
+    title: `Cómo se presenta ${botLabel()}`,
+    actions: '<button class="button quiet sm" type="button" data-goto="apariencia">Editar</button>',
+    body: `<dl class="area-facts wide">
+      ${[
+        ['Nombre en los mensajes', data.identity?.webhook?.name || botLabel()],
+        ['Apodo en el servidor', data.identity?.nickname || 'Sin apodo'],
+        ['Paquete de mensajes', theme?.name || 'Textos de fábrica'],
+        ['Color principal', config.profile?.primaryColor || '—']
+      ].map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`).join('')}
+    </dl>`
+  });
+
+  return `${overview}${identity}${areas}${card({
+    eyebrow: 'Detalle',
+    title: 'Todo lo guardado',
+    description: 'Cada ajuste con su valor, ya traducido a nombres de canales y roles.',
     actions: '<button class="button quiet sm" type="button" id="copy-config">Copiar como JSON</button>',
     body: `
-      <div class="chips">
-        <span class="tag accent">${escapeHtml(TIER_LABELS[data.guild.tier] || data.guild.tier)}</span>
-        <span class="tag">${formatNumber(data.guild.memberCount)} miembros</span>
-        ${Object.entries(config.features || {}).map(([key, value]) => `<span class="tag ${value ? 'ok' : ''}">${escapeHtml(moduleLabel(key))}</span>`).join('')}
-      </div>
+      <details class="more-options">
+        <summary>Ver todos los ajustes</summary>
       <div class="def-grid">
         ${blocks.map(([title, rows]) => `
           <div class="def-block">
             <h3>${escapeHtml(title)}</h3>
             <dl>${rows.map(([label, value]) => `<div class="def-row"><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(String(value))}</dd></div>`).join('')}</dl>
           </div>`).join('')}
-      </div>`
-  });
+      </div>
+      </details>`
+  })}`;
 }
 
 /* ---------------------------------------------------------------- */
@@ -4658,6 +4825,7 @@ function bindModulos(root) {
 }
 
 function bindResumen(root) {
+  root.querySelectorAll('[data-meter]').forEach(bar => bar.style.setProperty('--meter', `${bar.dataset.meter}%`));
   root.querySelector('#copy-config')?.addEventListener('click', async () => {
     const json = JSON.stringify(state.data.config, null, 2);
     try {

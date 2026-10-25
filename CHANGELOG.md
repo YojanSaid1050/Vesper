@@ -1,5 +1,43 @@
 # Changelog
 
+## 3.9.1 — Tipografía de Embers Void, Rockolita y QA completo
+
+### Temas
+- **Embers Void** escribe sus mensajes en su cursiva fina de Unicode
+  (𝐸𝑚𝑏𝑒𝑟𝑠 𝑉𝑜𝑖𝑑𝑠): títulos, encabezados de registro, cuerpos y pies. Las
+  variables y los enlaces no se tocan; tildes y eñe se conservan. La
+  bienvenida y la despedida mantienen su diseño. El banner de música va en
+  serif cursiva, a juego.
+- **Ankerie Dimension:** el controlador se llama **Rockolita** y las salas
+  son **Equipos** («Equipos Limón», salas «Equipo de {username}»).
+- Los demás servidores siguen con «Controlador de música» y «Salas de voz».
+
+### Panel
+- **Configuración** rehecha: cuántas funciones están listas, qué falta con
+  un botón «Arreglar», una tarjeta por función con su estado y lo esencial,
+  «Activar» directo para las apagadas y el detalle completo plegado, con
+  valores legibles (ya no «warn» ni «cinnamoroll»).
+- Los mensajes de moderación automática (aviso y privado) ya se pueden
+  guardar: el panel decía «no admite imagen» aunque no llevaran ninguna.
+
+### Bot
+- Si algo falla después de «pensando…», la respuesta se cierra con un aviso
+  en vez de quedarse esperando.
+- Colores, países, juegos y plataformas confirman en privado el rol; los
+  botones de color y país de paneles antiguos ya funcionan.
+- Los botones de rol distinguen «Ahora tienes», «Ya tenías» y «Te quité».
+- La interfaz de salas muestra los avisos tal cual (no estás en tu sala, no
+  eres el dueño), sin «No pude cambiar la sala».
+- /panel usa el nombre del bot en cada servidor.
+
+### QA
+- 82 comandos como administrador y como miembro, 204 interacciones (todos
+  los botones, menús y formularios), 18 eventos, todos los formularios del
+  panel y el panel completo en escritorio y móvil.
+- Pruebas nuevas: los 42 mensajes en los tres tipos de servidor contra los
+  límites de Discord, la moderación automática de punta a punta y el
+  repintado de los paneles fijos al arrancar.
+
 ## 3.9.0 — Controlador de música, interfaz de salas y mensajes con tema
 
 ### Música
