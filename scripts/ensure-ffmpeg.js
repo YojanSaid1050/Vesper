@@ -17,7 +17,13 @@ const { download } = require('./ensure-ytdlp');
 const BIN_DIR = path.join(__dirname, '..', 'bin');
 const TARGET_DIR = path.join(BIN_DIR, 'ffmpeg-btbn');
 const TARGET = path.join(TARGET_DIR, 'bin', 'ffmpeg');
-const URL = 'https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-lgpl-shared.tar.xz';
+// BtbN publica la misma compilación para Intel/AMD (linux64) y para ARM
+// (linuxarm64), que es lo que dan los servidores gratis de Oracle Cloud.
+function btbnUrl(arch = process.arch) {
+  const target = arch === 'arm64' ? 'linuxarm64' : 'linux64';
+  return `https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-${target}-lgpl-shared.tar.xz`;
+}
+const URL = btbnUrl();
 const MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
 function bundledFfmpeg() {
@@ -67,7 +73,7 @@ async function installBtbn() {
 
 async function main() {
   if (process.env.FFMPEG_PATH || process.env.SKIP_FFMPEG_DOWNLOAD === 'true') return;
-  if (process.platform !== 'linux' || process.arch !== 'x64') return;
+  if (process.platform !== 'linux' || !['x64', 'arm64'].includes(process.arch)) return;
   if (fs.existsSync(TARGET) && isFresh(TARGET) && readsMpegTs(TARGET)) {
     console.log('🎚️  ffmpeg alternativo ya instalado.');
     return;
@@ -90,4 +96,4 @@ if (require.main === module) {
   main().catch(error => console.warn(`⚠️  Preparando ffmpeg: ${error.message}`));
 }
 
-module.exports = { readsMpegTs, TARGET };
+module.exports = { readsMpegTs, btbnUrl, TARGET };

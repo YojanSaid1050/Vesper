@@ -18,8 +18,14 @@ const BIN_DIR = path.join(__dirname, '..', 'bin');
 const TARGET = path.join(BIN_DIR, process.platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp');
 
 // `yt-dlp_linux` y `yt-dlp.exe` son autocontenidos: no necesitan Python.
+// Los servidores ARM (Oracle Cloud gratis, Raspberry Pi…) necesitan su propia
+// versión: la de Intel/AMD ni siquiera arranca ahí.
+function linuxAsset(arch = process.arch) {
+  return arch === 'arm64' ? 'yt-dlp_linux_aarch64' : 'yt-dlp_linux';
+}
+const LINUX_ASSET = linuxAsset();
 const ASSET = {
-  linux: 'yt-dlp_linux',
+  linux: LINUX_ASSET,
   darwin: 'yt-dlp_macos',
   win32: 'yt-dlp.exe'
 }[process.platform] || 'yt-dlp';
@@ -33,9 +39,9 @@ const TIMEOUT_MS = Number(process.env.YTDLP_DOWNLOAD_TIMEOUT_MS || 120_000);
 // plan gratuito de Render, con 0,1 CPU, eso eran ~11 s solo para arrancar y
 // la búsqueda de una canción agotaba el tiempo. La carpeta arranca al momento.
 const ONEDIR_DIR = path.join(BIN_DIR, 'yt-dlp-onedir');
-const ONEDIR_TARGET = path.join(ONEDIR_DIR, 'yt-dlp_linux');
-const ONEDIR_URL = `${RELEASES}/yt-dlp_linux.zip`;
-const USE_ONEDIR = process.platform === 'linux' && process.arch === 'x64';
+const ONEDIR_TARGET = path.join(ONEDIR_DIR, LINUX_ASSET);
+const ONEDIR_URL = `${RELEASES}/${LINUX_ASSET}.zip`;
+const USE_ONEDIR = process.platform === 'linux' && ['x64', 'arm64'].includes(process.arch);
 
 // YouTube cambia a menudo y yt-dlp lo sigue con versiones nuevas: una copia
 // de más de una semana se vuelve a descargar en el siguiente despliegue.
@@ -124,7 +130,7 @@ async function installOnedir() {
     await download(ONEDIR_URL, archive);
     fs.rmSync(staging, { recursive: true, force: true });
     extractZip(fs.readFileSync(archive), staging);
-    fs.chmodSync(path.join(staging, 'yt-dlp_linux'), 0o755);
+    fs.chmodSync(path.join(staging, LINUX_ASSET), 0o755);
     fs.rmSync(ONEDIR_DIR, { recursive: true, force: true });
     fs.renameSync(staging, ONEDIR_DIR);
     return true;
@@ -180,4 +186,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { extractZip, download, ONEDIR_TARGET };
+module.exports = { extractZip, download, linuxAsset, ONEDIR_TARGET };

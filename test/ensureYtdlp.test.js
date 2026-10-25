@@ -61,3 +61,12 @@ test('el extractor rechaza rutas que salen de la carpeta', t => {
   assert.throws(() => extractZip(buildZip([{ name: '../fuera.txt', content: Buffer.from('no') }]), dir), /no permitida/);
   assert.equal(fs.existsSync(path.join(dir, '..', 'fuera.txt')), false);
 });
+
+test('en servidores ARM se descarga la versión ARM de yt-dlp y de ffmpeg', () => {
+  const { linuxAsset } = require('../scripts/ensure-ytdlp');
+  const { btbnUrl } = require('../scripts/ensure-ffmpeg');
+  assert.equal(linuxAsset('x64'), 'yt-dlp_linux');
+  assert.equal(linuxAsset('arm64'), 'yt-dlp_linux_aarch64');
+  assert.match(btbnUrl('x64'), /ffmpeg-master-latest-linux64-lgpl-shared\.tar\.xz$/);
+  assert.match(btbnUrl('arm64'), /ffmpeg-master-latest-linuxarm64-lgpl-shared\.tar\.xz$/);
+});
