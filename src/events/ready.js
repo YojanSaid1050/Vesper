@@ -69,6 +69,18 @@ module.exports = {
       console.log('🎵 Música no disponible; el resto de Vesper sigue activo:', error.message);
     }
 
+    // Controladores de música e interfaces de salas: tras un reinicio no
+    // suena nada, así que se repintan en espera y con los textos actuales.
+    try {
+      const { attachController } = require('../core/music/controller');
+      attachController(client);
+      const { refreshFixedPanels } = require('../core/FixedPanels');
+      const panels = await refreshFixedPanels(client);
+      if (panels) console.log(`🎛️ Paneles fijos actualizados: ${panels}`);
+    } catch (error) {
+      console.warn('🎛️ No pude actualizar los paneles fijos:', error.message);
+    }
+
     for (const guild of client.guilds.cache.values()) {
       if (!isAnyMainGuild(guild.id)) continue;
       const config = await getGuildConfig(guild.id).catch(() => null);

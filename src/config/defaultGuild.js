@@ -79,7 +79,7 @@ function createDefaultGuildConfig(guildId = null) {
       epicFree: true, giveaways: true, steamSpecials: false,
       minDiscount: 50, giveawayPlatforms: ['steam', 'epic-games-store', 'gog'], maxPerCycle: 5
     },
-    music: { requestChannel: null, preferredVoiceChannel: null, defaultVolume: 50, maxQueue: 100, maxPerUser: 3, maxTrackMinutes: 15, idleSeconds: 180 },
+    music: { requestChannel: null, preferredVoiceChannel: null, defaultVolume: 50, maxQueue: 100, maxPerUser: 3, maxTrackMinutes: 15, idleSeconds: 180, controllerChannel: null, controllerMessage: null },
     tempVoice: {
       generatorChannel: null,
       category: null,
@@ -87,7 +87,9 @@ function createDefaultGuildConfig(guildId = null) {
       userLimit: 0,
       bitrate: 64000,
       lockedByDefault: false,
-      hiddenByDefault: false
+      hiddenByDefault: false,
+      interfaceChannel: null,
+      interfaceMessage: null
     },
     community: defaultCommunityConfig(),
     testPanel: { activeSection: 'general' }

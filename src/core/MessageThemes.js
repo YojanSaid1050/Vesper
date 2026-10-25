@@ -64,6 +64,7 @@ function pack(theme, messages) {
       title: entry.title ?? null,
       message: entry.message ?? null,
       footer: entry.footer ?? null,
+      ...(entry.image ? { image: entry.image } : {}),
       color: theme.colors[entry.tone || 'neutral']
     };
   }
@@ -182,6 +183,30 @@ const VOID_MESSAGES = {
     message: 'Valor habitual: {worth}\nPlataformas: {platforms}\nTermina: {endsAt}\n\n{url}',
     footer: 'Sorteo o llave gratis',
     tone: 'good'
+  },
+
+  // Música y salas de voz: el controlador fijo del canal de música y la
+  // interfaz de las salas temporales. Llevan los botones dentro.
+  music_controller: {
+    title: '## ☾ Resonancia del Vacío',
+    message: 'El vacío espera una melodía…\nEscribe aquí el nombre o el enlace de una canción y su eco llenará la sala.\n\n-# Entra antes a un canal de voz.',
+    footer: '⛧ {server} · Sistema de resonancia',
+    image: '{assets}/img/musica-void.png'
+  },
+  music_playing: {
+    title: '## ⛧ Resuena en el vacío',
+    message: '### [{title}]({url})\n{author} · {duration}\n\nInvocada por {requester} · desde {source}\nVolumen {volume}% · {queue} en espera{loop}',
+    footer: '⛧ {server} · Sistema de resonancia'
+  },
+  tempvoice_interface: {
+    title: '## ⛧ Cámaras del Vacío',
+    message: 'Cada alma puede abrir su propia cámara de voz.\nEntra en {generator} para crear la tuya y gobiérnala con los sellos de abajo mientras estés dentro.',
+    footer: 'Solo quien abrió la cámara puede cambiarla. «Reclamar» sirve cuando su dueño se fue.'
+  },
+  tempvoice_room: {
+    title: '## ☾ Tu cámara despertó',
+    message: 'Esta cámara pertenece a {owner}.\nCambia su nombre, su límite o quién puede cruzar con los sellos de abajo. Se disuelve sola cuando queda vacía.',
+    footer: '⛧ Cámaras del Vacío'
   }
 };
 
@@ -300,6 +325,30 @@ const LIMONES_MESSAGES = {
     message: 'Valor habitual: {worth}\nPlataformas: {platforms}\nTermina: {endsAt}\n\n{url}',
     footer: 'Sorteo o llave gratis',
     tone: 'good'
+  },
+
+  music_controller: {
+    title: '## 🍋 Rocola Limón',
+    message: 'Esperando una canción… :3\nEscribe aquí el nombre o el enlace de una canción y la pongo a sonar.\n\n-# Entra antes a un canal de voz.',
+    footer: 'Rocola de {server}',
+    image: '{assets}/img/musica-limones.png',
+    tone: 'warn'
+  },
+  music_playing: {
+    title: '## 🍋 Sonando ahora',
+    message: '### [{title}]({url})\n{author} · {duration}\n\nLa pidió {requester} · desde {source}\nVolumen {volume}% · {queue} en cola{loop}',
+    footer: 'Rocola de {server}',
+    tone: 'warn'
+  },
+  tempvoice_interface: {
+    title: '## 🍋 Salitas Limón',
+    message: 'Tu propia salita de voz :3\nEntra en {generator} para crearla y cámbiala con los botones de abajo mientras estés dentro.',
+    footer: 'Solo quien creó la salita puede cambiarla. «Reclamar» sirve si se fue.'
+  },
+  tempvoice_room: {
+    title: '## 🍋 ¡Tu salita está lista!',
+    message: 'Esta salita es de {owner}.\nCambia el nombre, el límite o quién puede entrar con los botones de abajo. Se borra sola cuando queda vacía.',
+    footer: 'Salitas Limón'
   }
 };
 
@@ -420,6 +469,28 @@ const ESTANDAR_MESSAGES = {
     title: 'Gratis: {title}',
     message: 'Valor habitual: {worth}\nPlataformas: {platforms}\nTermina: {endsAt}\n\n{url}',
     tone: 'good'
+  },
+
+  music_controller: {
+    title: '## 🎶 Controlador de música',
+    message: 'Esperando música…\nEscribe en este canal el nombre o el enlace de una canción y empezará a sonar.\n\n-# Entra antes a un canal de voz.',
+    footer: 'Sistema de música de {server}',
+    image: '{assets}/img/musica-estandar.png'
+  },
+  music_playing: {
+    title: '## 🎶 Ahora suena',
+    message: '### [{title}]({url})\n{author} · {duration}\n\nPedida por {requester} · desde {source}\nVolumen {volume}% · {queue} en cola{loop}',
+    footer: 'Sistema de música de {server}'
+  },
+  tempvoice_interface: {
+    title: '## 🔊 Salas de voz',
+    message: 'Este panel controla tu sala de voz temporal.\nEntra en {generator} para crear la tuya y usa los botones de abajo mientras estés dentro.',
+    footer: 'Solo el dueño de la sala puede cambiarla. «Reclamar» sirve cuando el dueño se fue.'
+  },
+  tempvoice_room: {
+    title: '## 🔊 Tu sala está lista',
+    message: 'Esta sala es de {owner}.\nCambia el nombre, el límite o quién puede entrar con los botones de abajo. Se borra sola cuando queda vacía.',
+    footer: 'Salas de voz'
   }
 };
 
@@ -478,7 +549,10 @@ function applyTheme(id, { kinds = null } = {}) {
   const embeds = {};
   for (const [kind, entry] of Object.entries(theme.messages)) {
     if (kinds && !kinds.includes(kind)) continue;
-    embeds[kind] = { ...entry };
+    // La imagen del paquete no se escribe: queda como valor por defecto y no
+    // pisa la que el servidor ya tuviera puesta.
+    const { image, ...fields } = entry;
+    embeds[kind] = fields;
   }
   return embeds;
 }
@@ -492,4 +566,29 @@ function clearTheme(kinds) {
   return embeds;
 }
 
-module.exports = { THEMES, THEME_IDS, getTheme, themeAllowed, themesForPanel, applyTheme, clearTheme };
+// El paquete que lleva cada Main sin que nadie lo aplique: Embers Void habla
+// con la voz de Void y Ankerie Dimension con la de Limones. Lo guardado en el
+// panel siempre manda, y elegir «ninguno» vuelve a los mensajes de fábrica.
+const TIER_THEMES = Object.freeze({ primary_main: 'void', themed_main: 'limones' });
+
+// La bienvenida y la despedida tienen su propio diseño por servidor (el de
+// Embers Void es un contenedor con GIF) y no se tocan desde aquí.
+const OWN_DESIGN = new Set(['welcome', 'goodbye']);
+
+function activeThemeId(config, tier) {
+  const chosen = config?.profile?.messageTheme;
+  if (chosen === 'ninguno') return null;
+  if (chosen && themeAllowed(chosen, tier)) return chosen;
+  return TIER_THEMES[tier] || null;
+}
+
+// Los campos del paquete activo para un mensaje, o un objeto vacío.
+function themeLayer(config, kind, tier) {
+  if (OWN_DESIGN.has(kind)) return {};
+  const theme = getTheme(activeThemeId(config, tier));
+  const entry = theme?.messages?.[kind];
+  if (!entry) return {};
+  return Object.fromEntries(Object.entries(entry).filter(([, value]) => value !== null && value !== undefined && value !== ''));
+}
+
+module.exports = { THEMES, THEME_IDS, TIER_THEMES, getTheme, themeAllowed, themesForPanel, applyTheme, clearTheme, activeThemeId, themeLayer };

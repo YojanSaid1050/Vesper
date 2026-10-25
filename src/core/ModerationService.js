@@ -167,7 +167,10 @@ async function handleMessage(message) {
   if (moderation.blockInvites !== false && INVITE_PATTERN.test(message.content)) {
     reason = 'las invitaciones de Discord no están permitidas';
   }
-  if (!reason && moderation.filterLinks) {
+  // En el canal del controlador de música se pegan enlaces de canciones a
+  // propósito: ahí el filtro de enlaces no aplica (las invitaciones, sí).
+  const musicRequests = config.music?.controllerChannel && config.music.controllerChannel === message.channelId;
+  if (!reason && moderation.filterLinks && !musicRequests) {
     const urls = message.content.match(URL_PATTERN) || [];
     const disallowed = urls.map(normalizeDomain).filter(Boolean).find(domain => !domainAllowed(domain, moderation.allowedDomains || []));
     if (disallowed) reason = `el dominio ${disallowed} no está autorizado`;

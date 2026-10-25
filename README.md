@@ -1,4 +1,4 @@
-# Vesper Bot 3.8.1
+# Vesper Bot 3.9.0
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión actual conserva la presentación visual original con
@@ -299,6 +299,22 @@ nunca llegaba a existir: Vesper intentaba conectarse a `127.0.0.1:2333` contra
 nada y la música no funcionaba jamás. Ahora no hay nada que levantar ni que
 configurar.
 
+### Controlador de música
+
+Un mensaje fijo con los botones del reproductor dentro del bloque: bajar y
+subir volumen, anterior, pausar/reanudar, saltar, mezclar, bucle, detener, cola
+y un enlace al panel. Mientras no suena nada invita a escribir; **en su canal,
+cualquier mensaje se toma como una canción** y se borra para dejarlo limpio.
+Mientras suena enseña el título, el artista, la duración, quién la pidió, de qué
+fuente sale y la portada.
+
+Se publica desde el panel (Música → Controlador de música) o con
+`/musica controlador`. Cada servidor lo ve con su tema: *Resonancia del Vacío*,
+*Rocola Limón* o *Controlador de música*, con su banner. Sin rol DJ, los botones
+los puede usar quien pidió la canción o quien está solo con el bot; saltar
+funciona por votos. Vesper necesita Ver canal, Enviar mensajes, Leer el
+historial y Gestionar mensajes en ese canal.
+
 ### Varias fuentes, con relevo automático
 
 YouTube bloquea a casi todos los alojamientos en la nube (Render, Railway,
@@ -308,9 +324,9 @@ siguen funcionando: **saca el título de donde sea y el audio de donde se pueda*
 
 | Orden | Fuente | Notas |
 | --- | --- | --- |
-| 1 | YouTube | Cliente `visionos` (sin reto JavaScript) y, si hace falta, el camino completo con Node 24 |
-| 2 | SoundCloud | Sin verificación para servidores; se descartan las muestras de 30 s |
-| 3 | Audius | Música completa y gratuita con API abierta |
+| 1 | SoundCloud | Sin verificación para servidores; se descartan las muestras de 30 s |
+| 2 | Audius | Música completa y gratuita con API abierta |
+| 3 | YouTube | Último recurso: bloquea a casi todos los alojamientos en la nube |
 
 - Si YouTube bloquea al alojamiento, se deja de intentar durante 30 minutos
   y las canciones salen directamente de la siguiente fuente, sin esperas.
@@ -325,7 +341,7 @@ dice cuánto tarda o por qué falla. Es lo primero que hay que mirar.
 
 | Variable | Para qué |
 | --- | --- |
-| `MUSIC_SOURCES` | Orden de fuentes, por ejemplo `soundcloud,youtube,audius` |
+| `MUSIC_SOURCES` | Orden de fuentes (por defecto `soundcloud,audius,youtube`; quita `youtube` para no usarlo nunca) |
 | `MUSIC_YOUTUBE_COOLDOWN_MS` | Cuánto se pausa YouTube tras un bloqueo (30 min por defecto) |
 | `YTDLP_COOKIES` | Cookies de YouTube en formato Netscape o base64. Suele saltarse el bloqueo, pero usa **una cuenta secundaria**: Google puede limitarla |
 | `YTDLP_PROXY` | Proxy (por ejemplo, residencial) para YouTube; ffmpeg sale por el mismo |
@@ -341,8 +357,25 @@ npm run music:setup
 ## Canales de voz temporales
 
 El panel web incluye **Salas temporales**. Se elige un canal de voz generador y
-una categoría; al entrar, Vesper crea una sala, mueve al usuario y publica un
-panel con controles para renombrar, limitar, bloquear, ocultar o cerrar.
+una categoría; al entrar, Vesper crea una sala, mueve al usuario y deja en el
+chat de la sala la interfaz con sus botones.
+
+La **interfaz de salas** es un mensaje fijo con 15 botones metidos dentro del
+bloque (Components V2), al estilo de TempVoice pero con nombre propio en cada
+servidor: *Cámaras del Vacío* en Embers Void, *Salitas Limón* en Ankerie
+Dimension y *Salas de voz* en los demás. Se publica desde el panel o con
+`/salas interfaz`, y los botones actúan sobre la sala en la que esté quien los
+pulsa:
+
+| Fila | Botones |
+| --- | --- |
+| 1 | Nombre · Límite · Privacidad (cerrar, abrir, ocultar, mostrar) · Chat · Región |
+| 2 | Permitir · Quitar · Invitar (con mensaje privado) · Expulsar · Info |
+| 3 | Bloquear · Desbloquear · Reclamar · Transferir · Eliminar |
+
+El nombre de la sala usa `{username}`, que es el **nombre visible del perfil**
+(si alguien no tiene, su @usuario). También están `{displayName}` (respeta el
+apodo del servidor) y `{handle}` (siempre el @usuario).
 
 - El propietario no recibe permisos administrativos peligrosos.
 - Si el propietario sale y quedan personas, la propiedad pasa a la siguiente.
@@ -406,7 +439,7 @@ panel dentro de Discord y los comandos de identidad (`/branding`,
 
 ## Paquetes de mensajes
 
-Personalizar 38 avisos a mano es una tarde entera, y dejar la mitad a medias
+Personalizar los 42 avisos a mano es una tarde entera, y dejar la mitad a medias
 queda peor que no haber tocado nada. Por eso hay paquetes que los escriben
 todos de golpe:
 
@@ -419,6 +452,11 @@ todos de golpe:
 Se aplican desde «Todos los mensajes» con un clic y se pueden deshacer. Después
 puedes retocar los mensajes que quieras uno a uno: el paquete solo es el punto
 de partida.
+
+Embers Void y Ankerie Dimension llevan **su paquete por defecto** (Void y
+Limones), sin tener que aplicarlo: todo mensaje que no se haya tocado sale con
+esa voz, también los que se añadan más adelante. Lo escrito en el panel siempre
+manda, y «Sin paquete» vuelve a los textos de fábrica.
 
 ## Comprobar que todo funciona de verdad
 

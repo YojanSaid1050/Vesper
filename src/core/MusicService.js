@@ -47,6 +47,7 @@ function sessionDefaults(config = {}) {
     textChannelId: null,
     queue: [],
     current: null,
+    history: [],
     volume: Number(config.defaultVolume || DEFAULTS.volume),
     loop: false,
     skipVotes: new Set(),
@@ -103,6 +104,13 @@ class MusicService {
     this.lastError = null;
     this.started = false;
     this.tools = sources.toolCheck();
+    // El controlador fijo del canal de música se apunta aquí para repintarse
+    // cada vez que cambia algo (canción, pausa, volumen, cola…).
+    this.onChange = null;
+  }
+
+  changed(guildId) {
+    try { this.onChange?.(guildId); } catch { /* el controlador no debe tumbar la música */ }
   }
 
   async start() {
@@ -177,7 +185,8 @@ class MusicService {
     if (!alreadyInside && voiceChannel.userLimit > 0 && voiceChannel.members?.size >= voiceChannel.userLimit) {
       throw new Error(`El canal ${voiceChannel} está lleno`);
     }
-    if (config.music?.requestChannel && interaction.channelId !== config.music.requestChannel) {
+    const requestChannels = [config.music?.requestChannel, config.music?.controllerChannel].filter(Boolean);
+    if (config.music?.requestChannel && !requestChannels.includes(interaction.channelId)) {
       throw new Error(`Las solicitudes de música solo se aceptan en <#${config.music.requestChannel}>`);
     }
     return { config, voiceChannel };
@@ -271,6 +280,8 @@ class MusicService {
         if (player.current !== item && !player.queue.includes(item)) {
           throw new Error(this.lastError || 'No pude iniciar esa canción. Revisa /musica diagnostico e inténtalo otra vez.');
         }
+      } else {
+        this.changed(interaction.guildId);
       }
       return { item, position: player.current === item ? 0 : player.queue.indexOf(item) + 1 };
     } catch (error) {
@@ -293,6 +304,13 @@ class MusicService {
     if (player.idleTimer) clearTimeout(player.idleTimer);
     player.idleTimer = null;
     if (player.loop && player.current) player.queue.unshift(player.current);
+    // Lo que acaba de sonar queda para el botón «Anterior», salvo cuando es
+    // justo ese botón el que provoca el cambio.
+    if (player.current && !player.loop && !player.goingBack) {
+      player.history.push(player.current);
+      if (player.history.length > 25) player.history.shift();
+    }
+    player.goingBack = false;
     player.current = player.queue.shift() || null;
     player.skipVotes.clear();
     player.elapsedBeforeSeek = 0;
@@ -300,6 +318,7 @@ class MusicService {
     if (!player.current) {
       const seconds = Number(player.settings.idleSeconds || DEFAULTS.idleSeconds);
       player.idleTimer = setTimeout(() => this.stop(guildId).catch(() => null), seconds * 1000);
+      this.changed(guildId);
       return;
     }
 
@@ -307,7 +326,10 @@ class MusicService {
     try {
       await this.playCurrent(guildId);
       const now = player.current;
-      if (now && !now.quietStart && !repeating) {
+      this.changed(guildId);
+      // Con el controlador en ese mismo canal, la canción ya se ve en él.
+      const controllerHere = player.settings.controllerChannel && player.settings.controllerChannel === player.textChannelId;
+      if (now && !now.quietStart && !repeating && !controllerHere) {
         const via = now.provider && now.provider !== 'youtube' ? ` · desde ${providers.PROVIDER_LABELS[now.provider] || now.source}` : '';
         this.announce(player, `🎶 Ahora suena: **${now.title || 'canción'}**${now.requesterId ? ` · pedida por <@${now.requesterId}>` : ''}${via}`);
       }
@@ -388,7 +410,14 @@ class MusicService {
 
   announce(player, text) {
     const channel = player?.textChannelId && this.client.channels?.cache?.get(player.textChannelId);
-    if (channel?.send) channel.send({ content: text, allowedMentions: { parse: [] } }).catch(() => null);
+    if (!channel?.send) return;
+    const sent = channel.send({ content: text, allowedMentions: { parse: [] } });
+    // En el canal del controlador los avisos se borran solos para que el
+    // controlador siga siendo lo primero que se ve.
+    const controllerHere = player.settings?.controllerChannel && player.settings.controllerChannel === player.textChannelId;
+    sent.then(message => {
+      if (controllerHere) setTimeout(() => message.delete().catch(() => null), 15_000).unref?.();
+    }).catch(() => null);
   }
 
   checkAudience(guildId) {
@@ -421,6 +450,44 @@ class MusicService {
         player.pausedAt = 0;
       }
     }
+    this.changed(guildId);
+  }
+
+  paused(guildId) {
+    return Boolean(this.players.get(guildId)?.pausedAt);
+  }
+
+  // Vuelve a la canción anterior; la que sonaba pasa a ser la siguiente.
+  async previous(guildId) {
+    const player = this.players.get(guildId);
+    if (!player?.history?.length) throw new Error('No hay una canción anterior');
+    const back = player.history.pop();
+    if (player.current) player.queue.unshift(player.current);
+    player.queue.unshift(back);
+    player.loop = false;
+    player.goingBack = true;
+    const session = this.connections.get(guildId);
+    if (session && player.current) session.audio.stop(true);
+    else await this.advance(guildId);
+  }
+
+  shuffle(guildId) {
+    const player = this.players.get(guildId);
+    if (!player || player.queue.length < 2) throw new Error('Hacen falta al menos dos canciones en cola para mezclar');
+    for (let i = player.queue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [player.queue[i], player.queue[j]] = [player.queue[j], player.queue[i]];
+    }
+    this.changed(guildId);
+    return player.queue.length;
+  }
+
+  setLoop(guildId, active) {
+    const player = this.players.get(guildId);
+    if (!player) throw new Error('No hay una sesión de música');
+    player.loop = Boolean(active);
+    this.changed(guildId);
+    return player.loop;
   }
 
   async skip(guildId) {
@@ -442,6 +509,7 @@ class MusicService {
     if (!player) throw new Error('No hay una sesión de música');
     player.volume = Math.max(1, Math.min(100, Number(volume) || DEFAULTS.volume));
     if (player.current && !player.current.live) await this.playCurrent(guildId, this.elapsed(player));
+    this.changed(guildId);
     return player.volume;
   }
 
@@ -467,6 +535,7 @@ class MusicService {
     } else {
       try { getVoiceConnection(guildId)?.destroy(); } catch { /* nada que cerrar */ }
     }
+    if (player) this.changed(guildId);
   }
 
   async shutdown() {

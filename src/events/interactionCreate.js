@@ -165,7 +165,7 @@ module.exports = {
       // ==================================================
       // SELECT MENUS
       // ==================================================
-      if (interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu()) {
+      if (interaction.isStringSelectMenu() || interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu() || interaction.isUserSelectMenu()) {
         const { handleSelect } = require('../handlers/selects');
         return await handleSelect(interaction, client);
       }

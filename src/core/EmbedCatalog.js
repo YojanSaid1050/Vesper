@@ -12,6 +12,8 @@
 
 const { colorNumber, imageUrl, normalizeLayout, rendersMentions } = require('./EmbedTemplateService');
 const { containerPayload } = require('./EmbedLayouts');
+const { themeLayer } = require('./MessageThemes');
+const { guildTier } = require('../config/guildPolicy');
 
 // Variables comunes a casi todos los registros.
 const MEMBER_VARS = [
@@ -43,6 +45,20 @@ const CREATOR_VARS = [
 // `supports` dice qué campos tiene sentido ofrecer en el editor de cada
 // mensaje. Un registro sin miniatura no debe mostrar esa casilla.
 const FULL = { footer: true, thumbnail: true, image: true };
+const CONTROLLER = { footer: true, thumbnail: false, image: true };
+
+const TRACK_VARS = [
+  ['{title}', 'título de la canción'],
+  ['{url}', 'enlace de la canción'],
+  ['{author}', 'artista o canal'],
+  ['{duration}', 'duración'],
+  ['{requester}', 'quién la pidió'],
+  ['{source}', 'de dónde sale (SoundCloud, Audius…)'],
+  ['{volume}', 'volumen actual'],
+  ['{queue}', 'canciones en cola'],
+  ['{loop}', '« · en bucle» si la repetición está activa'],
+  ['{server}', 'nombre del servidor']
+];
 const NO_THUMB = { footer: true, thumbnail: false, image: true };
 
 const CATALOG = Object.freeze({
@@ -257,6 +273,33 @@ const CATALOG = Object.freeze({
     group: 'Avisos de redes', label: 'YouTube · Short nuevo',
     description: 'Aviso cuando un canal publica un Short.',
     variables: [...CREATOR_VARS, ['{views}', 'visualizaciones']], supports: FULL
+  },
+
+  // ------------------------------------------------------ Música y salas
+  // Mensajes fijos con botones dentro: siempre salen como contenedor V2,
+  // porque es la única forma en que Discord deja meter botones en el bloque.
+  music_controller: {
+    group: 'Música y salas de voz', label: 'Controlador de música · en espera',
+    description: 'El mensaje fijo del canal de música cuando no suena nada. Lleva los botones del reproductor.',
+    variables: [['{server}', 'nombre del servidor'], ['{channel}', 'canal de música']],
+    supports: CONTROLLER, fixedLayout: 'components_v2'
+  },
+  music_playing: {
+    group: 'Música y salas de voz', label: 'Controlador de música · sonando',
+    description: 'El mismo mensaje mientras suena una canción. La portada de la canción sale a la derecha.',
+    variables: TRACK_VARS, supports: CONTROLLER, fixedLayout: 'components_v2'
+  },
+  tempvoice_interface: {
+    group: 'Música y salas de voz', label: 'Interfaz de salas de voz',
+    description: 'El panel fijo con los 15 botones para gestionar la sala temporal de cada uno.',
+    variables: [['{server}', 'nombre del servidor'], ['{generator}', 'canal para crear una sala']],
+    supports: CONTROLLER, fixedLayout: 'components_v2'
+  },
+  tempvoice_room: {
+    group: 'Música y salas de voz', label: 'Sala de voz recién creada',
+    description: 'Se publica en el chat de cada sala nueva, con los mismos botones.',
+    variables: [['{owner}', 'menciona al dueño'], ['{ownerName}', 'nombre del dueño'], ['{channel}', 'la sala'], ['{server}', 'nombre del servidor']],
+    supports: CONTROLLER, fixedLayout: 'components_v2'
   }
 });
 
@@ -505,6 +548,32 @@ const FACTORY = Object.freeze({
     title: 'Gratis: {title}',
     message: 'Valor habitual: {worth}\nPlataformas: {platforms}\nTermina: {endsAt}\n\n{url}',
     color: '#57F287'
+  },
+
+  music_controller: {
+    title: '## 🎶 Controlador de música',
+    message: 'Esperando música…\nEscribe en este canal el nombre o el enlace de una canción y empezará a sonar.\n\n-# Entra antes a un canal de voz.',
+    footer: 'Sistema de música de {server}',
+    image: '{assets}/img/musica-estandar.png',
+    color: '#5865F2'
+  },
+  music_playing: {
+    title: '## 🎶 Ahora suena',
+    message: '### [{title}]({url})\n{author} · {duration}\n\nPedida por {requester} · desde {source}\nVolumen {volume}% · {queue} en cola{loop}',
+    footer: 'Sistema de música de {server}',
+    color: '#5865F2'
+  },
+  tempvoice_interface: {
+    title: '## 🔊 Salas de voz',
+    message: 'Este panel controla tu sala de voz temporal.\nEntra en {generator} para crear la tuya y usa los botones de abajo mientras estés dentro.',
+    footer: 'Solo el dueño de la sala puede cambiarla. «Reclamar» sirve cuando el dueño se fue.',
+    color: '#5865F2'
+  },
+  tempvoice_room: {
+    title: '## 🔊 Tu sala está lista',
+    message: 'Esta sala es de {owner}.\nCambia el nombre, el límite o quién puede entrar con los botones de abajo. Se borra sola cuando queda vacía.',
+    footer: 'Salas de voz',
+    color: '#5865F2'
   }
 });
 
@@ -525,10 +594,16 @@ function kindInfo(kind) {
 // Agrupado tal y como lo pinta el panel. `defaultLayouts` dice con qué forma
 // sale de fábrica cada mensaje en ESTE servidor: la bienvenida de Embers Void
 // nace como contenedor V2 y el resto como embed clásico.
-function catalogForPanel(defaultLayouts = {}) {
+// `config` y `guildId` sirven para enseñar como «original» el texto del
+// paquete que ese servidor lleva puesto, que es el que sale de verdad.
+function catalogForPanel(defaultLayouts = {}, { config = null, guildId = null } = {}) {
   const groups = new Map();
+  const tier = guildId ? guildTier(guildId) : null;
   for (const [id, entry] of Object.entries(CATALOG)) {
     if (!groups.has(entry.group)) groups.set(entry.group, []);
+    // La imagen se queda con {assets}: el panel lo sustituye por su propia
+    // dirección, que es la misma desde la que el bot sirve los banners.
+    const factory = { ...factoryDefaults(id), ...themeLayer(config, id, tier) };
     groups.get(entry.group).push({
       id,
       label: entry.label,
@@ -536,8 +611,9 @@ function catalogForPanel(defaultLayouts = {}) {
       variables: entry.variables,
       supports: entry.supports,
       plainText: Boolean(entry.plainText),
-      defaultLayout: defaultLayouts[id] === 'components_v2' ? 'components_v2' : 'classic',
-      factory: factoryDefaults(id)
+      fixedLayout: entry.fixedLayout || null,
+      defaultLayout: entry.fixedLayout || (defaultLayouts[id] === 'components_v2' ? 'components_v2' : 'classic'),
+      factory
     });
   }
   return [...groups.entries()].map(([group, items]) => ({ group, items }));
@@ -546,6 +622,25 @@ function catalogForPanel(defaultLayouts = {}) {
 function storedTemplate(config, kind) {
   const stored = config?.embeds?.[kind];
   return stored && typeof stored === 'object' ? stored : {};
+}
+
+// Dirección pública de las imágenes del panel (los banners del controlador).
+// Sin WEB_BASE_URL no hay de dónde servirlas y el mensaje sale sin imagen.
+function assetsBase() {
+  const base = String(process.env.WEB_BASE_URL || '').trim().replace(/\/+$/, '');
+  return /^https:\/\//.test(base) ? `${base}/panel/assets` : '';
+}
+
+// Lo guardado en el panel encima del paquete de mensajes del servidor. Un
+// campo vacío en lo guardado no borra el del paquete.
+function effectiveTemplate(config, kind) {
+  const stored = storedTemplate(config, kind);
+  const layer = themeLayer(config, kind, config?.guildId ? guildTier(config.guildId) : null);
+  const merged = { ...layer };
+  for (const [field, value] of Object.entries(stored)) {
+    if (value !== null && value !== undefined && value !== '') merged[field] = value;
+  }
+  return merged;
 }
 
 // ¿Tiene este mensaje alguna personalización guardada?
@@ -565,9 +660,10 @@ function isCustomised(config, kind) {
  * cual; si lo ha escrito, ese texto sustituye el cuerpo, que es justo lo que
  * se espera al personalizar.
  */
-function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = {}) {
-  const stored = storedTemplate(config, kind);
+function buildMessage(kind, { config, vars: eventVars = {}, defaults = {}, fields = [] } = {}) {
+  const stored = effectiveTemplate(config, kind);
   const entry = CATALOG[kind];
+  const vars = { assets: assetsBase(), ...eventVars };
 
   // Un campo vacío o en blanco significa "usa el valor original", no "déjalo
   // en blanco": así el editor puede vaciarse para volver al diseño de fábrica.
@@ -579,7 +675,7 @@ function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = 
 
   // El título y el pie de un embed clásico no convierten <@123…> en una
   // mención: sale el número en bruto. En esos huecos se usa el nombre.
-  const layoutNow = normalizeLayout(stored.layout, defaults.layout);
+  const layoutNow = entry?.fixedLayout || normalizeLayout(stored.layout, defaults.layout);
   const flat = rendersMentions('title', layoutNow) ? vars : plainVars(vars);
 
   // El catálogo manda cuando el evento no trae nada propio. Los eventos solo
@@ -599,7 +695,8 @@ function buildMessage(kind, { config, vars = {}, defaults = {}, fields = [] } = 
   const title = resolve(stored.title, flat) ?? (plantillaTitulo ? substitute(plantillaTitulo, flat) : null);
   const message = resolve(stored.message);
   const footer = resolve(stored.footer, flat) ?? (plantillaPie ? substitute(plantillaPie, flat) : null);
-  const image = imageUrl(stored.image) ?? defaults.image ?? null;
+  const fabricaImagen = fabrica.image ? substitute(fabrica.image, vars) : null;
+  const image = imageUrl(resolve(stored.image)) ?? defaults.image ?? imageUrl(fabricaImagen) ?? null;
   const color = colorNumber(stored.color, colorNumber(defaults.color ?? fabrica.color, 0x5865F2));
   const showThumbnail = stored.thumbnail === undefined || stored.thumbnail === null
     ? defaults.thumbnail !== false
@@ -707,6 +804,8 @@ module.exports = {
   kindInfo,
   catalogForPanel,
   isCustomised,
+  effectiveTemplate,
+  assetsBase,
   buildMessage,
   containerPayload,
   plainVars,

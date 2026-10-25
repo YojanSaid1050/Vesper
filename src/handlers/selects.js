@@ -14,6 +14,11 @@ async function getPanelMode(guildId, platform) {
 async function handleSelect(interaction, client) {
   if (!interaction.guild) return;
 
+  if (String(interaction.customId || '').startsWith('tempvoice:')) {
+    const { handleTempVoiceSelect } = require('../core/TempVoiceService');
+    if (await handleTempVoiceSelect(interaction)) return;
+  }
+
   if (String(interaction.customId || '').startsWith('vesper_roles:')) {
     const { handleCustomRoleMenu } = require('../core/CustomComponentService');
     if (await handleCustomRoleMenu(interaction)) return;

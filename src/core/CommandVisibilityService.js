@@ -2,7 +2,7 @@ const WEB_MANAGED_COMMANDS = new Set([
   'branding', 'cache', 'resetalldb', 'vesper-comunidad', 'config-dashboard', 'forcecheck',
   'resetbranding', 'resetconfig', 'serverconfig', 'setbotavatar', 'setbotlog', 'setbotname',
   'setbotrole', 'setgoodbye', 'setlog', 'vesper-setup', 'setwelcome', 'testbranding',
-  'vesper-historial', 'vesper-mod-config', 'vesper-modulo', 'vesper-musica-config',
+  'vesper-historial', 'vesper-mod-config', 'vesper-modulo', 'vesper-musica-config', 'salas',
   'tiktok-add', 'tiktok-clear', 'tiktok-list', 'tiktok-remove', 'tiktok-setchannel', 'tiktok-setpingrole',
   'twitch-add', 'twitch-clear', 'twitch-list', 'twitch-remove', 'twitch-setchannel', 'twitch-setpingrole',
   'youtube-add', 'youtube-clear', 'youtube-list', 'youtube-remove', 'youtube-setchannel', 'youtube-setpingrole'

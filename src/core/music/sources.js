@@ -365,7 +365,14 @@ function openStream(url, { seekSeconds = 0, volume = 100, live = false, codec = 
   // Las emisiones largas se cortan solas y esto las reengancha, pero son
   // opciones del protocolo HTTP: si se le pasan a un archivo local, ffmpeg ni
   // siquiera abre la entrada.
-  if (isHttpUrl(url)) args.push('-reconnect', '1', '-reconnect_streamed', '1', '-reconnect_delay_max', '5');
+  // `-reconnect_streamed` solo en directo: las compilaciones nuevas de ffmpeg
+  // toman el final de una canción servida sin longitud como un corte y la
+  // vuelven a pedir desde el principio sin parar, así que la canción nunca
+  // terminaba y la cola se quedaba atascada.
+  if (isHttpUrl(url)) {
+    args.push('-reconnect', '1', '-reconnect_on_network_error', '1', '-reconnect_delay_max', '5');
+    if (live) args.push('-reconnect_streamed', '1');
+  }
   // ffmpeg solo entiende proxies HTTP; uno SOCKS no se le puede pasar.
   if (proxy && isHttpUrl(url) && /^http:\/\//i.test(proxy)) args.push('-http_proxy', proxy);
   if (seekSeconds > 0 && !live) args.push('-ss', String(Math.floor(seekSeconds)));

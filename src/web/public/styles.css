@@ -407,7 +407,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .9rem; }
 .field { display: grid; gap: .3rem; min-width: 0; align-content: start; }
 .field > label, .field-label { font-size: .82rem; font-weight: 600; }
-.field .hint { color: var(--text-3); font-size: .76rem; }
+.field .hint, p.hint { color: var(--text-3); font-size: .76rem; line-height: 1.5; }
+p.hint { margin: .6rem 0 0; }
 .field.wide { grid-column: 1 / -1; }
 
 input[type="text"], input[type="url"], input[type="number"], input[type="search"], select, textarea {
@@ -1559,3 +1560,43 @@ body[data-view="servidores"] .view { max-width: 60rem; margin-inline: auto; widt
   .alert-banner { grid-template-columns: auto minmax(0, 1fr); }
   .alert-banner .button { grid-column: 1 / -1; width: 100%; justify-content: center; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Mensajes fijos con botones (controlador de música, salas de voz)    */
+/* ------------------------------------------------------------------ */
+
+.v2-buttons { display: grid; gap: .35rem; }
+.v2-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .35rem; }
+.v2-button {
+  display: flex; align-items: center; justify-content: center; gap: .3rem; min-width: 0;
+  padding: .38rem .3rem; border-radius: .35rem;
+  background: #3c3d44; color: #f2f3f5;
+  font-size: .7rem; font-weight: 600; white-space: nowrap; overflow: hidden;
+}
+.v2-button span { flex: 0 0 auto; }
+.v2-button em { font-style: normal; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.v2-button.off { opacity: .45; }
+.v2-button.success { background: #248046; color: #fff; }
+.v2-button.danger { background: #da373c; color: #fff; }
+.v2-button.link { background: #3c3d44; }
+body[data-mode="light"] .v2-button { background: #e3e5e8; color: #2e3035; }
+body[data-mode="light"] .v2-button.success { background: #248046; color: #fff; }
+body[data-mode="light"] .v2-button.danger { background: #da373c; color: #fff; }
+
+.fixed-panel { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 1.25rem; align-items: start; }
+.fixed-panel-side { display: grid; gap: .8rem; }
+.fixed-panel-side .form-actions { flex-wrap: wrap; }
+.fixed-panel-preview { display: grid; gap: .5rem; min-width: 0; }
+.fixed-preview .embed-preview { max-width: none; }
+@media (max-width: 900px) {
+  .fixed-panel { grid-template-columns: 1fr; }
+}
+/* En el móvil Discord aprieta los botones: se ve el emoji y poco más. */
+@media (max-width: 560px) {
+  .v2-button { padding: .45rem .2rem; font-size: .85rem; }
+  .v2-button em { display: none; }
+}
+
+.theme-card { position: relative; }
+.theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.theme-active { position: absolute; top: .7rem; right: .7rem; }

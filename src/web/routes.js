@@ -50,7 +50,7 @@ const { verifyChannel } = require('../platforms/youtube/utils');
 const { publishSelfRolePanel, publishTicketPanel, reviewSuggestion } = require('../core/CommunityService');
 const { catalogForPanel } = require('../core/EmbedCatalog');
 const { alertOverview } = require('../core/AlertRouter');
-const { themesForPanel, themeAllowed, applyTheme, clearTheme } = require('../core/MessageThemes');
+const { themesForPanel, themeAllowed, applyTheme, clearTheme, activeThemeId } = require('../core/MessageThemes');
 const { KINDS } = require('../core/EmbedCatalog');
 const { buildCustomEmbedPayload } = require('../core/CustomEmbedService');
 const { selfAssignableRoleIssue } = require('../core/RoleSafetyService');
@@ -253,6 +253,8 @@ function effectiveIdentity(config, client, guild) {
     },
     // Apodo del bot en este servidor (lo aplica Vesper desde profile.displayName).
     nickname: guild?.members?.me?.nickname || null,
+    // Color del servidor: tiñe el panel también para quien no administra.
+    accent: /^#[0-9a-f]{6}$/i.test(String(profile.primaryColor || '')) ? profile.primaryColor : null,
     // Lo que aparece como autor de los mensajes con webhook.
     webhook: {
       name: profile.displayName || branding.name || botUser?.username || 'Vesper',
@@ -517,7 +519,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         memberView: memberViewFor(config, access, req.params.guildId),
         embedDefaults: access.configure ? embedDefaultsFor(req.params.guildId, access.guild.name) : null,
         messageCatalog: access.configure
-          ? catalogForPanel(welcomeLayoutsFor(req.params.guildId))
+          ? catalogForPanel(welcomeLayoutsFor(req.params.guildId), { config, guildId: req.params.guildId })
           : null,
         plan: {
           id: guildPlan(req.params.guildId, config),
@@ -527,6 +529,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         },
         alerts: access.configure ? alertOverview(config) : null,
         messageThemes: access.configure ? themesForPanel(guildTier(req.params.guildId)) : null,
+        activeMessageTheme: access.configure ? activeThemeId(config, guildTier(req.params.guildId)) : null,
         identity: effectiveIdentity(config, client, access.guild),
         config: access.configure ? serializedConfig(config) : null,
         channels,
@@ -586,10 +589,65 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         for (const [field, value] of Object.entries(fields)) flattened[`${kind}.${field}`] = value;
       }
       await updateGuildSection(req.params.guildId, 'embeds', flattened);
+      // Se recuerda el paquete para los mensajes que se añadan más adelante.
+      await updateGuildSection(req.params.guildId, 'profile', { messageTheme: themeId });
       await recordAudit(req, req.params.guildId, 'config.messageTheme', null, { theme: themeId });
+      const { refreshGuildPanels } = require('../core/FixedPanels');
+      refreshGuildPanels(context.client, req.params.guildId).catch(() => null);
 
       const config = await getGuildConfig(req.params.guildId);
       return res.json({ ok: true, theme: themeId, config: serializedConfig(config) });
+    } catch (error) { return next(error); }
+  });
+
+  // Mensajes fijos con botones: el controlador de música y la interfaz de
+  // salas de voz. Se publican en el canal elegido y sustituyen al anterior.
+  const FIXED_PANELS = {
+    'music-controller': {
+      label: 'el controlador de música',
+      publish: (client, guildId, channelId) => require('../core/music/controller').publishController(client, guildId, channelId),
+      remove: (client, guildId) => require('../core/music/controller').removeController(client, guildId)
+    },
+    'tempvoice-interface': {
+      label: 'la interfaz de salas',
+      publish: (client, guildId, channelId) => require('../core/TempVoiceService').publishInterface(client, guildId, channelId),
+      remove: (client, guildId) => require('../core/TempVoiceService').removeInterface(client, guildId)
+    }
+  };
+
+  api.post('/guilds/:guildId/fixed-panels/:panel', requireSession, requireCsrf, async (req, res, next) => {
+    try {
+      const panel = FIXED_PANELS[req.params.panel];
+      if (!panel) return res.status(404).json({ error: 'Ese panel no existe.' });
+      const context = await accessFor(req, res, getClient);
+      if (!context) return;
+      if (!context.access.configure) return res.status(403).json({ error: `Necesitas Administrar servidor para publicar ${panel.label}.` });
+      const channelId = String(req.body?.channelId || '');
+      const channel = context.access.guild.channels.cache.get(channelId);
+      if (!channel || channel.guild?.id !== context.access.guild.id) return res.status(400).json({ error: 'Elige un canal de este servidor.' });
+      let result;
+      try {
+        result = await panel.publish(context.client, req.params.guildId, channelId);
+      } catch (error) {
+        return res.status(400).json({ error: String(error.message || error).slice(0, 300) });
+      }
+      await recordAudit(req, req.params.guildId, 'fixedPanel.publish', null, { panel: req.params.panel, channelId });
+      const config = await getGuildConfig(req.params.guildId);
+      return res.json({ ok: true, ...result, config: serializedConfig(config) });
+    } catch (error) { return next(error); }
+  });
+
+  api.delete('/guilds/:guildId/fixed-panels/:panel', requireSession, requireCsrf, async (req, res, next) => {
+    try {
+      const panel = FIXED_PANELS[req.params.panel];
+      if (!panel) return res.status(404).json({ error: 'Ese panel no existe.' });
+      const context = await accessFor(req, res, getClient);
+      if (!context) return;
+      if (!context.access.configure) return res.status(403).json({ error: `Necesitas Administrar servidor para quitar ${panel.label}.` });
+      await panel.remove(context.client, req.params.guildId);
+      await recordAudit(req, req.params.guildId, 'fixedPanel.remove', null, { panel: req.params.panel });
+      const config = await getGuildConfig(req.params.guildId);
+      return res.json({ ok: true, config: serializedConfig(config) });
     } catch (error) { return next(error); }
   });
 
@@ -624,6 +682,13 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         clearWebhookCache(req.params.guildId);
       }
       if (updates.features?.music === false) await context.client.music?.stop?.(req.params.guildId).catch(() => null);
+      // El controlador de música y la interfaz de salas ya publicados se
+      // repintan con lo recién guardado.
+      const fixedKinds = Object.keys(updates.embeds || {}).some(kind => /^(music|tempvoice)_/.test(kind));
+      if (fixedKinds || updates.tempVoice || updates.profile) {
+        const { refreshGuildPanels } = require('../core/FixedPanels');
+        refreshGuildPanels(context.client, req.params.guildId).catch(() => null);
+      }
       await recordAudit(req, req.params.guildId, 'config.update', null, {
         fields: Object.entries(updates).flatMap(([section, values]) => section === 'community'
           ? Object.entries(values).flatMap(([subsection, fields]) => Object.keys(fields).map(key => `${section}.${subsection}.${key}`))

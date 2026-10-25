@@ -6,7 +6,8 @@ const temporaryVoiceChannelSchema = new mongoose.Schema({
   ownerId: { type: String, required: true, index: true },
   controlMessageId: { type: String, default: null },
   locked: { type: Boolean, default: false },
-  hidden: { type: Boolean, default: false }
+  hidden: { type: Boolean, default: false },
+  chatLocked: { type: Boolean, default: false }
 }, { timestamps: true });
 
 temporaryVoiceChannelSchema.index({ guildId: 1, ownerId: 1 });

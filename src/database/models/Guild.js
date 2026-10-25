@@ -57,7 +57,10 @@ const guildSchema = new mongoose.Schema({
     welcomeMessage: { type: String, default: null, maxlength: 1500 },
     goodbyeTitle: { type: String, default: null, maxlength: 120 },
     goodbyeMessage: { type: String, default: null, maxlength: 1500 },
-    memberRole: { type: String, default: null }
+    memberRole: { type: String, default: null },
+    // Paquete de mensajes elegido en el panel. Vacío: el del servidor (Void en
+    // Embers Void, Limones en Ankerie Dimension); «ninguno»: los de fábrica.
+    messageTheme: { type: String, default: null, maxlength: 20 }
   },
   // Plantillas de los mensajes que publica el bot, indexadas por el tipo del
   // catálogo (welcome, log_ban_added, notify_twitch_live…). Se guarda como
@@ -117,7 +120,11 @@ const guildSchema = new mongoose.Schema({
     maxQueue: { type: Number, min: 1, max: 500, default: 100 },
     maxPerUser: { type: Number, min: 1, max: 25, default: 3 },
     maxTrackMinutes: { type: Number, min: 1, max: 180, default: 15 },
-    idleSeconds: { type: Number, min: 30, max: 3600, default: 180 }
+    idleSeconds: { type: Number, min: 30, max: 3600, default: 180 },
+    // Mensaje fijo con los botones del reproductor; en su canal se piden
+    // canciones escribiendo.
+    controllerChannel: { type: String, default: null },
+    controllerMessage: { type: String, default: null }
   },
   tempVoice: {
     generatorChannel: { type: String, default: null },
@@ -126,7 +133,10 @@ const guildSchema = new mongoose.Schema({
     userLimit: { type: Number, min: 0, max: 99, default: 0 },
     bitrate: { type: Number, min: 8000, max: 384000, default: 64000 },
     lockedByDefault: { type: Boolean, default: false },
-    hiddenByDefault: { type: Boolean, default: false }
+    hiddenByDefault: { type: Boolean, default: false },
+    // Interfaz fija con los botones para gestionar la sala de cada uno.
+    interfaceChannel: { type: String, default: null },
+    interfaceMessage: { type: String, default: null }
   },
   community: {
     tickets: {

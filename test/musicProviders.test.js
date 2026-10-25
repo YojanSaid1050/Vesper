@@ -9,7 +9,7 @@ const providers = require('../src/core/music/providers');
 // yt-dlp falso: YouTube puede responder con el bloqueo anti-bot que da en los
 // centros de datos, y SoundCloud devuelve resultados (uno de ellos, solo una
 // muestra de 20 s que no se debe elegir).
-function fakeYtdlp(t, { youtube = 'ok' } = {}) {
+function fakeYtdlp(t, { youtube = 'ok', order = 'youtube,soundcloud,audius' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vesper-providers-'));
   const log = path.join(dir, 'calls.log');
   const script = path.join(dir, 'yt-dlp');
@@ -37,7 +37,7 @@ console.log(JSON.stringify({ _type: 'playlist', entries: [{ ...video, formats: [
 `, { mode: 0o755 });
   const previous = { YTDLP_PATH: process.env.YTDLP_PATH, MUSIC_SOURCES: process.env.MUSIC_SOURCES };
   process.env.YTDLP_PATH = script;
-  delete process.env.MUSIC_SOURCES;
+  process.env.MUSIC_SOURCES = order;
   providers.reset();
   t.after(() => {
     for (const [key, value] of Object.entries(previous)) {
@@ -161,5 +161,28 @@ test('el orden de fuentes se puede cambiar y valida los nombres', t => {
   process.env.MUSIC_SOURCES = 'soundcloud, youtube, inventada';
   assert.deepEqual(providers.providerOrder(), ['soundcloud', 'youtube']);
   delete process.env.MUSIC_SOURCES;
-  assert.deepEqual(providers.providerOrder(), ['youtube', 'soundcloud', 'audius']);
+  assert.deepEqual(providers.providerOrder(), ['soundcloud', 'audius', 'youtube']);
+});
+
+test('por defecto YouTube va de último y ni se consulta si SoundCloud responde', async t => {
+  const calls = fakeYtdlp(t, { order: '' });
+  delete process.env.MUSIC_SOURCES;
+  const [track] = await providers.search('joji slow dancing in the dark');
+  assert.equal(track.provider, 'soundcloud');
+  assert.ok(calls().every(args => args.at(-1).startsWith('scsearch')), 'no se llamó a YouTube');
+});
+
+test('con YouTube de último, un enlace de YouTube se busca por su título sin tocar YouTube', async t => {
+  const calls = fakeYtdlp(t, { order: 'soundcloud,audius,youtube' });
+  mockFetch(t, { 'https://www.youtube.com/oembed': { title: 'Joji - SLOW DANCING IN THE DARK (Official Video)' } });
+  const [track] = await providers.search('https://www.youtube.com/watch?v=K3Qzzggn--s');
+  assert.equal(track.provider, 'soundcloud');
+  assert.ok(calls().every(args => !args.at(-1).includes('youtube.com')), 'no se pidió el enlace a YouTube');
+});
+
+test('quitar youtube de MUSIC_SOURCES lo deja fuera por completo', async t => {
+  fakeYtdlp(t, { order: 'soundcloud' });
+  assert.deepEqual(providers.providerOrder(), ['soundcloud']);
+  mockFetch(t, {});
+  await assert.rejects(providers.search('https://www.youtube.com/watch?v=K3Qzzggn--s'), /No pude leer ese enlace/);
 });
