@@ -62,39 +62,53 @@ async function handleColorRoles(interaction) {
     await interaction.followUp({ content: reason, flags: MessageFlags.Ephemeral }).catch(() => null);
   };
 
+  // Una línea privada que confirma el cambio: antes el rol cambiaba en
+  // silencio y no se sabía si el clic había servido.
+  const roleName = roleId => interaction.guild?.roles?.cache?.get(roleId)?.name || 'ese rol';
+  const confirm = content => interaction.followUp({ content, flags: MessageFlags.Ephemeral, allowedMentions: { parse: [] } }).catch(() => null);
+
   const applyRoles = async action => {
     try {
-      await action();
+      const done = await action();
+      if (done) await confirm(done);
     } catch (error) {
       await explainFailure(error);
     }
     return true;
   };
 
-  if (interaction.isStringSelectMenu() && interaction.customId === 'select_color') {
-    const selected = interaction.values[0];
-    return applyRoles(async () => {
-      await interaction.member.roles.remove(Object.values(colorRoles));
-      if (selected !== 'color_remove') {
-        const roleId = colorRoles[selected];
-        if (roleId) await interaction.member.roles.add(roleId);
-      }
-    });
-  }
+  // El color y el país se pueden elegir con el menú o con un botón por opción
+  // (paneles antiguos de Embers Void): antes el botón no hacía nada.
+  const pickColor = selected => applyRoles(async () => {
+    await interaction.member.roles.remove(Object.values(colorRoles));
+    if (selected === 'color_remove') return '✅ Te quité el color.';
+    const roleId = colorRoles[selected];
+    if (!roleId) return null;
+    await interaction.member.roles.add(roleId);
+    return `✅ Ahora tu color es **${roleName(roleId)}**.`;
+  });
 
-  if (interaction.isStringSelectMenu() && interaction.customId === 'select_country') {
-    const selected = interaction.values[0];
-    return applyRoles(async () => {
-      await interaction.member.roles.remove(Object.values(countryRoles));
-      const roleId = countryRoles[selected];
-      if (roleId) await interaction.member.roles.add(roleId);
-    });
-  }
+  const pickCountry = selected => applyRoles(async () => {
+    await interaction.member.roles.remove(Object.values(countryRoles));
+    const roleId = countryRoles[selected];
+    if (!roleId) return null;
+    await interaction.member.roles.add(roleId);
+    return `✅ Listo: **${roleName(roleId)}**.`;
+  });
+
+  if (interaction.isStringSelectMenu() && interaction.customId === 'select_color') return pickColor(interaction.values[0]);
+  if (interaction.isStringSelectMenu() && interaction.customId === 'select_country') return pickCountry(interaction.values[0]);
+  if (interaction.isButton() && inMap(colorRoles)) return pickColor(customId);
+  if (interaction.isButton() && inMap(countryRoles)) return pickCountry(customId);
 
   const toggleFrom = map => applyRoles(async () => {
     const roleId = map[customId];
-    if (interaction.member.roles.cache.has(roleId)) await interaction.member.roles.remove(roleId);
-    else await interaction.member.roles.add(roleId);
+    if (interaction.member.roles.cache.has(roleId)) {
+      await interaction.member.roles.remove(roleId);
+      return `Te quité **${roleName(roleId)}**.`;
+    }
+    await interaction.member.roles.add(roleId);
+    return `✅ Ahora tienes **${roleName(roleId)}**.`;
   });
 
   if (interaction.isButton() && inMap(gameRoles)) return toggleFrom(gameRoles);
@@ -180,9 +194,16 @@ module.exports = {
 
     } catch (error) {
       console.error('❌ Error en interactionCreate:', error);
+      // Si ya se había respondido con «pensando…», hay que cerrar esa respuesta:
+      // antes la persona se quedaba esperando para siempre sin saber qué pasó.
+      const content = '❌ Algo falló al hacer eso. Inténtalo de nuevo en un momento.';
       try {
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: '❌ Error inesperado.', flags: MessageFlags.Ephemeral });
+          await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+        } else if (interaction.deferred && !interaction.replied) {
+          await interaction.editReply({ content, embeds: [], components: [] });
+        } else {
+          await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
         }
       } catch {}
     }

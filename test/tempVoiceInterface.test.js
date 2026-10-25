@@ -183,5 +183,5 @@ test('sin sala propia, la interfaz explica qué hacer', async t => {
   const { guild, members } = setup(t);
   const { interaction, replies } = press(guild, members, STRANGER, 'tempvoice:info');
   await handleTempVoiceButton(interaction);
-  assert.match(text(replies[0]), /Entra a tu sala temporal/);
+  assert.match(text(replies[0]), /^Entra a tu sala temporal/, "es un aviso, no un fallo");
 });

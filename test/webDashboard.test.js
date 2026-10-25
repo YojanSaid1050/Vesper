@@ -704,3 +704,14 @@ test('el resumen para miembros dice qué está activo sin revelar canales privad
   assert.equal(view.tempvoice.generator.name, 'Crear sala');
   assert.equal(JSON.stringify(view).includes('staff'), false);
 });
+
+test('los mensajes de solo texto se guardan aunque el editor mande la imagen vacía', t => {
+  const previousMain = process.env.MAIN_GUILD_ID;
+  t.after(() => { if (previousMain === undefined) delete process.env.MAIN_GUILD_ID; else process.env.MAIN_GUILD_ID = previousMain; });
+  process.env.MAIN_GUILD_ID = '323456789012345678';
+  const guild = mockGuild();
+  const result = sanitizeGuildPatch({ embeds: { automod_notice: { message: '{user}, quité tu mensaje: {reason}.', image: null }, automod_dm: { message: 'Aviso', image: '' } } }, guild);
+  assert.equal(result.embeds.automod_notice.message, '{user}, quité tu mensaje: {reason}.');
+  assert.equal(result.embeds.automod_notice.image, null);
+  assert.throws(() => sanitizeGuildPatch({ embeds: { automod_dm: { image: 'https://ejemplo.com/a.png' } } }, guild), ValidationError);
+});

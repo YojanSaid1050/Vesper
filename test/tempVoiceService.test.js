@@ -41,8 +41,8 @@ test('cada Main ve la interfaz con su tema', t => {
   process.env.MAIN_GUILD_ID = '1506580021232406540';
   process.env.THEMED_MAIN_GUILD_IDS = '1124871897688055818';
   const titulo = guildId => interfacePayload({ guild: { name: 'x' }, config: { guildId } }).components[0].components[0].content;
-  assert.match(titulo('1506580021232406540'), /Cámaras del Vacío/);
-  assert.match(titulo('1124871897688055818'), /Salitas Limón/);
+  assert.match(titulo('1506580021232406540'), /𝐶𝑎́𝑚𝑎𝑟𝑎𝑠 𝑑𝑒𝑙 𝑉𝑎𝑐𝑖́𝑜/);
+  assert.match(titulo('1124871897688055818'), /Equipos Limón/);
   assert.match(titulo('999999999999999999'), /Salas de voz/);
   // Lo escrito en el panel manda sobre el tema.
   const propio = interfacePayload({ guild: { name: 'x' }, config: { guildId: '1124871897688055818', embeds: { tempvoice_interface: { title: '## Mis salas' } } } });
@@ -115,4 +115,25 @@ test('una sala cerrada desde el botón no se vuelve a procesar', async t => {
   await settleRoom(guild, '900000000000000003');
 
   assert.equal(removed.mock.callCount(), 0);
+});
+
+test('las salas de Ankerie Dimension se llaman «Equipo de…» salvo que se haya escrito otro nombre', t => {
+  const previous = process.env.THEMED_MAIN_GUILD_IDS;
+  t.after(() => { if (previous === undefined) delete process.env.THEMED_MAIN_GUILD_IDS; else process.env.THEMED_MAIN_GUILD_IDS = previous; });
+  process.env.THEMED_MAIN_GUILD_IDS = '1124871897688055818';
+  const { roomTemplate } = require('../src/core/TempVoiceService');
+  assert.equal(roomTemplate({}, '1124871897688055818'), 'Equipo de {username}');
+  assert.equal(roomTemplate({ nameTemplate: 'Sala de {username}' }, '1124871897688055818'), 'Equipo de {username}');
+  assert.equal(roomTemplate({ nameTemplate: 'Cueva de {handle}' }, '1124871897688055818'), 'Cueva de {handle}');
+  assert.equal(roomTemplate({}, '999999999999999999'), 'Sala de {username}');
+  assert.equal(roomName(roomTemplate({}, '1124871897688055818'), member), 'Equipo de xyojansaidx');
+});
+
+test('Embers Void escribe sus textos en su cursiva fina sin tocar las variables', () => {
+  const { voidType, THEMES } = require('../src/core/MessageThemes');
+  assert.equal(voidType('Hola {user}, mirá https://x.com/a'), '𝐻𝑜𝑙𝑎 {user}, 𝑚𝑖𝑟𝑎́ https://x.com/a');
+  assert.equal(voidType('[{title}]({url}) · Vacío'), '[{title}]({url}) · 𝑉𝑎𝑐𝑖́𝑜');
+  // La bienvenida conserva su diseño escrito a mano.
+  assert.match(THEMES.void.messages.welcome.title, /𝐴 𝑛𝑒𝑤 𝑤𝑎𝑛𝑑𝑒𝑟𝑒𝑟/);
+  assert.equal(THEMES.void.messages.log_role_deleted.author, '✦ 𝑈𝑛𝑎 𝑚𝑎𝑟𝑐𝑎 𝑠𝑒 𝑑𝑒𝑠ℎ𝑖𝑧𝑜 · {server}');
 });

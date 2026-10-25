@@ -195,9 +195,12 @@ function sanitizeGuildPatch(input, guild) {
         result[field] = optionalText(block[field], EMBED_FIELD_LIMITS[field], `embeds.${kind}.${field}`);
       }
       const supports = kindInfo(kind)?.supports || {};
+      // El editor manda la imagen vacía también en los mensajes de solo
+      // texto; eso no es un error, solo se rechaza una URL de verdad.
       if (block.image !== undefined) {
-        if (supports.image === false) throw new ValidationError(`embeds.${kind} no admite imagen.`);
-        result.image = imageUrlValue(block.image, `embeds.${kind}.image`);
+        const empty = block.image === null || String(block.image).trim() === '';
+        if (supports.image === false && !empty) throw new ValidationError(`embeds.${kind} no admite imagen.`);
+        result.image = supports.image === false ? null : imageUrlValue(block.image, `embeds.${kind}.image`);
       }
       if (block.color !== undefined) {
         result.color = block.color === null || block.color === '' ? null : colorValue(block.color, `embeds.${kind}.color`);

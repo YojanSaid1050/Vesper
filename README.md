@@ -1,4 +1,4 @@
-# Vesper Bot 3.9.0
+# Vesper Bot 3.9.1
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión actual conserva la presentación visual original con
@@ -310,7 +310,7 @@ fuente sale y la portada.
 
 Se publica desde el panel (Música → Controlador de música) o con
 `/musica controlador`. Cada servidor lo ve con su tema: *Resonancia del Vacío*,
-*Rocola Limón* o *Controlador de música*, con su banner. Sin rol DJ, los botones
+*Rockolita* o *Controlador de música*, con su banner. Sin rol DJ, los botones
 los puede usar quien pidió la canción o quien está solo con el bot; saltar
 funciona por votos. Vesper necesita Ver canal, Enviar mensajes, Leer el
 historial y Gestionar mensajes en ese canal.
@@ -362,7 +362,7 @@ chat de la sala la interfaz con sus botones.
 
 La **interfaz de salas** es un mensaje fijo con 15 botones metidos dentro del
 bloque (Components V2), al estilo de TempVoice pero con nombre propio en cada
-servidor: *Cámaras del Vacío* en Embers Void, *Salitas Limón* en Ankerie
+servidor: *Cámaras del Vacío* en Embers Void, *Equipos Limón* en Ankerie
 Dimension y *Salas de voz* en los demás. Se publica desde el panel o con
 `/salas interfaz`, y los botones actúan sobre la sala en la que esté quien los
 pulsa:

@@ -1600,3 +1600,37 @@ body[data-mode="light"] .v2-button.danger { background: #da373c; color: #fff; }
 .theme-card { position: relative; }
 .theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
 .theme-active { position: absolute; top: .7rem; right: .7rem; }
+
+/* ------------------------------------------------------------------ */
+/* Configuración: vista general por funciones                          */
+/* ------------------------------------------------------------------ */
+
+.overview-meter { height: .5rem; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.overview-meter span { display: block; width: var(--meter, 0%); height: 100%; border-radius: inherit; background: var(--accent); transition: width .3s ease; }
+.pending-list { display: grid; gap: .5rem; margin-top: 1rem; }
+.pending-row {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .75rem; align-items: center;
+  padding: .65rem .8rem; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface-2);
+}
+.pending-row strong { display: block; font-size: .9rem; }
+.pending-row small { color: var(--warn); font-size: .78rem; }
+
+.area-grid { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fill, minmax(min(100%, 15.5rem), 1fr)); }
+.area-card {
+  display: flex; flex-direction: column; gap: .6rem;
+  padding: .9rem; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface-2);
+}
+.area-card.ok { border-color: color-mix(in srgb, var(--ok) 35%, var(--line)); }
+.area-card.warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); }
+.area-card.off, .area-card.locked { opacity: .72; }
+.area-actions { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: auto; padding-top: .2rem; }
+.area-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .55rem; align-items: center; }
+.area-head strong { font-size: .92rem; }
+.area-facts { display: grid; gap: .35rem; margin: 0; }
+.area-facts div { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: .5rem; font-size: .8rem; }
+.area-facts dt { color: var(--text-3); }
+.area-facts dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+.area-facts.wide { grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .6rem 1.25rem; }
+.area-facts.wide div { grid-template-columns: 10rem minmax(0, 1fr); }
+.area-missing { margin: 0; color: var(--warn); font-size: .78rem; }
+.more-options .def-grid { margin-top: 1rem; }

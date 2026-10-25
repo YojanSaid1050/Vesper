@@ -83,7 +83,7 @@ function createDefaultGuildConfig(guildId = null) {
     tempVoice: {
       generatorChannel: null,
       category: null,
-      nameTemplate: 'Sala de {username}',
+      nameTemplate: isThemedMainGuild(guildId) ? 'Equipo de {username}' : 'Sala de {username}',
       userLimit: 0,
       bitrate: 64000,
       lockedByDefault: false,
