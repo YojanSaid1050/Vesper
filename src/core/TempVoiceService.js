@@ -21,7 +21,7 @@ const {
 } = require('discord.js');
 const TemporaryVoiceChannel = require('../database/models/TemporaryVoiceChannel');
 const { getGuildConfig, updateGuildSection } = require('../database/mongoManager');
-const { isModuleEnabledConfig } = require('../config/guildPolicy');
+const { isModuleEnabledConfig, guildTier } = require('../config/guildPolicy');
 const { buildMessage } = require('./EmbedCatalog');
 
 const createLocks = new Set();
@@ -70,6 +70,19 @@ const PICKS = Object.freeze({
   unblock: { placeholder: 'A quién le levantas el bloqueo', max: 10 },
   transfer: { placeholder: 'El nuevo dueño (tiene que estar en la sala)', max: 1 }
 });
+
+// Nombre de fábrica de las salas en cada servidor. En Ankerie Dimension las
+// salas son «equipos». «Sala de {username}» era el valor de fábrica para todos,
+// así que guardado tal cual se toma como «sin personalizar».
+const LEGACY_ROOM_TEMPLATE = 'Sala de {username}';
+function defaultRoomTemplate(guildId) {
+  return guildTier(guildId) === 'themed_main' ? 'Equipo de {username}' : LEGACY_ROOM_TEMPLATE;
+}
+
+function roomTemplate(settings, guildId) {
+  const saved = String(settings?.nameTemplate || '').trim();
+  return !saved || saved === LEGACY_ROOM_TEMPLATE ? defaultRoomTemplate(guildId) : saved;
+}
 
 function cleanChannelName(value) {
   return String(value || 'Sala temporal').replace(/[\r\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Sala temporal';
@@ -198,7 +211,7 @@ async function createRoom(newState, config) {
     await member.user.fetch?.(true).catch(() => null);
     const settings = config.tempVoice || {};
     const channel = await guild.channels.create({
-      name: roomName(settings.nameTemplate, member),
+      name: roomName(roomTemplate(settings, guild.id), member),
       type: ChannelType.GuildVoice,
       parent: settings.category || newState.channel?.parentId || null,
       userLimit: Number(settings.userLimit || 0),
@@ -620,6 +633,8 @@ module.exports = {
   removeInterface,
   interfacePayload,
   roomName,
+  roomTemplate,
+  defaultRoomTemplate,
   cleanChannelName,
   controlPayload,
   settleRoom,

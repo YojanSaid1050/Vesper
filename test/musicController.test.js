@@ -51,7 +51,7 @@ test('en espera: un único bloque V2 con los botones dentro y el banner del tema
   assert.equal(payload.flags, 32768);
   assert.equal(payload.components.length, 1);
   assert.doesNotThrow(() => new ContainerBuilder(payload.components[0]).toJSON());
-  assert.match(textos(payload), /Rocola Limón/);
+  assert.match(textos(payload), /Rockolita Limón/);
   const galeria = partes(payload).find(part => part.type === 12);
   assert.equal(galeria.items[0].media.url, 'https://vesper-q5jv.onrender.com/panel/assets/img/musica-limones.png');
 
@@ -64,8 +64,8 @@ test('en espera: un único bloque V2 con los botones dentro y el banner del tema
 
 test('cada Main tiene su propio controlador', () => {
   const titulo = guildId => textos(controllerPayload({ guild: { id: guildId, name: 'x' }, config: { guildId } }));
-  assert.match(titulo(MAIN), /Resonancia del Vacío/);
-  assert.match(titulo(THEMED), /Rocola Limón/);
+  assert.match(titulo(MAIN), /𝑅𝑒𝑠𝑜𝑛𝑎𝑛𝑐𝑖𝑎 𝑑𝑒𝑙 𝑉𝑎𝑐𝑖́𝑜/);
+  assert.match(titulo(THEMED), /Rockolita Limón/);
   assert.match(titulo('999999999999999999'), /Controlador de música/);
 });
 

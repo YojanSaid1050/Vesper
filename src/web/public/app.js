@@ -3775,7 +3775,7 @@ function renderTempVoice() {
           <div class="form-row">
             <div class="field grow">
               <label for="tempvoice-name">Nombre de la sala</label>
-              <input id="tempvoice-name" type="text" maxlength="80" value="${escapeHtml(temp.nameTemplate || 'Sala de {username}')}" required>
+              <input id="tempvoice-name" type="text" maxlength="80" value="${escapeHtml(data.roomNameTemplate || temp.nameTemplate || 'Sala de {username}')}" required>
               <span class="hint">{username}: el nombre visible del perfil · {displayName}: el apodo del servidor · {handle}: el @usuario. Usa al menos uno.</span>
             </div>
             <div class="field">

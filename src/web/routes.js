@@ -530,6 +530,8 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         alerts: access.configure ? alertOverview(config) : null,
         messageThemes: access.configure ? themesForPanel(guildTier(req.params.guildId)) : null,
         activeMessageTheme: access.configure ? activeThemeId(config, guildTier(req.params.guildId)) : null,
+        // El nombre con el que nacen las salas aquí (en Ankerie, «Equipo de…»).
+        roomNameTemplate: access.configure ? require('../core/TempVoiceService').roomTemplate(config.tempVoice, req.params.guildId) : null,
         identity: effectiveIdentity(config, client, access.guild),
         config: access.configure ? serializedConfig(config) : null,
         channels,

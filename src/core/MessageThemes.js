@@ -21,7 +21,8 @@ const VOID = {
   id: 'void',
   scope: 'primary_main',
   name: 'Void',
-  tagline: 'Morado profundo, negro y blanco. Solemne y con ornamentos.',
+  tagline: 'Morado profundo, negro y blanco. Solemne, con ornamentos y en cursiva fina.',
+  typeface: 'italic',
   accent: '#9D63FF',
   swatches: ['#1B1425', '#9D63FF', '#C9A7FF', '#FFFFFF'],
   colors: {
@@ -53,17 +54,47 @@ const LIMONES = {
   }
 };
 
+// La tipografía de Embers Void: la cursiva fina de Unicode (𝐸𝑚𝑏𝑒𝑟𝑠 𝑉𝑜𝑖𝑑𝑠,
+// 𝐴 𝑛𝑒𝑤 𝑤𝑎𝑛𝑑𝑒𝑟𝑒𝑟). No es una fuente: son letras de verdad, así que se ven
+// igual en el celular y en el computador.
+const ITALIC_UPPER = 0x1D434;
+const ITALIC_LOWER = 0x1D44E;
+
+function italicLetters(text) {
+  // Esas letras no traen tildes ni eñe: se escriben como letra + tilde
+  // combinada (𝑖́, 𝑛̃), que Discord pinta encima sin problema.
+  return [...String(text).normalize('NFD')].map(char => {
+    const code = char.codePointAt(0);
+    if (char === 'h') return 'ℎ';
+    if (code >= 65 && code <= 90) return String.fromCodePoint(ITALIC_UPPER + code - 65);
+    if (code >= 97 && code <= 122) return String.fromCodePoint(ITALIC_LOWER + code - 97);
+    return char;
+  }).join('');
+}
+
+// Pasa a cursiva el texto escrito, nunca lo que rellena el bot: {variables},
+// direcciones de enlaces ni URLs.
+function voidType(text) {
+  if (typeof text !== 'string' || !text) return text;
+  return text
+    .split(/(\{\w+\}|\]\([^)]*\)|https?:\/\/\S+)/)
+    .map((part, index) => (index % 2 ? part : italicLetters(part)))
+    .join('');
+}
+
 // Un mensaje del paquete: título, cuerpo y color. Dejar el cuerpo vacío
 // conserva los campos originales del aviso (quién, cuándo, dónde), que en los
 // registros es justo lo que interesa.
 function pack(theme, messages) {
   const resolved = {};
+  // La bienvenida y la despedida ya vienen escritas a mano con su diseño.
+  const type = (kind, text) => (theme.typeface === 'italic' && !['welcome', 'goodbye'].includes(kind) ? voidType(text) : text);
   for (const [kind, entry] of Object.entries(messages)) {
     resolved[kind] = {
-      author: entry.author ?? null,
-      title: entry.title ?? null,
-      message: entry.message ?? null,
-      footer: entry.footer ?? null,
+      author: type(kind, entry.author ?? null),
+      title: type(kind, entry.title ?? null),
+      message: type(kind, entry.message ?? null),
+      footer: type(kind, entry.footer ?? null),
       ...(entry.image ? { image: entry.image } : {}),
       color: theme.colors[entry.tone || 'neutral']
     };
@@ -328,27 +359,27 @@ const LIMONES_MESSAGES = {
   },
 
   music_controller: {
-    title: '## 🍋 Rocola Limón',
+    title: '## 🍋 Rockolita Limón',
     message: 'Esperando una canción… :3\nEscribe aquí el nombre o el enlace de una canción y la pongo a sonar.\n\n-# Entra antes a un canal de voz.',
-    footer: 'Rocola de {server}',
+    footer: 'Rockolita de {server}',
     image: '{assets}/img/musica-limones.png',
     tone: 'warn'
   },
   music_playing: {
     title: '## 🍋 Sonando ahora',
     message: '### [{title}]({url})\n{author} · {duration}\n\nLa pidió {requester} · desde {source}\nVolumen {volume}% · {queue} en cola{loop}',
-    footer: 'Rocola de {server}',
+    footer: 'Rockolita de {server}',
     tone: 'warn'
   },
   tempvoice_interface: {
-    title: '## 🍋 Salitas Limón',
-    message: 'Tu propia salita de voz :3\nEntra en {generator} para crearla y cámbiala con los botones de abajo mientras estés dentro.',
-    footer: 'Solo quien creó la salita puede cambiarla. «Reclamar» sirve si se fue.'
+    title: '## 🍋 Equipos Limón',
+    message: 'Arma tu propio equipo de voz :3\nEntra en {generator} para crearlo y cámbialo con los botones de abajo mientras estés dentro.',
+    footer: 'Solo quien creó el equipo puede cambiarlo. «Reclamar» sirve si se fue.'
   },
   tempvoice_room: {
-    title: '## 🍋 ¡Tu salita está lista!',
-    message: 'Esta salita es de {owner}.\nCambia el nombre, el límite o quién puede entrar con los botones de abajo. Se borra sola cuando queda vacía.',
-    footer: 'Salitas Limón'
+    title: '## 🍋 ¡Tu equipo está listo!',
+    message: 'Este equipo es de {owner}.\nCambia el nombre, el límite o quién puede entrar con los botones de abajo. Se borra solo cuando queda vacío.',
+    footer: 'Equipos Limón'
   }
 };
 
@@ -591,4 +622,4 @@ function themeLayer(config, kind, tier) {
   return Object.fromEntries(Object.entries(entry).filter(([, value]) => value !== null && value !== undefined && value !== ''));
 }
 
-module.exports = { THEMES, THEME_IDS, TIER_THEMES, getTheme, themeAllowed, themesForPanel, applyTheme, clearTheme, activeThemeId, themeLayer };
+module.exports = { voidType, THEMES, THEME_IDS, TIER_THEMES, getTheme, themeAllowed, themesForPanel, applyTheme, clearTheme, activeThemeId, themeLayer };
