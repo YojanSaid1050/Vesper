@@ -23,6 +23,7 @@ const TemporaryVoiceChannel = require('../database/models/TemporaryVoiceChannel'
 const { getGuildConfig, updateGuildSection } = require('../database/mongoManager');
 const { isModuleEnabledConfig, guildTier } = require('../config/guildPolicy');
 const { buildMessage } = require('./EmbedCatalog');
+const { sendBrandedMessage, editBrandedMessage, deleteBrandedMessage } = require('../utils/webhookSender');
 
 const createLocks = new Set();
 const deleteTimers = new Map();
@@ -197,7 +198,7 @@ async function refreshRoomControl(guild, channel, room) {
   if (!message) return;
   const config = await getGuildConfig(guild.id).catch(() => null);
   const owner = guild.members?.cache?.get(room.ownerId);
-  await message.edit(interfacePayload({ guild, config, room, ownerName: owner ? roomName('{username}', owner) : null })).catch(() => null);
+  await editBrandedMessage(channel, message.id, interfacePayload({ guild, config, room, ownerName: owner ? roomName('{username}', owner) : null })).catch(() => null);
 }
 
 async function createRoom(newState, config) {
@@ -247,7 +248,8 @@ async function createRoom(newState, config) {
       if (channel.isTextBased?.()) {
         const permissions = channel.permissionsFor(guild.members.me);
         if (permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages])) {
-          const message = await channel.send(interfacePayload({ guild, config, room: record, ownerName: roomName('{username}', member) })).catch(() => null);
+          // Con el webhook del servidor, para que salga con su nombre y su foto.
+          const message = await sendBrandedMessage(channel, interfacePayload({ guild, config, room: record, ownerName: roomName('{username}', member) }), { interactive: true }).catch(() => null);
           if (message) {
             record.controlMessageId = message.id;
             await record.save();
@@ -592,9 +594,10 @@ async function publishInterface(client, guildId, channelId) {
   }
   const config = await getGuildConfig(guildId);
   const previous = await fetchInterfaceMessage(client, config);
-  const message = await channel.send(interfacePayload({ guild, config }));
+  const message = await sendBrandedMessage(channel, interfacePayload({ guild, config }), { interactive: true, throwOnFailure: true });
+  if (!message?.id) throw new Error('Discord no confirmó el mensaje de la interfaz.');
   await updateGuildSection(guildId, 'tempVoice', { interfaceChannel: channel.id, interfaceMessage: message.id });
-  if (previous && previous.id !== message.id) await previous.delete().catch(() => null);
+  if (previous && previous.id !== message.id) await deleteBrandedMessage(previous.channel, previous.id).catch(() => null);
   return { channelId: channel.id, messageId: message.id };
 }
 
@@ -602,14 +605,14 @@ async function refreshInterface(client, guildId) {
   const config = await getGuildConfig(guildId);
   const message = await fetchInterfaceMessage(client, config);
   if (!message) return false;
-  await message.edit(interfacePayload({ guild: client.guilds.cache.get(guildId) || message.guild, config }));
+  await editBrandedMessage(message.channel, message.id, interfacePayload({ guild: client.guilds.cache.get(guildId) || message.guild, config }));
   return true;
 }
 
 async function removeInterface(client, guildId) {
   const config = await getGuildConfig(guildId);
   const message = await fetchInterfaceMessage(client, config);
-  if (message) await message.delete().catch(() => null);
+  if (message) await deleteBrandedMessage(message.channel, message.id).catch(() => null);
   await updateGuildSection(guildId, 'tempVoice', { interfaceChannel: null, interfaceMessage: null });
 }
 
@@ -640,6 +643,7 @@ module.exports = {
   handleTempVoiceModal,
   reconcileTemporaryVoiceChannels,
   publishInterface,
+  fetchInterfaceMessage,
   refreshInterface,
   removeInterface,
   interfacePayload,

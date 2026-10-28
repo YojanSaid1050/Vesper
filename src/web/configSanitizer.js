@@ -131,7 +131,7 @@ function shortText(value, max, path) {
   return text;
 }
 
-function sanitizeGuildPatch(input, guild) {
+function sanitizeGuildPatch(input, guild, config = null) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new ValidationError('La configuración enviada no es válida.');
   const updates = {};
 
@@ -165,6 +165,9 @@ function sanitizeGuildPatch(input, guild) {
   // de webhooks. Lo gestionaban /setbotname, /setbotavatar y /branding, que el
   // panel declara reemplazar, pero no había forma de editarlo desde la web.
   if (input.branding !== undefined) {
+    if (!featureAvailable('branding', guild?.id, config)) {
+      throw new ValidationError('Cambiar el nombre y el logo del bot es parte del plan premium.');
+    }
     const source = input.branding;
     if (!source || typeof source !== 'object' || Array.isArray(source)) throw new ValidationError('branding no es válido.');
     const target = {};
@@ -173,10 +176,10 @@ function sanitizeGuildPatch(input, guild) {
     if (Object.keys(target).length) updates.branding = target;
   }
 
-  // Editor de embeds de bienvenida y despedida. Disponible en cualquier
-  // servidor: cada Main tiene su propio diseño y sus propios textos.
+  // Editor de mensajes y embeds: plan premium (o Main). El plan concedido
+  // desde el panel se guarda en la configuración, por eso se pasa `config`.
   if (input.embeds !== undefined) {
-    if (!featureAvailable('embeds', guild?.id)) {
+    if (!featureAvailable('embeds', guild?.id, config)) {
       throw new ValidationError('Editar los mensajes es parte del plan premium.');
     }
     const source = input.embeds;

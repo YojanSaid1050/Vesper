@@ -17,6 +17,7 @@ const StarboardEntry = require('../database/models/StarboardEntry');
 const { getGuildConfig } = require('../database/mongoManager');
 const { isApprovedGuild, isModuleEnabledConfig } = require('../config/guildPolicy');
 const { selfAssignableRoleIssue } = require('./RoleSafetyService');
+const { sendBrandedMessage, editBrandedMessage, deleteBrandedMessage } = require('../utils/webhookSender');
 
 const ticketLocks = new Set();
 const ticketCloseLocks = new Set();
@@ -59,7 +60,7 @@ async function publishTicketPanel(guild, channel) {
   if (!permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks])) {
     throw new Error('Vesper no puede publicar el panel en ese canal.');
   }
-  return channel.send(ticketPanelPayload());
+  return sendBrandedMessage(channel, ticketPanelPayload(), { interactive: true, throwOnFailure: true });
 }
 
 function ticketModal() {
@@ -126,7 +127,7 @@ async function createTicket(interaction, subject) {
       await channel.delete('No se pudo registrar el ticket').catch(() => null);
       throw error;
     }
-    await channel.send({
+    await sendBrandedMessage(channel, {
       content: `<@${interaction.user.id}>`,
       embeds: [new EmbedBuilder().setTitle(`Ticket ${ticket.ticketId}`).setDescription(ticket.subject).setColor(0x7C3AED)
         .addFields({ name: 'Estado', value: 'Abierto', inline: true }, { name: 'Solicitante', value: `<@${interaction.user.id}>`, inline: true })
@@ -135,7 +136,7 @@ async function createTicket(interaction, subject) {
         new ButtonBuilder().setCustomId(`community_ticket_close:${ticket.ticketId}`).setLabel('Cerrar ticket').setEmoji('🔒').setStyle(ButtonStyle.Danger)
       )],
       allowedMentions: { users: [interaction.user.id], roles: [] }
-    });
+    }, { interactive: true });
     return interaction.editReply({ content: `✅ Ticket creado: ${channel}` });
   } finally {
     ticketLocks.delete(lockKey);
@@ -205,14 +206,14 @@ async function closeTicket(interaction, ticketId, reason = '') {
       files: [attachment],
       allowedMentions: { parse: [] }
     };
-    if (transcriptChannel?.isTextBased?.()) transcriptMessage = await transcriptChannel.send(transcriptPayload).catch(() => null);
-    if (!transcriptMessage) transcriptMessage = await channel.send(transcriptPayload).catch(() => null);
+    if (transcriptChannel?.isTextBased?.()) transcriptMessage = await sendBrandedMessage(transcriptChannel, transcriptPayload).catch(() => null);
+    if (!transcriptMessage) transcriptMessage = await sendBrandedMessage(channel, transcriptPayload).catch(() => null);
     await channel.permissionOverwrites.edit(ticket.userId, { SendMessages: false, AddReactions: false }, { reason: `Ticket ${ticket.ticketId} cerrado` });
     await CommunityTicket.updateOne({ _id: ticket._id, status: 'open' }, {
       $set: { status: 'closed', closedBy: interaction.user.id, closeReason: String(reason || '').slice(0, 500) || null, closedAt: new Date(), transcriptMessageId: transcriptMessage?.id || null }
     });
     await channel.setName(`cerrado-${safeChannelName(ticket.ticketId)}`).catch(() => null);
-    await channel.send({ embeds: [new EmbedBuilder().setTitle('🔒 Ticket cerrado').setDescription(String(reason || 'Sin motivo indicado').slice(0, 500)).setColor(0x6B7280).setTimestamp()], allowedMentions: { parse: [] } }).catch(() => null);
+    await sendBrandedMessage(channel, { embeds: [new EmbedBuilder().setTitle('🔒 Ticket cerrado').setDescription(String(reason || 'Sin motivo indicado').slice(0, 500)).setColor(0x6B7280).setTimestamp()], allowedMentions: { parse: [] } }).catch(() => null);
     return interaction.editReply({ content: `✅ Ticket **${ticket.ticketId}** cerrado y transcripción generada.` });
   } finally {
     ticketCloseLocks.delete(lockKey);
@@ -235,11 +236,11 @@ async function publishSelfRolePanel(guild, channel, roles) {
     if (item.emoji) option.emoji = item.emoji;
     menu.addOptions(option);
   }
-  return channel.send({
+  return sendBrandedMessage(channel, {
     embeds: [new EmbedBuilder().setTitle('🎭 Autorroles').setDescription('Elige uno o varios roles para alternarlos: si ya lo tienes se retira; si no, se añade.').setColor(0x7C3AED)],
     components: [new ActionRowBuilder().addComponents(menu)],
     allowedMentions: { parse: [] }
-  });
+  }, { interactive: true, throwOnFailure: true });
 }
 
 async function handleSelfRoles(interaction) {
@@ -276,17 +277,17 @@ async function createSuggestion(interaction, text) {
   const channel = channelId && (interaction.guild.channels.cache.get(channelId) || await interaction.guild.channels.fetch(channelId).catch(() => null));
   if (!channel?.isTextBased?.()) return interaction.reply({ content: 'El canal de sugerencias no está configurado.', flags: 64 });
   await interaction.deferReply({ flags: 64 });
-  const message = await channel.send({
+  const message = await sendBrandedMessage(channel, {
     embeds: [new EmbedBuilder().setTitle('💡 Nueva sugerencia').setDescription(String(text).trim().slice(0, 1500)).setColor(0x7C3AED)
       .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL() })
       .addFields({ name: 'Estado', value: '🟡 Pendiente' }).setTimestamp()],
     allowedMentions: { parse: [] }
-  });
+  }, { throwOnFailure: true });
   await Promise.all([message.react('👍'), message.react('👎')]).catch(() => null);
   try {
     await Suggestion.create({ guildId: interaction.guildId, channelId: channel.id, messageId: message.id, userId: interaction.user.id, text: String(text).trim() });
   } catch (error) {
-    await message.delete().catch(() => null);
+    await deleteBrandedMessage(channel, message.id).catch(() => null);
     throw error;
   }
   suggestionCooldowns.set(cooldownKey, Date.now() + 60_000);
@@ -312,7 +313,7 @@ async function reviewSuggestion(guild, messageId, status, reviewerId, note) {
     const embed = EmbedBuilder.from(message.embeds[0] || {}).setColor(status === 'approved' ? 0x57F287 : status === 'rejected' ? 0xED4245 : 0xFEE75C);
     const baseFields = (embed.data.fields || []).filter(field => !['Estado', 'Revisión'].includes(field.name));
     embed.setFields(...baseFields, { name: 'Estado', value: label }, ...(note ? [{ name: 'Revisión', value: String(note).slice(0, 500) }] : []));
-    await message.edit({ embeds: [embed] });
+    await editBrandedMessage(channel, message.id, { embeds: [embed] });
   }
   return suggestion;
 }
@@ -357,8 +358,7 @@ async function handleStarReaction(reaction) {
     const entry = await StarboardEntry.findOne({ guildId: message.guild.id, sourceMessageId: message.id });
     if (count < threshold) {
       if (entry) {
-        const mirror = await channel.messages.fetch(entry.starboardMessageId).catch(() => null);
-        if (mirror) await mirror.delete().catch(() => null);
+        await deleteBrandedMessage(channel, entry.starboardMessageId).catch(() => null);
         await entry.deleteOne();
       }
       return;
@@ -372,14 +372,15 @@ async function handleStarReaction(reaction) {
     if (entry) {
       const mirror = await channel.messages.fetch(entry.starboardMessageId).catch(() => null);
       if (mirror) {
-        await mirror.edit(payload);
+        await editBrandedMessage(channel, mirror.id, payload);
         entry.count = count;
         await entry.save();
         return;
       }
       await entry.deleteOne();
     }
-    const mirror = await channel.send(payload);
+    const mirror = await sendBrandedMessage(channel, payload, { throwOnFailure: true });
+    if (!mirror?.id) return;
     await StarboardEntry.create({ guildId: message.guild.id, sourceMessageId: message.id, sourceChannelId: message.channelId, starboardMessageId: mirror.id, authorId: message.author.id, count });
   } finally {
     starboardLocks.delete(lockKey);
