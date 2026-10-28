@@ -435,7 +435,14 @@ const MODULES = {
   starboard: ['Mensajes destacados', 'Destaca mensajes que superan un número de reacciones.']
 };
 
-const moduleLabel = key => MODULES[key]?.[0] || key;
+const PLAN_FEATURE_LABELS = {
+  embeds: 'Editar mensajes y embeds',
+  messageThemes: 'Paquetes de mensajes',
+  branding: 'Nombre y logo del bot',
+  profile: 'Identidad propia del bot',
+  discordPanel: 'Panel dentro de Discord'
+};
+const moduleLabel = key => MODULES[key]?.[0] || PLAN_FEATURE_LABELS[key] || key;
 const moduleHint = key => MODULES[key]?.[1] || '';
 
 const EMBED_KINDS = { welcome: 'Bienvenida', goodbye: 'Despedida' };
@@ -735,7 +742,7 @@ const SECTIONS = [
     title: 'Apariencia',
     hint: 'Nombre, avatar y color del bot.',
     needs: 'configure',
-    feature: 'profile',
+    feature: 'branding',
     keywords: ['identidad', 'nombre', 'avatar', 'color', 'marca', 'branding', 'apodo', 'tema']
   },
 
@@ -775,6 +782,7 @@ const SECTIONS = [
     title: 'Mensajes',
     hint: 'Lo que escribe el bot.',
     needs: 'configure',
+    feature: 'embeds',
     keywords: ['embed', 'texto', 'editar', 'plantilla', 'formato', 'letra', 'símbolos', 'markdown', 'título']
   },
   {
@@ -872,9 +880,19 @@ const FEATURE_LABELS = {
   youtube: 'los avisos de redes',
   deals: 'las ofertas y juegos gratis',
   music: 'la música',
+  embeds: 'la personalización de los mensajes',
+  messageThemes: 'los paquetes de mensajes',
+  branding: 'el nombre y el logo del bot',
   profile: 'la identidad propia del bot',
-  discordPanel: 'el panel dentro de Discord',
-  brandingCommands: 'los comandos de identidad'
+  discordPanel: 'el panel dentro de Discord'
+};
+
+// Por qué cada función de pago lo es, para no explicar la música al que
+// intenta cambiar el logo.
+const PREMIUM_REASON = {
+  embeds: 'Escribir los textos y los embeds del bot a tu gusto es lo que lo convierte en «tu» bot, y por eso va en el plan premium. Sin plan, los mensajes salen con el texto de siempre.',
+  messageThemes: 'Los paquetes de mensajes cambian todos los textos de una vez y van con la personalización, en el plan premium.',
+  branding: 'Publicar con otro nombre y otro logo es parte de la personalización del plan premium. Sin plan, el bot publica con el nombre y el avatar de su cuenta de Discord.'
 };
 
 function lockedScreen(section, kind) {
@@ -889,9 +907,9 @@ function lockedScreen(section, kind) {
     })
     : card({
       eyebrow: 'Plan premium',
-      title: `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} necesita plan`,
+      title: `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${/^(los|las) | y /.test(nombre) ? 'necesitan' : 'necesita'} plan`,
       description: 'Disponible con el plan premium.',
-      ayuda: 'Vigilar redes, reproducir música y consultar tiendas obliga al bot a estar preguntando a todas horas. Eso consume procesador y cuota, y por eso va en el plan de pago. Todo lo que no cuesta nada tener encendido es gratis y lo seguirá siendo.',
+      ayuda: PREMIUM_REASON[section.feature] || 'Vigilar redes, reproducir música y consultar tiendas obliga al bot a estar preguntando a todas horas. Eso consume procesador y cuota, y por eso va en el plan de pago. Todo lo que no cuesta nada tener encendido es gratis y lo seguirá siendo.',
       body: `
         <div class="locked-body">
           <p>Sin plan sigues teniendo:</p>
@@ -900,6 +918,7 @@ function lockedScreen(section, kind) {
             <li>Registros</li>
             <li>Moderación</li>
             <li>Tickets, sugerencias y autorroles</li>
+            <li>Salas de voz temporales</li>
           </ul>
           <p class="hint">Pídeselo al propietario del bot.</p>
         </div>`
@@ -1478,7 +1497,7 @@ function renderIdentidad() {
     </form>` : `
     <div class="callout">
       <strong>Este servidor no tiene identidad propia.</strong>
-      <span>Los satélites publican con el nombre y el avatar de la cuenta del bot. Puedes ajustar el branding de los webhooks más abajo.</span>
+      <span>La identidad completa (apodo y colores) es de los servidores principales. Con el plan premium puedes poner el nombre y el logo con los que publica el bot, más abajo.</span>
     </div>`;
 
   const brandingForm = `
@@ -1488,12 +1507,12 @@ function renderIdentidad() {
           <label for="branding-name">Nombre en webhooks</label>
           <input id="branding-name" type="text" maxlength="80" value="${escapeHtml(branding.name || '')}"
                  placeholder="${escapeHtml(identity.account?.username || 'Vesper')}">
-          <span class="hint">Solo se usa si no hay nombre visible arriba.</span>
+          <span class="hint">${isMain ? 'Solo se usa si no hay nombre visible arriba.' : 'Vacío: el nombre de la cuenta del bot.'}</span>
         </div>
         <div class="field">
           <label for="branding-avatar">Avatar en webhooks (URL HTTPS)</label>
           <input id="branding-avatar" type="url" maxlength="500" placeholder="https://…" value="${escapeHtml(branding.avatar || '')}">
-          <span class="hint">Alternativa de reserva si no hay avatar de identidad.</span>
+          <span class="hint">${isMain ? 'Alternativa de reserva si no hay avatar de identidad.' : 'Vacío: el avatar de la cuenta del bot.'}</span>
         </div>
       </div>
       ${formActions('Guardar branding')}
@@ -1522,9 +1541,11 @@ function renderIdentidad() {
 
     ${card({
       eyebrow: 'Branding',
-      title: 'Valores de reserva',
-      description: 'Valores de reserva.',
-      ayuda: 'Son los que usaban los comandos /setbotname, /setbotavatar y /branding. Se aplican solo cuando la identidad de arriba está vacía.',
+      title: isMain ? 'Valores de reserva' : 'Nombre y logo del bot',
+      description: isMain ? 'Valores de reserva.' : 'Con los que publica en este servidor.',
+      ayuda: isMain
+        ? 'Son los que usaban los comandos /setbotname, /setbotavatar y /branding. Se aplican solo cuando la identidad de arriba está vacía.'
+        : 'Los mensajes del bot (bienvenidas, avisos, paneles, música, salas…) salen con este nombre y esta imagen. Discord no deja cambiar el avatar de la lista de miembros por servidor, así que allí se sigue viendo la cuenta del bot.',
       body: brandingForm
     })}`;
 }
@@ -3850,8 +3871,8 @@ function renderModulos() {
 
   const PLAN_COPY = {
     main: { badge: 'Principal', title: 'Servidor principal', detail: 'Lo tiene todo, incluida la identidad propia del bot y el panel dentro de Discord.' },
-    premium: { badge: 'Premium', title: 'Plan premium', detail: 'Además de lo gratis: avisos de TikTok, Twitch y YouTube, música y ofertas.' },
-    free: { badge: 'Gratis', title: 'Plan gratis', detail: 'Mensajes, registros, bienvenidas, moderación y comunidad, sin límite ni caducidad.' }
+    premium: { badge: 'Premium', title: 'Plan premium', detail: 'Además de lo gratis: avisos de TikTok, Twitch y YouTube, música, ofertas y la personalización (mensajes, embeds, nombre y logo del bot).' },
+    free: { badge: 'Gratis', title: 'Plan gratis', detail: 'Bienvenidas, registros, moderación, comunidad y salas de voz, sin límite ni caducidad.' }
   };
   const copy = PLAN_COPY[plan.id] || PLAN_COPY.free;
 

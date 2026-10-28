@@ -13,7 +13,7 @@
 const { colorNumber, imageUrl, normalizeLayout, rendersMentions } = require('./EmbedTemplateService');
 const { containerPayload } = require('./EmbedLayouts');
 const { themeLayer } = require('./MessageThemes');
-const { guildTier } = require('../config/guildPolicy');
+const { guildTier, featureAvailable } = require('../config/guildPolicy');
 
 // Variables comunes a casi todos los registros.
 const MEMBER_VARS = [
@@ -634,7 +634,9 @@ function assetsBase() {
 // Lo guardado en el panel encima del paquete de mensajes del servidor. Un
 // campo vacío en lo guardado no borra el del paquete.
 function effectiveTemplate(config, kind) {
-  const stored = storedTemplate(config, kind);
+  // Los textos escritos a mano son del plan premium: si el servidor lo
+  // pierde, vuelven los de siempre sin borrar lo guardado.
+  const stored = config?.guildId && !featureAvailable('embeds', config.guildId, config) ? {} : storedTemplate(config, kind);
   const layer = themeLayer(config, kind, config?.guildId ? guildTier(config.guildId) : null);
   const merged = { ...layer };
   for (const [field, value] of Object.entries(stored)) {

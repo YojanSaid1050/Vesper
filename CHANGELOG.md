@@ -1,5 +1,35 @@
 # Changelog
 
+## 3.9.3 — Todo con el nombre y el logo del servidor, y planes en orden
+
+### Mensajes con la identidad del servidor
+- La **interfaz de salas**, el **controlador de música** y sus avisos, el
+  **panel de tickets** (bienvenida, cierre y transcripción), el **panel de
+  autorroles**, las **sugerencias**, los **destacados**, el aviso de la
+  **moderación automática** y las **publicaciones con botones** del panel
+  salen ahora por el webhook del servidor: con su nombre y su logo (por
+  ejemplo AnkeBot en Ankerie Dimension) en vez de «Vesper».
+- Los botones y menús siguen funcionando: el webhook lo crea el propio bot,
+  así que Discord le manda los clics.
+- Al arrancar, el controlador y la interfaz que se publicaron antes con la
+  cuenta del bot se vuelven a publicar solos con el webhook y se quita el
+  viejo.
+- Si el bot no tiene **Gestionar webhooks** en un canal, publica con su
+  cuenta como antes. `BRANDED_COMPONENTS=false` en el entorno devuelve los
+  mensajes con botones a la cuenta del bot sin tocar el código.
+
+### Planes
+- **Premium** ahora incluye también el **nombre y el logo** con los que
+  publica el bot (branding). Antes cualquier servidor podía cambiarlos con
+  `/setbotname` y `/setbotavatar`.
+- Corregido: un servidor con el premium concedido desde el panel no podía
+  editar sus mensajes (solo se miraba la lista del entorno).
+- Si un servidor pierde el plan, sus textos, nombre y logo personalizados
+  dejan de usarse (no se borran) y vuelven los de siempre.
+- En el panel, **Mensajes** y **Apariencia** aparecen con candado y su
+  explicación en los servidores sin plan, en vez de dejar editar y fallar al
+  guardar.
+
 ## 3.9.2 — Listo para Oracle Cloud gratis (ARM)
 
 - **Instalador para Oracle Cloud Always Free** (`deploy/oracle/install.sh`):

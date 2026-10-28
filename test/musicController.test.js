@@ -149,7 +149,10 @@ test('al arrancar, el controlador y la interfaz publicados se repintan', async (
     tempVoice: { interfaceChannel: 'c2', interfaceMessage: 'm2', generatorChannel: 'v1' }
   });
   const edits = {};
-  const channel = id => ({ messages: { fetch: async messageId => ({ id: messageId, edit: async payload => { edits[`${id}/${messageId}`] = payload; } }) } });
+  const channel = id => {
+    const chan = { id, messages: { fetch: async messageId => ({ id: messageId, channel: chan, edit: async payload => { edits[`${id}/${messageId}`] = payload; } }) } };
+    return chan;
+  };
   const guild = { id: THEMED, name: 'Ankerie Dimension' };
   const client = {
     guilds: { cache: new Map([[THEMED, guild]]) },
@@ -161,4 +164,41 @@ test('al arrancar, el controlador y la interfaz publicados se repintan', async (
   await new Promise(resolve => setTimeout(resolve, 50));
   assert.match(JSON.stringify(edits['c1/m1']), /Rockolita/);
   assert.match(JSON.stringify(edits['c2/m2']), /Equipos Limón/);
+});
+
+test('el controlador y la interfaz se publican con el webhook del servidor y los viejos se cambian solos', async () => {
+  const hookLog = { sent: [], edited: [], deleted: [] };
+  const webhook = {
+    owner: { id: 'bot' },
+    send: async payload => { hookLog.sent.push(payload); return { id: `w${hookLog.sent.length}`, webhookId: 'hook' }; },
+    editMessage: async (id, payload) => { hookLog.edited.push([id, payload]); },
+    deleteMessage: async id => { hookLog.deleted.push(id); }
+  };
+  const all = { has: () => true };
+  const guild = { id: THEMED, name: 'Ankerie Dimension', members: { me: { id: 'bot' } } };
+  const textChannel = {
+    id: 'c9', name: 'musica', guild, client: { user: { id: 'bot', username: 'Vesper', displayAvatarURL: () => null } },
+    isTextBased: () => true, isVoiceBased: () => false, permissionsFor: () => all,
+    fetchWebhooks: async () => ({ find: fn => [webhook].find(fn) }),
+    // El panel viejo, publicado con la cuenta del bot (sin webhookId).
+    messages: { fetch: async id => ({ id, channel: textChannel, webhookId: null, delete: async () => null }) }
+  };
+  guild.channels = { cache: new Map([['c9', textChannel]]), fetch: async () => textChannel };
+  configs.set(THEMED, {
+    guildId: THEMED, features: { music: true, tempvoice: true },
+    profile: { displayName: 'AnkeBot', avatar: 'https://cdn.example.com/anke.png' },
+    music: { controllerChannel: 'c9', controllerMessage: 'viejo1' },
+    tempVoice: { interfaceChannel: 'c9', interfaceMessage: 'viejo2' }
+  });
+  const client = {
+    guilds: { cache: new Map([[THEMED, guild]]) },
+    channels: { cache: new Map([['c9', textChannel]]), fetch: async () => textChannel },
+    music: { queue: () => null, paused: () => false }
+  };
+  const { refreshFixedPanels } = require('../src/core/FixedPanels');
+  assert.equal(await refreshFixedPanels(client), 2);
+  assert.equal(hookLog.sent.length, 2, 'los dos paneles se vuelven a publicar por el webhook');
+  assert.ok(hookLog.sent.every(payload => payload.username === 'AnkeBot' && payload.avatarURL === 'https://cdn.example.com/anke.png'));
+  assert.ok(hookLog.sent.every(payload => payload.flags === 32768 && payload.components?.length), 'con su bloque V2 y sus botones');
+  assert.deepEqual(hookLog.deleted.sort(), ['viejo1', 'viejo2'], 'y se quitan los que tenían el nombre de Vesper');
 });

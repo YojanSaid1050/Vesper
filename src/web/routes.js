@@ -7,7 +7,7 @@ const Suggestion = require('../database/models/Suggestion');
 const WebAuditLog = require('../database/models/WebAuditLog');
 const { getGuildConfig, updateGuildSection, setGuildPlan, updateCommunitySection, addGuildListItem, removeGuildListItem } = require('../database/mongoManager');
 const { setupChecks } = require('../core/SetupService');
-const { isModuleEnabledConfig, guildTier, isAnyMainGuild, guildPlan, lockedFeatures, featureAvailable, PREMIUM_FEATURES, MAIN_ONLY_FEATURES } = require('../config/guildPolicy');
+const { isModuleEnabledConfig, guildTier, isAnyMainGuild, guildPlan, lockedFeatures, featureAvailable, identitySources, PREMIUM_FEATURES, MAIN_ONLY_FEATURES } = require('../config/guildPolicy');
 const {
   createCase,
   getCase,
@@ -241,7 +241,7 @@ function embedDefaultsFor(guildId, guildName) {
 // tener que provocar un mensaje de prueba.
 function effectiveIdentity(config, client, guild) {
   const profile = config.profile || {};
-  const branding = config.branding || {};
+  const { profile: profileIdentity, branding } = identitySources(config, guild?.id);
   const botUser = client?.user;
   const botAvatar = botUser?.displayAvatarURL?.({ extension: 'png', size: 128 }) || null;
 
@@ -257,11 +257,11 @@ function effectiveIdentity(config, client, guild) {
     accent: /^#[0-9a-f]{6}$/i.test(String(profile.primaryColor || '')) ? profile.primaryColor : null,
     // Lo que aparece como autor de los mensajes con webhook.
     webhook: {
-      name: profile.displayName || branding.name || botUser?.username || 'Vesper',
-      avatar: profile.avatar || branding.avatar || botAvatar,
+      name: profileIdentity.displayName || branding.name || botUser?.username || 'Vesper',
+      avatar: profileIdentity.avatar || branding.avatar || botAvatar,
       source: {
-        name: profile.displayName ? 'profile' : branding.name ? 'branding' : 'account',
-        avatar: profile.avatar ? 'profile' : branding.avatar ? 'branding' : 'account'
+        name: profileIdentity.displayName ? 'profile' : branding.name ? 'branding' : 'account',
+        avatar: profileIdentity.avatar ? 'profile' : branding.avatar ? 'branding' : 'account'
       }
     },
     guildIcon: guild?.iconURL?.({ extension: 'png', size: 128 }) || null
@@ -658,7 +658,7 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
       const context = await accessFor(req, res, getClient);
       if (!context) return;
       if (!context.access.configure) return res.status(403).json({ error: 'Necesitas Administrar servidor para cambiar la configuración.' });
-      const updates = sanitizeGuildPatch(req.body, context.access.guild);
+      const updates = sanitizeGuildPatch(req.body, context.access.guild, context.config);
       for (const [section, values] of Object.entries(updates)) {
         if (section === 'community') {
           for (const [subsection, fields] of Object.entries(values)) await updateCommunitySection(req.params.guildId, subsection, fields);
@@ -761,15 +761,14 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
         return res.status(409).json({ error: 'Activa y configura el módulo de tickets antes de publicar un botón para abrir tickets.' });
       }
 
-      // Los componentes interactivos deben salir de la cuenta del bot. Los
-      // webhooks entrantes pueden conservar la marca, pero Discord ignora sus
-      // botones con custom_id porque no pertenecen a una aplicación.
-      const message = built.hasInteractiveComponents
-        ? await channel.send(built.payload)
-        : await sendBrandedMessage(channel, built.payload, {
-          throwOnFailure: true,
-          allowedMentions: built.payload.allowedMentions
-        });
+      // El webhook lo crea el propio bot, así que Discord lo trata como de la
+      // aplicación y le manda los clics de los botones: el mensaje sale con
+      // el nombre y la imagen del servidor también cuando lleva botones.
+      const message = await sendBrandedMessage(channel, built.payload, {
+        interactive: built.hasInteractiveComponents,
+        throwOnFailure: true,
+        allowedMentions: built.payload.allowedMentions
+      });
       if (!message) throw Object.assign(new Error('Discord no confirmó el envío del mensaje.'), { statusCode: 502 });
 
       // La publicación ya ocurrió: un fallo secundario al escribir la auditoría

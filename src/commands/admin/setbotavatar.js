@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
-const { updateGuildSection } = require('../../database/mongoManager');
+const { updateGuildSection, getGuildConfig } = require('../../database/mongoManager');
+const { featureAvailable } = require('../../config/guildPolicy');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 const { clearWebhookCache } = require('../../utils/webhookSender');
 const { isValidImageUrl } = require('../../utils/imageUrlValidator');
@@ -13,6 +14,9 @@ module.exports = {
 
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 });
+    if (!featureAvailable('branding', interaction.guild.id, await getGuildConfig(interaction.guild.id))) {
+      return interaction.editReply({ content: '🔒 Cambiar el nombre y el logo del bot es parte del plan premium.' });
+    }
     const url = interaction.options.getString('url');
     
     await interaction.editReply({ content: '🔍 Verificando imagen...' });

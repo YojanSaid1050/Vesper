@@ -14,6 +14,7 @@ const { MessageFlags, PermissionFlagsBits } = require('discord.js');
 const { getGuildConfig, updateGuildSection } = require('../../database/mongoManager');
 const { isModuleEnabledConfig } = require('../../config/guildPolicy');
 const { buildMessage } = require('../EmbedCatalog');
+const { sendBrandedMessage, editBrandedMessage, deleteBrandedMessage, sendTemporaryBranded } = require('../../utils/webhookSender');
 const { CAPABILITIES, canWithGuildConfig } = require('../PermissionService');
 const providers = require('./providers');
 
@@ -139,7 +140,8 @@ async function refreshNow(client, guildId) {
   if (!message) return false;
   const guild = client.guilds?.cache?.get(guildId) || message.guild;
   const player = client.music?.queue(guildId) || null;
-  await message.edit(controllerPayload({ guild, config, player, paused: client.music?.paused(guildId) }));
+  // Se edita por el webhook con el que se publicó (nombre y foto del servidor).
+  await editBrandedMessage(message.channel, message.id, controllerPayload({ guild, config, player, paused: client.music?.paused(guildId) }));
   return true;
 }
 
@@ -174,11 +176,14 @@ async function publishController(client, guildId, channelId) {
   const config = await getGuildConfig(guildId);
   const previous = await fetchControllerMessage(client, config);
   const next = { ...config, music: { ...(config.music || {}), controllerChannel: channel.id } };
-  const message = await channel.send(controllerPayload({
+  // Con el webhook del servidor: sale con su nombre y su foto (AnkeBot en
+  // Ankerie Dimension), no con la cuenta de Vesper.
+  const message = await sendBrandedMessage(channel, controllerPayload({
     guild, config: next, player: client.music?.queue(guildId) || null, paused: client.music?.paused(guildId)
-  }));
+  }), { interactive: true, throwOnFailure: true });
+  if (!message?.id) throw new Error('Discord no confirmó el mensaje del controlador.');
   await updateGuildSection(guildId, 'music', { controllerChannel: channel.id, controllerMessage: message.id });
-  if (previous && previous.id !== message.id) await previous.delete().catch(() => null);
+  if (previous && previous.id !== message.id) await deleteBrandedMessage(previous.channel, previous.id).catch(() => null);
   // La sesión que ya estuviera sonando también tiene que saber dónde está.
   const player = client.music?.queue(guildId);
   if (player) player.settings = { ...player.settings, controllerChannel: channel.id };
@@ -188,7 +193,7 @@ async function publishController(client, guildId, channelId) {
 async function removeController(client, guildId) {
   const config = await getGuildConfig(guildId);
   const message = await fetchControllerMessage(client, config);
-  if (message) await message.delete().catch(() => null);
+  if (message) await deleteBrandedMessage(message.channel, message.id).catch(() => null);
   await updateGuildSection(guildId, 'music', { controllerChannel: null, controllerMessage: null });
 }
 
@@ -197,9 +202,7 @@ async function removeController(client, guildId) {
 /* ------------------------------------------------------------------ */
 
 function temporary(channel, content, ms = 8_000) {
-  return channel.send({ content, allowedMentions: { parse: [] } })
-    .then(message => { setTimeout(() => message.delete().catch(() => null), ms).unref?.(); })
-    .catch(() => null);
+  return sendTemporaryBranded(channel, { content, allowedMentions: { parse: [] } }, ms).catch(() => null);
 }
 
 // Un mensaje escrito en el canal del controlador es una canción que pedir.
@@ -327,6 +330,7 @@ function attachController(client) {
 }
 
 module.exports = {
+  fetchControllerMessage,
   controllerPayload,
   publishController,
   removeController,

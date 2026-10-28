@@ -1,12 +1,16 @@
 const { getGuildConfig } = require('../database/mongoManager');
 const { monitorError } = require('./logger');
 const { clampPayload } = require('./discordLimits');
+const { identitySources } = require('../config/guildPolicy');
 
 const webhookCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000;
 const channelQueues = new Map();
 
 async function getWebhook(channel) {
+  // Hilos, MD o canales a medio cargar: no hay webhook posible y se publica
+  // con la cuenta del bot.
+  if (!channel?.guild || typeof channel.fetchWebhooks !== 'function') return null;
   const cacheKey = `${channel.guild.id}_${channel.id}`;
   const cached = webhookCache.get(cacheKey);
   
@@ -37,11 +41,23 @@ async function getWebhook(channel) {
   }
 }
 
+// Los botones y menús salen también por el webhook: como lo crea el propio
+// bot, Discord lo trata como «de la aplicación» y le manda los clics. Si algún
+// día dejara de funcionar, BRANDED_COMPONENTS=false vuelve a publicarlos con
+// la cuenta del bot sin tocar el código.
+function brandInteractive() {
+  return String(process.env.BRANDED_COMPONENTS ?? 'true').toLowerCase() !== 'false';
+}
+
 async function sendBrandedMessageNow(channel, payload, options = {}) {
+  if (!channel?.guild || (options.interactive && !brandInteractive())) {
+    return channel.send({ ...payload, allowedMentions: options.allowedMentions || payload.allowedMentions || { parse: [], roles: [], users: [] } });
+  }
   try {
     const config = await getGuildConfig(channel.guild.id);
-    const branding = config.branding || {};
-    const profile = config.profile || {};
+    // Solo lo que cubre el plan: sin premium, el nombre y el logo guardados
+    // no se usan y el mensaje sale con los de la cuenta del bot.
+    const { profile, branding } = identitySources(config, channel.guild.id);
     const allowedRoleIds = [
       config.tiktok?.pingRole,
       config.twitch?.pingRole,
@@ -124,7 +140,7 @@ async function editBrandedMessage(channel, messageId, payload) {
   return enqueueChannel(channel.id, async () => {
     const webhook = await getWebhook(channel);
     const safePayload = {
-      ...payload,
+      ...clampPayload(payload),
       allowedMentions: { parse: [], roles: [], users: [] }
     };
     // El mensaje puede haberse publicado por el camino de respaldo (sin
@@ -143,6 +159,39 @@ async function editBrandedMessage(channel, messageId, payload) {
   });
 }
 
+// Borra un mensaje publicado con el webhook (el bot no necesita «Gestionar
+// mensajes» para eso) o, si salió por la cuenta del bot, por el canal.
+async function deleteBrandedMessage(channel, messageId) {
+  if (!channel || !messageId) return false;
+  const webhook = await getWebhook(channel);
+  if (webhook) {
+    try {
+      await webhook.deleteMessage(messageId);
+      return true;
+    } catch {
+      // se intenta por el canal, más abajo
+    }
+  }
+  const message = await channel.messages?.fetch(messageId).catch(() => null);
+  if (!message) return false;
+  return message.delete().then(() => true).catch(() => false);
+}
+
+// ¿Saldría este mensaje con el nombre y la foto del servidor? Sirve para
+// volver a publicar con el webhook los paneles que se publicaron antes con la
+// cuenta del bot.
+async function brandingAvailable(channel, { interactive = false } = {}) {
+  if (interactive && !brandInteractive()) return false;
+  return Boolean(await getWebhook(channel));
+}
+
+// Un mensaje que no se borra solo: aviso breve que desaparece a los `ms`.
+async function sendTemporaryBranded(channel, payload, ms) {
+  const message = await sendBrandedMessage(channel, payload).catch(() => null);
+  if (message?.id) setTimeout(() => deleteBrandedMessage(channel, message.id).catch(() => null), ms).unref?.();
+  return message;
+}
+
 function clearWebhookCache(guildId = null) {
   if (guildId) {
     for (const [key, value] of webhookCache.entries()) {
@@ -156,8 +205,11 @@ function clearWebhookCache(guildId = null) {
   console.log(`🗑️ Webhook cache cleared${guildId ? ` for guild ${guildId}` : ''}`);
 }
 
-module.exports = { 
+module.exports = {
   sendBrandedMessage,
   editBrandedMessage,
+  deleteBrandedMessage,
+  sendTemporaryBranded,
+  brandingAvailable,
   clearWebhookCache
 };

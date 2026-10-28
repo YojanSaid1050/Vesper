@@ -512,7 +512,7 @@ test('lo que no consume recursos está disponible en cualquier servidor', () => 
   for (const feature of ['alerts', 'moderation', 'welcome', 'goodbye', 'logs', 'tickets', 'selfroles']) {
     assert.equal(featureAvailable(feature, '999999999999999999'), true, `${feature} no debería estar restringido`);
   }
-  assert.equal(MAIN_ONLY_FEATURES.length, 3, 'la lista de exclusivas debe quedarse corta a propósito');
+  assert.equal(MAIN_ONLY_FEATURES.length, 2, 'la lista de exclusivas debe quedarse corta a propósito');
 });
 
 test('lo que consume recursos es de plan premium', () => {
@@ -521,9 +521,10 @@ test('lo que consume recursos es de plan premium', () => {
     assert.equal(featureAvailable(feature, gratis), false, `${feature} debería requerir plan`);
     assert.equal(featureAvailable(feature, gratis, { plan: 'premium' }), true, `${feature} debería abrirse con plan`);
   }
-  // Editar los textos del bot entra aquí: es lo que convierte a Vesper en
-  // «tu» bot, y es la razón principal por la que alguien pagaría.
-  assert.deepEqual([...PREMIUM_FEATURES].sort(), ['deals', 'embeds', 'messageThemes', 'music', 'tiktok', 'twitch', 'youtube']);
+  // Editar los textos, el nombre y el logo del bot entra aquí: es lo que
+  // convierte a Vesper en «tu» bot, y es la razón principal por la que
+  // alguien pagaría.
+  assert.deepEqual([...PREMIUM_FEATURES].sort(), ['branding', 'deals', 'embeds', 'messageThemes', 'music', 'tiktok', 'twitch', 'youtube']);
 });
 
 test('los dos Main lo tienen todo sin necesitar plan', () => {
@@ -714,4 +715,27 @@ test('los mensajes de solo texto se guardan aunque el editor mande la imagen vac
   assert.equal(result.embeds.automod_notice.message, '{user}, quité tu mensaje: {reason}.');
   assert.equal(result.embeds.automod_notice.image, null);
   assert.throws(() => sanitizeGuildPatch({ embeds: { automod_dm: { image: 'https://ejemplo.com/a.png' } } }, guild), ValidationError);
+});
+
+test('sin plan, el nombre y el logo guardados no se usan ni se pueden cambiar', () => {
+  const { identitySources } = require('../src/config/guildPolicy');
+  const gratis = '999999999999999999';
+  const config = { guildId: gratis, branding: { name: 'Mi bot', avatar: 'https://cdn.example.com/a.png' }, profile: { displayName: 'Otro' } };
+  assert.deepEqual(identitySources(config, gratis), { profile: {}, branding: {} });
+  assert.deepEqual(identitySources({ ...config, plan: 'premium' }, gratis).branding, config.branding);
+  assert.deepEqual(identitySources({ ...config, plan: 'premium' }, gratis).profile, {}, 'la identidad completa sigue siendo de los Main');
+  const guild = { id: gratis, channels: { cache: new Map() }, roles: { cache: new Map() } };
+  assert.throws(() => sanitizeGuildPatch({ branding: { name: 'Mi bot' } }, guild, config), /plan premium/);
+  assert.equal(sanitizeGuildPatch({ branding: { name: 'Mi bot' } }, guild, { plan: 'premium' }).branding.name, 'Mi bot');
+  // El plan concedido desde el panel también abre el editor de mensajes.
+  assert.throws(() => sanitizeGuildPatch({ embeds: { welcome: { title: 'Hola' } } }, guild, config), /plan premium/);
+  assert.equal(sanitizeGuildPatch({ embeds: { welcome: { title: 'Hola' } } }, guild, { plan: 'premium' }).embeds.welcome.title, 'Hola');
+});
+
+test('si un servidor pierde el plan, vuelven los mensajes de siempre', () => {
+  const { effectiveTemplate } = require('../src/core/EmbedCatalog');
+  const gratis = '999999999999999999';
+  const stored = { embeds: { welcome: { title: 'Título propio' } } };
+  assert.equal(effectiveTemplate({ guildId: gratis, plan: 'premium', ...stored }, 'welcome').title, 'Título propio');
+  assert.notEqual(effectiveTemplate({ guildId: gratis, ...stored }, 'welcome').title, 'Título propio');
 });

@@ -4,6 +4,7 @@ const { getGuildConfig } = require('../database/mongoManager');
 const { isModuleEnabledConfig } = require('../config/guildPolicy');
 const { buildMessage, memberVars } = require('./EmbedCatalog');
 const mongoose = require('mongoose');
+const { sendTemporaryBranded } = require('../utils/webhookSender');
 
 const repeats = new Map();
 const URL_PATTERN = /https?:\/\/[^\s<]+/gi;
@@ -148,11 +149,10 @@ async function applyAutomaticAction(message, config, reason) {
     vars,
     defaults: { message: '{user}, tu mensaje fue retirado: {reason}. Caso **#{case}**.' }
   });
-  const notice = await message.channel.send({
+  await sendTemporaryBranded(message.channel, {
     content: publicNotice.content,
     allowedMentions: { users: [message.author.id], roles: [], parse: [] }
-  }).catch(() => null);
-  if (notice) setTimeout(() => notice.delete().catch(() => null), 10_000);
+  }, 10_000);
 }
 
 async function handleMessage(message) {

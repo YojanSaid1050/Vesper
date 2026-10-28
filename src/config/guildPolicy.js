@@ -32,9 +32,13 @@ const MODULE_DEFAULTS = Object.freeze({
 //            arranca un ffmpeg y un yt-dlp por servidor que suena. En una
 //            máquina modesta, media docena de servidores con monitores se
 //            comen el procesador y la cuota antes que nada.
+//            También la personalización: escribir los mensajes y embeds,
+//            los paquetes de mensajes y el nombre y el logo con los que
+//            publica el bot (el «branding» de los webhooks).
 //
 //   main     Embers Void y Ankerie Dimension. Todo lo anterior más la
-//            identidad propia del bot y el panel dentro de Discord.
+//            identidad propia del bot (apodo, avatar, colores) y el panel
+//            dentro de Discord.
 //
 // Un servidor entra en premium por `PREMIUM_GUILD_IDS` o porque el
 // propietario se lo concede desde el panel (se guarda en `plan`).
@@ -43,10 +47,10 @@ const PLAN_FEATURES = Object.freeze({
     'welcome', 'goodbye', 'boosts', 'logs', 'alerts',
     'moderation', 'tickets', 'suggestions', 'selfroles', 'starboard', 'tempvoice'
   ],
-  // Lo que consume recursos, y escribir los textos del bot.
-  premium: ['tiktok', 'twitch', 'youtube', 'deals', 'music', 'embeds', 'messageThemes'],
-  // Lo que cambia la cara del bot o le ocupa un canal permanente.
-  main: ['profile', 'discordPanel', 'brandingCommands']
+  // Lo que consume recursos, y personalizar los textos, el nombre y el logo.
+  premium: ['tiktok', 'twitch', 'youtube', 'deals', 'music', 'embeds', 'messageThemes', 'branding'],
+  // La identidad completa del bot o lo que le ocupa un canal permanente.
+  main: ['profile', 'discordPanel']
 });
 
 const PREMIUM_FEATURES = Object.freeze(PLAN_FEATURES.premium);
@@ -79,6 +83,17 @@ function featureAvailable(feature, guildId, config = null) {
   return planIncludes(guildPlan(guildId, config), feature);
 }
 
+// Nombre y avatar con los que publica el bot, solo de lo que el plan cubre:
+// la identidad (Main) primero, luego el branding (premium). Si un servidor
+// pierde el plan, vuelve a salir con la cuenta del bot sin tocar nada.
+function identitySources(config, guildId) {
+  const id = guildId || config?.guildId;
+  return {
+    profile: featureAvailable('profile', id, config) ? config?.profile || {} : {},
+    branding: featureAvailable('branding', id, config) ? config?.branding || {} : {}
+  };
+}
+
 // Las funciones de pago que este servidor NO tiene. Sirve para explicarlo en
 // el panel en vez de limitarse a esconderlas.
 function lockedFeatures(guildId, config = null) {
@@ -86,32 +101,6 @@ function lockedFeatures(guildId, config = null) {
   return [...PLAN_FEATURES.premium, ...PLAN_FEATURES.main].filter(feature => !planIncludes(plan, feature));
 }
 
-// ------------------------------------------------------------------
-// (documentación heredada)
-// ------------------------------------------------------------------
-//
-// Vesper no está pensado solo para Embers Void y Ankerie Dimension: cualquiera
-// puede añadirlo. Lo que cambia entre unos y otros es esto y solo esto:
-//
-//   TODOS los servidores tienen
-//     · los 38 mensajes editables, con sus dos formatos de embed
-//     · los 27 registros con interruptor, canal y mención propios
-//     · los paquetes de mensajes (Void, Limones o ninguno)
-//     · avisos de TikTok, Twitch y YouTube
-//     · ofertas y juegos gratis
-//     · moderación, comunidad, música y el panel web entero
-//
-//   SOLO los dos Main tienen
-//     · identidad propia del bot: apodo, avatar y colores por servidor. En los
-//       demás, Vesper se llama y se ve igual que su cuenta de Discord.
-//     · el panel de control DENTRO de Discord (/panel y sus botones).
-//     · los comandos de identidad: /branding, /setbotname, /setbotavatar,
-//       /testbranding, /resetbranding.
-//
-// El motivo no es caprichoso: la identidad por servidor cambia el nombre y el
-// avatar con los que el bot publica, y el panel de Discord ocupa un canal
-// permanente. Son decisiones que afectan a cómo se ve el bot entero, y se
-// reservan a los servidores de casa.
 function csvSet(value) {
   return new Set(String(value || '').split(',').map(item => item.trim()).filter(Boolean));
 }
@@ -203,6 +192,7 @@ module.exports = {
   guildPlan,
   planIncludes,
   featureAvailable,
+  identitySources,
   lockedFeatures,
   guildTier,
   isApprovedGuild,

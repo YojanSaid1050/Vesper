@@ -411,13 +411,13 @@ class MusicService {
   announce(player, text) {
     const channel = player?.textChannelId && this.client.channels?.cache?.get(player.textChannelId);
     if (!channel?.send) return;
-    const sent = channel.send({ content: text, allowedMentions: { parse: [] } });
-    // En el canal del controlador los avisos se borran solos para que el
-    // controlador siga siendo lo primero que se ve.
+    // Con el webhook del servidor, como el resto de mensajes. En el canal del
+    // controlador los avisos se borran solos para que el controlador siga
+    // siendo lo primero que se ve.
+    const payload = { content: text, allowedMentions: { parse: [] } };
     const controllerHere = player.settings?.controllerChannel && player.settings.controllerChannel === player.textChannelId;
-    sent.then(message => {
-      if (controllerHere) setTimeout(() => message.delete().catch(() => null), 15_000).unref?.();
-    }).catch(() => null);
+    const { sendBrandedMessage, sendTemporaryBranded } = require('../utils/webhookSender');
+    (controllerHere ? sendTemporaryBranded(channel, payload, 15_000) : sendBrandedMessage(channel, payload)).catch(() => null);
   }
 
   checkAudience(guildId) {

@@ -1,4 +1,4 @@
-# Vesper Bot 3.9.2
+# Vesper Bot 3.9.3
 
 Bot de Discord para administración de servidores y notificaciones de Twitch,
 YouTube y TikTok. La versión actual conserva la presentación visual original con
@@ -416,20 +416,24 @@ carácter. Si alguien cambia la estructura del embed sin querer, falla.
 
 ## Planes
 
-Los monitores no son gratis de tener encendidos: vigilar tres redes significa
-preguntar cada pocos minutos, por cada cuenta, todo el día. Esa es la línea.
+Premium es lo que cuesta tener encendido (vigilar tres redes significa
+preguntar cada pocos minutos, por cada cuenta, todo el día; la música arranca
+ffmpeg) y la personalización: lo que convierte a Vesper en «tu» bot.
 
 | | Gratis | Premium | Principal |
 | --- | --- | --- | --- |
-| Bienvenidas, despedidas y boosts | ✅ | ✅ | ✅ |
+| Bienvenidas, despedidas y boosts (con el texto de siempre) | ✅ | ✅ | ✅ |
 | Los 27 registros con canal y mención propios | ✅ | ✅ | ✅ |
-| Los 38 mensajes editables y los paquetes | ✅ | ✅ | ✅ |
-| Moderación, tickets, sugerencias, autorroles | ✅ | ✅ | ✅ |
-| Panel web completo | ✅ | ✅ | ✅ |
+| Moderación, tickets, sugerencias, autorroles, destacados | ✅ | ✅ | ✅ |
+| Salas de voz temporales | ✅ | ✅ | ✅ |
+| Crear publicaciones (embeds con botones) | ✅ | ✅ | ✅ |
+| Panel web | ✅ | ✅ | ✅ |
 | **TikTok, Twitch y YouTube** | ❌ | ✅ | ✅ |
 | **Música** | ❌ | ✅ | ✅ |
 | **Ofertas y juegos gratis** | ❌ | ✅ | ✅ |
-| Identidad propia del bot | ❌ | ❌ | ✅ |
+| **Editar los 38 mensajes y embeds, y los paquetes** | ❌ | ✅ | ✅ |
+| **Nombre y logo con los que publica el bot** | ❌ | ✅ | ✅ |
+| Identidad propia (apodo, colores, paquete Void o Limones) | ❌ | ❌ | ✅ |
 | Panel dentro de Discord | ❌ | ❌ | ✅ |
 
 «Principal» son Embers Void y Ankerie Dimension, por serlo. El premium se
@@ -438,18 +442,17 @@ propietario del bot.
 
 Un servidor que pierde el plan **deja de consultar solo**: el corte está en los
 monitores, no en la interfaz. Aunque su configuración siga diciendo que el
-módulo está activo, no se hace ni una petición.
+módulo está activo, no se hace ni una petición. Con la personalización pasa
+igual: sus textos, nombre y logo se guardan, pero dejan de usarse y vuelven
+los de siempre hasta que recupere el plan.
 
 ## Qué tiene cada servidor
 
 Vesper no está pensado solo para Embers Void y Ankerie Dimension: cualquiera
-puede añadirlo. Lo único que se reserva a los dos servidores de casa es lo que
-cambia la cara del bot o le ocupa un canal permanente.
-
-Lo que se reserva a los dos servidores de casa es solo lo que cambia la cara
-del bot —apodo, avatar y colores propios— o le ocupa un canal permanente: el
-panel dentro de Discord y los comandos de identidad (`/branding`,
-`/setbotname`…). Ver la tabla de planes de arriba.
+puede añadirlo. A los dos servidores de casa se reserva solo la identidad
+completa del bot —apodo y colores propios, los paquetes Void y Limones— y el
+panel dentro de Discord, que le ocupa un canal permanente. Ver la tabla de
+planes de arriba.
 
 ## Paquetes de mensajes
 
