@@ -3,11 +3,12 @@ const { getGuildConfig, updateGuildSection } = require('../../database/mongoMana
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 const { clearGuildCache } = require('../../platforms/tiktok/monitors');
 const { CAPABILITIES, requireCapability } = require('../../core/PermissionService');
+const { friendlyError } = require('../../utils/userMessage');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('tiktok-clear')
-    .setDescription('Elimina TODOS los usuarios de TikTok del monitoreo')
+    .setDescription('Deja de seguir TODAS las cuentas de TikTok')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -22,7 +23,7 @@ module.exports = {
 
       const confirmEmbed = new EmbedBuilder()
         .setTitle('⚠️ Confirmar eliminación')
-        .setDescription(`Estás a punto de eliminar **${currentCount}** usuarios de la lista de monitoreo.\n\n${currentUsers.slice(0, 20).map(u => `• ${u}`).join('\n')}${currentCount > 20 ? `\n\n*... y ${currentCount - 20} más*` : ''}\n\nEsta acción no se puede deshacer.`)
+        .setDescription(`Estás a punto de eliminar **${currentCount}** usuarios de las cuentas que sigue el bot.\n\n${currentUsers.slice(0, 20).map(u => `• ${u}`).join('\n')}${currentCount > 20 ? `\n\n*... y ${currentCount - 20} más*` : ''}\n\nEsta acción no se puede deshacer.`)
         .setColor(0x000000);
 
       await interaction.reply({
@@ -45,7 +46,7 @@ module.exports = {
           if (i.customId === 'tiktok_clear_confirm') {
             await updateGuildSection(interaction.guildId, 'tiktok', { users: [] });
             await clearGuildCache(interaction.guildId);
-            await i.update({ content: `✅ Se eliminaron **${currentCount}** usuarios del monitoreo de TikTok.`, embeds: [], components: [] });
+            await i.update({ content: `✅ Se eliminaron **${currentCount}** usuarios de las que seguía el bot en TikTok.`, embeds: [], components: [] });
             
             // Refrescar dashboard automáticamente
             const activePanel = await getActivePanel(interaction.guildId);
@@ -57,7 +58,7 @@ module.exports = {
           console.error('Error en confirmación tiktok-clear:', error);
           // Si la confirmación ya se envió, `update` lanza
           // InteractionAlreadyReplied y el usuario no se entera de nada.
-          const aviso = { content: `❌ Error al eliminar: ${error.message}`, embeds: [], components: [] };
+          const aviso = { content: `❌ No pude borrar la lista. ${friendlyError(error)}`, embeds: [], components: [] };
           if (i.replied || i.deferred) await i.followUp({ content: aviso.content, flags: 64 }).catch(() => null);
           else await i.update(aviso).catch(() => null);
         }
@@ -76,7 +77,7 @@ module.exports = {
 
     } catch (error) {
       console.error('Error en tiktok-clear:', error);
-      await interaction.reply({ content: `❌ Error al procesar la solicitud: ${error.message}`, flags: 64 });
+      await interaction.reply({ content: `❌ ${friendlyError(error)}`, flags: 64 });
     }
   }
 };

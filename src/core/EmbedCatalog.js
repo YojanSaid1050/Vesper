@@ -21,7 +21,7 @@ const MEMBER_VARS = [
   ['{username}', 'su nombre de usuario'],
   ['{userTag}', 'su etiqueta completa'],
   ['{displayName}', 'su apodo en el servidor'],
-  ['{userId}', 'su ID'],
+  ['{userId}', 'su número de cuenta de Discord'],
   ['{server}', 'nombre del servidor'],
   ['{memberCount}', 'total de miembros']
 ];
@@ -33,7 +33,7 @@ const SERVER_VARS = [
 
 const ACTOR_VARS = [['{executor}', 'quién realizó la acción']];
 const CHANNEL_VARS = [['{channel}', 'canal afectado'], ['{channelName}', 'nombre del canal']];
-const ROLE_VARS = [['{role}', 'rol afectado'], ['{roleName}', 'nombre del rol'], ['{roleId}', 'ID del rol']];
+const ROLE_VARS = [['{role}', 'rol afectado'], ['{roleName}', 'nombre del rol'], ['{roleId}', 'número del rol en Discord']];
 
 const CREATOR_VARS = [
   ['{creator}', 'nombre de la cuenta'],

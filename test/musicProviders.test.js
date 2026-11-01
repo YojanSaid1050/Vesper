@@ -120,13 +120,14 @@ test('si YouTube y SoundCloud fallan, Audius toma el relevo', async t => {
   assert.equal(track.streamUrl, 'https://audius.example/v1/tracks/Ab1/stream?app_name=Vesper');
 });
 
-test('sin ninguna fuente disponible el error explica qué dijo cada una', async t => {
+test('sin ninguna fuente disponible, la persona lee una frase clara y el detalle queda para el diagnóstico', async t => {
   fakeYtdlp(t, { youtube: 'bot' });
   process.env.MUSIC_SOURCES = 'youtube,audius';
   mockFetch(t, {});
   await assert.rejects(providers.search('cancion inexistente'), error => {
-    assert.match(error.message, /YouTube: YouTube bloqueó/);
-    assert.match(error.message, /Audius:/);
+    assert.equal(error.message, 'No encontré esa canción en ninguna fuente.');
+    assert.deepEqual(error.causes.map(cause => cause.provider), ['youtube', 'audius']);
+    assert.match(error.causes[0].error.message, /YouTube bloqueó/);
     return true;
   });
 });

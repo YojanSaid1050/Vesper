@@ -278,7 +278,7 @@ class MusicService {
       if (!player.current) {
         await this.advance(interaction.guildId);
         if (player.current !== item && !player.queue.includes(item)) {
-          throw new Error(this.lastError || 'No pude iniciar esa canción. Revisa /musica diagnostico e inténtalo otra vez.');
+          throw new Error(this.lastError || 'No pude iniciar esa canción. Prueba con otra o inténtalo otra vez.');
         }
       } else {
         this.changed(interaction.guildId);

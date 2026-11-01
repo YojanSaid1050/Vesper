@@ -1,4 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
+const { friendlyError } = require('../../utils/userMessage');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -16,7 +17,7 @@ module.exports = {
     } catch (error) {
       const motivo = /Missing Permissions|50013/.test(String(error?.message))
         ? 'Me falta el permiso «Gestionar mensajes» en este canal.'
-        : `Discord no permitió borrar los mensajes: ${String(error?.message || error).slice(0, 150)}`;
+        : `Discord no permitió borrar los mensajes. ${friendlyError(error, '')}`.trim();
       return interaction.editReply({ content: `❌ ${motivo}` });
     }
 

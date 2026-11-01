@@ -8,9 +8,9 @@ module.exports = {
   capability: CAPABILITIES.MAIN_ADMIN,
   data: new SlashCommandBuilder()
     .setName('vesper-musica-config')
-    .setDescription('Configura la música de un servidor desde el Main.')
-    .addStringOption(option => option.setName('servidor').setDescription('ID del servidor').setRequired(true))
-    .addStringOption(option => option.setName('canal').setDescription('ID del canal de solicitudes; 0 para permitir todos'))
+    .setDescription('Configura la música de un servidor desde el servidor principal.')
+    .addStringOption(option => option.setName('servidor').setDescription('Número del servidor').setRequired(true))
+    .addStringOption(option => option.setName('canal').setDescription('Número del canal de pedidos (0: todos)'))
     .addIntegerOption(option => option.setName('volumen').setDescription('Volumen inicial').setMinValue(1).setMaxValue(100))
     .addIntegerOption(option => option.setName('cola').setDescription('Máximo de canciones en cola').setMinValue(1).setMaxValue(500))
     .addIntegerOption(option => option.setName('por_usuario').setDescription('Pendientes máximas por usuario').setMinValue(1).setMaxValue(25))

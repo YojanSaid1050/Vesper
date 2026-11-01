@@ -1,5 +1,29 @@
 # Changelog
 
+## 3.9.4 — Todo en el idioma de quien lo usa
+
+Nada de lo que ve la gente, en el panel o en Discord, habla ya de código.
+
+### Panel
+- Fuera «URL HTTPS», «webhooks», «Contenedor V2», «JSON», «Unicode» y los
+  nombres de ajustes internos. Las imágenes piden «el enlace» y el formato
+  moderno se llama **Bloque moderno**.
+- Se quitan de la guía de formato el código en línea, los bloques de código
+  y las menciones escritas a mano con números.
+- El **historial de cambios** dice quién (su nombre, no su número), qué hizo y
+  dónde, con palabras del panel.
+- Se quita «Copiar como JSON».
+
+### Discord
+- Los errores que venían de Discord o de otros servicios en inglés
+  («Missing Permissions», «Request failed…») salen ahora como una frase clara.
+- Descripciones de comandos, opciones y respuestas sin «webhooks», «branding»,
+  «caché», «monitoreo», «streamer», «Live Channel» ni «Ping Role».
+- El estado del bot, el diagnóstico de música y el de TikTok hablan del
+  reproductor, de los avisos y de las cuentas, no de herramientas internas.
+- Las funciones se nombran en español (Bienvenidas, Registros, Música…) en
+  todas las listas.
+
 ## 3.9.3 — Todo con el nombre y el logo del servidor, y planes en orden
 
 ### Mensajes con la identidad del servidor

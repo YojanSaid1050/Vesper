@@ -211,8 +211,9 @@ const SEARCHERS = { youtube: fromYoutube, soundcloud: fromSoundcloud, audius: fr
 
 function combinedError(errors, fallback = 'No encontré esa canción en ninguna fuente.') {
   if (!errors.length) return new Error(fallback);
-  const detail = errors.map(({ provider, error }) => `${PROVIDER_LABELS[provider]}: ${error.message}`).join(' · ');
-  return Object.assign(new Error(`${fallback} (${detail})`.slice(0, 400)), { causes: errors });
+  // El detalle de cada fuente se guarda para el diagnóstico; a la persona
+  // solo le llega la frase clara.
+  return Object.assign(new Error(fallback), { causes: errors });
 }
 
 // Busca un texto recorriendo las fuentes en orden hasta que una responda.
@@ -250,7 +251,7 @@ async function fromYoutubeLink(url, limit) {
   if (order[0] === 'youtube' || playlist) {
     const tracks = await tryYoutube();
     if (tracks?.length) return tracks;
-    if (playlist) throw new Error('YouTube no deja reproducir listas desde este alojamiento. Pide las canciones por su nombre.');
+    if (playlist) throw new Error('Ahora mismo no se pueden reproducir listas de YouTube. Pide las canciones por su nombre.');
   }
 
   const title = await titleFromLink(url).catch(() => null);

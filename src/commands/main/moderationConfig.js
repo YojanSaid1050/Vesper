@@ -9,8 +9,8 @@ module.exports = {
   capability: CAPABILITIES.MAIN_ADMIN,
   data: new SlashCommandBuilder()
     .setName('vesper-mod-config')
-    .setDescription('Configura filtros de moderación desde el Main.')
-    .addStringOption(option => option.setName('servidor').setDescription('ID del servidor').setRequired(true))
+    .setDescription('Configura la moderación de un servidor desde el servidor principal.')
+    .addStringOption(option => option.setName('servidor').setDescription('Número del servidor').setRequired(true))
     .addBooleanOption(option => option.setName('filtrar_enlaces').setDescription('Aplicar lista de dominios permitidos'))
     .addStringOption(option => option.setName('dominios').setDescription('Dominios permitidos separados por coma'))
     .addBooleanOption(option => option.setName('bloquear_invitaciones').setDescription('Bloquear invitaciones de Discord'))

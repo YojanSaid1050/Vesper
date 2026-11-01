@@ -7,8 +7,8 @@ const { clearWebhookCache } = require('../../utils/webhookSender');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setbotname')
-    .setDescription('Configura el nombre usado en los webhooks (no afecta al nombre del bot)')
-    .addStringOption(opt => opt.setName('nombre').setDescription('Nombre a mostrar en webhooks').setRequired(true).setMaxLength(80))
+    .setDescription('Cambia el nombre con el que publica el bot en este servidor')
+    .addStringOption(opt => opt.setName('nombre').setDescription('Nombre que se verá en los mensajes').setRequired(true).setMaxLength(80))
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -25,8 +25,8 @@ module.exports = {
     clearWebhookCache(interaction.guild.id);
 
     const embed = new EmbedBuilder()
-      .setTitle('✅ Branding actualizado')
-      .setDescription(`El nombre **"${nombre}"** se usará en los webhooks.\n\n> ⚠️ **Nota:** Esto NO cambia el nombre del bot principal.`)
+      .setTitle('✅ Nombre actualizado')
+      .setDescription(`Desde ahora el bot firma sus mensajes como **${nombre}** en este servidor.\n\n> Su cuenta de Discord sigue igual.`)
       .setColor('#57F287')
       .setTimestamp();
 

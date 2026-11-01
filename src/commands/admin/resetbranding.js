@@ -6,7 +6,7 @@ const { clearWebhookCache } = require('../../utils/webhookSender');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('resetbranding')
-    .setDescription('Restablece el branding de los webhooks a los valores por defecto')
+    .setDescription('Vuelve al nombre y al logo de la cuenta del bot')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -18,8 +18,8 @@ module.exports = {
     clearWebhookCache(interaction.guild.id);
 
     const embed = new EmbedBuilder()
-      .setTitle('✅ Branding restablecido')
-      .setDescription('Los webhooks usarán ahora el nombre y avatar predeterminados del bot.')
+      .setTitle('✅ Nombre y logo restablecidos')
+      .setDescription('El bot vuelve a publicar con el nombre y el logo de su cuenta.')
       .setColor('#57F287')
       .setTimestamp();
 

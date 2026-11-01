@@ -2,6 +2,7 @@ const { Events, MessageFlags } = require('discord.js');
 const { isMainGuild, commandAvailable } = require('../config/guildPolicy');
 const { CAPABILITIES, requireCapability } = require('../core/PermissionService');
 const { colorRoles, countryRoles, gameRoles, platformRoles } = require('../config/mainGuild');
+const { friendlyError } = require('../utils/userMessage');
 
 const COLLECTOR_ONLY_COMPONENT_IDS = new Set([
   'tiktok_clear_confirm', 'tiktok_clear_cancel',
@@ -58,7 +59,7 @@ async function handleColorRoles(interaction) {
   const explainFailure = async error => {
     const reason = /Missing Permissions|50013/.test(String(error?.message))
       ? 'No puedo darte ese rol: me falta el permiso «Gestionar roles», o el rol está por encima del mío en la lista.'
-      : `No pude cambiar tus roles: ${String(error?.message || error).slice(0, 150)}`;
+      : `No pude cambiar tus roles. ${friendlyError(error, '')}`.trim();
     await interaction.followUp({ content: reason, flags: MessageFlags.Ephemeral }).catch(() => null);
   };
 

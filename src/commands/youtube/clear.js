@@ -4,11 +4,12 @@ const { getChannelInfo } = require('../../platforms/youtube/utils');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 const { CAPABILITIES, requireCapability } = require('../../core/PermissionService');
 const { clearGuildCache } = require('../../platforms/youtube/monitors');
+const { friendlyError } = require('../../utils/userMessage');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('youtube-clear')
-    .setDescription('Elimina TODOS los canales de YouTube del monitoreo')
+    .setDescription('Deja de seguir TODOS los canales de YouTube')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -33,7 +34,7 @@ module.exports = {
 
       const confirmEmbed = new EmbedBuilder()
         .setTitle('⚠️ Confirmar eliminación')
-        .setDescription(`Estás a punto de eliminar **${currentCount}** canales de la lista de monitoreo.\n\n${channelNames.map(n => `• ${n}`).join('\n')}${currentCount > 10 ? `\n\n*... y ${currentCount - 10} más*` : ''}\n\nEsta acción no se puede deshacer.`)
+        .setDescription(`Estás a punto de eliminar **${currentCount}** canales de las cuentas que sigue el bot.\n\n${channelNames.map(n => `• ${n}`).join('\n')}${currentCount > 10 ? `\n\n*... y ${currentCount - 10} más*` : ''}\n\nEsta acción no se puede deshacer.`)
         .setColor(0xFF0000);
 
       await interaction.reply({
@@ -56,7 +57,7 @@ module.exports = {
           if (i.customId === 'youtube_clear_confirm') {
             await updateGuildSection(interaction.guildId, 'youtube', { users: [] });
             await clearGuildCache(interaction.guildId);
-            await i.update({ content: `✅ Se eliminaron **${currentCount}** canales del monitoreo de YouTube.`, embeds: [], components: [] });
+            await i.update({ content: `✅ Se eliminaron **${currentCount}** canales de las que seguía el bot en YouTube.`, embeds: [], components: [] });
             
             // Refrescar dashboard automáticamente
             const activePanel = await getActivePanel(interaction.guildId);
@@ -68,7 +69,7 @@ module.exports = {
           console.error('Error en confirmación youtube-clear:', error);
           // Si la confirmación ya se envió, `update` lanza
           // InteractionAlreadyReplied y el usuario no se entera de nada.
-          const aviso = { content: `❌ Error al eliminar: ${error.message}`, embeds: [], components: [] };
+          const aviso = { content: `❌ No pude borrar la lista. ${friendlyError(error)}`, embeds: [], components: [] };
           if (i.replied || i.deferred) await i.followUp({ content: aviso.content, flags: 64 }).catch(() => null);
           else await i.update(aviso).catch(() => null);
         }
@@ -87,7 +88,7 @@ module.exports = {
 
     } catch (error) {
       console.error('Error en youtube-clear:', error);
-      await interaction.reply({ content: `❌ Error al procesar la solicitud: ${error.message}`, flags: 64 });
+      await interaction.reply({ content: `❌ ${friendlyError(error)}`, flags: 64 });
     }
   }
 };

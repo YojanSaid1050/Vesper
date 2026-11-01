@@ -170,7 +170,7 @@ async function brandingPanel(guildId) {
     { type: 14, spacing: 2 },
     { type: 10, content: '### 𝑇ℎ𝑒 𝑓𝑖𝑟𝑒𝑠 𝑡ℎ𝑎𝑡 𝑚𝑜𝑙𝑑 𝑡ℎ𝑒 𝑟𝑒𝑙𝑖𝑐\'𝑠 𝑓𝑎𝑐𝑒.\n\n༺𓆩~~𝑌𝑜𝑢 𝑎𝑟𝑒 𝑛𝑜𝑡 𝑐𝑜𝑛𝑓𝑖𝑔𝑢𝑟𝑖𝑛𝑔 𝑏𝑟𝑎𝑛𝑑𝑖𝑛𝑔… 𝑦𝑜𝑢 𝑎𝑟𝑒 𝑓𝑜𝑟𝑔𝑖𝑛𝑔 𝑎𝑛 𝑖𝑑𝑒𝑛𝑡𝑖𝑡𝑦.~~𓆪༻' },
     { type: 14, spacing: 2 },
-    { type: 10, content: `🔥 **𝑁𝑜𝑚𝑏𝑟𝑒 𝑒𝑛 𝑤𝑒𝑏ℎ𝑜𝑜𝑘𝑠**\n𝐸𝑙 𝑛𝑜𝑚𝑏𝑟𝑒 𝑞𝑢𝑒 𝑠𝑒 𝑚𝑜𝑠𝑡𝑟𝑎𝑟á 𝑒𝑛 𝑙𝑜𝑠 𝑚𝑒𝑛𝑠𝑎𝑗𝑒𝑠 𝑑𝑒 𝑤𝑒𝑏ℎ𝑜𝑜𝑘.\n${branding.name ? `\`${branding.name}\`` : '`Nombre del bot`'}\n\n🎭 **𝐴𝑣𝑎𝑡𝑎𝑟 𝑒𝑛 𝑤𝑒𝑏ℎ𝑜𝑜𝑘𝑠**\n𝐿𝑎 𝑖𝑚𝑎𝑔𝑒𝑛 𝑞𝑢𝑒 𝑠𝑒 𝑚𝑜𝑠𝑡𝑟𝑎𝑟á 𝑒𝑛 𝑙𝑜𝑠 𝑚𝑒𝑛𝑠𝑎𝑗𝑒𝑠 𝑑𝑒 𝑤𝑒𝑏ℎ𝑜𝑜𝑘.\n${branding.avatar ? '`Forjado ✓`' : '`Avatar del bot`'}\n\n> ⚠️ **Nota:** Esto solo afecta a los mensajes enviados por webhooks, **no cambia el nombre o avatar del bot principal**.` }
+    { type: 10, content: `🔥 **𝑁𝑜𝑚𝑏𝑟𝑒 𝑒𝑛 𝑙𝑜𝑠 𝑚𝑒𝑛𝑠𝑎𝑗𝑒𝑠**\n𝐸𝑙 𝑛𝑜𝑚𝑏𝑟𝑒 𝑐𝑜𝑛 𝑒𝑙 𝑞𝑢𝑒 𝑝𝑢𝑏𝑙𝑖𝑐𝑎 𝑒𝑙 𝑏𝑜𝑡 𝑒𝑛 𝑒𝑠𝑡𝑒 𝑠𝑒𝑟𝑣𝑖𝑑𝑜𝑟.\n${branding.name ? `\`${branding.name}\`` : '`Nombre del bot`'}\n\n🎭 **𝐿𝑜𝑔𝑜 𝑒𝑛 𝑙𝑜𝑠 𝑚𝑒𝑛𝑠𝑎𝑗𝑒𝑠**\n𝐿𝑎 𝑖𝑚𝑎𝑔𝑒𝑛 𝑐𝑜𝑛 𝑙𝑎 𝑞𝑢𝑒 𝑝𝑢𝑏𝑙𝑖𝑐𝑎 𝑒𝑙 𝑏𝑜𝑡 𝑒𝑛 𝑒𝑠𝑡𝑒 𝑠𝑒𝑟𝑣𝑖𝑑𝑜𝑟.\n${branding.avatar ? '`Forjado ✓`' : '`Avatar del bot`'}\n\n> ⚠️ **Nota:** Cambia cómo firma el bot sus mensajes en este servidor; **su cuenta de Discord sigue igual**.` }
   ];
 
   if (branding.avatar) {
@@ -516,26 +516,26 @@ async function testPanel(guildId) {
         `👁️ **General**\n` +
         `└ Welcome: ${config.general?.welcomeChannel ? `<#${config.general.welcomeChannel}>` : '`No vinculado`'}\n` +
         `└ Goodbye: ${config.general?.goodbyeChannel ? `<#${config.general.goodbyeChannel}>` : '`No vinculado`'}\n` +
-        `└ Logs: ${config.general?.logChannel ? `<#${config.general.logChannel}>` : '`No vinculado`'}\n` +
-        `└ Bot Logs: ${config.general?.botLogChannel ? `<#${config.general.botLogChannel}>` : '`No vinculado`'}\n` +
+        `└ Registros: ${config.general?.logChannel ? `<#${config.general.logChannel}>` : '`No vinculado`'}\n` +
+        `└ Registros de bots: ${config.general?.botLogChannel ? `<#${config.general.botLogChannel}>` : '`No vinculado`'}\n` +
         `└ Bot Role: ${config.general?.botRole ? `<@&${config.general.botRole}>` : '`No vinculado`'}\n\n` +
         `🎭 **Whispers (TikTok)**\n` +
-        `└ Live Channel: ${tiktok.liveChannel ? `<#${tiktok.liveChannel}>` : '`No vinculado`'}\n` +
+        `└ Canal de directos: ${tiktok.liveChannel ? `<#${tiktok.liveChannel}>` : '`No vinculado`'}\n` +
         `└ Video Channel: ${tiktok.videoChannel ? `<#${tiktok.videoChannel}>` : '`No vinculado`'}\n` +
         `└ Users: ${tiktok.users?.length || 0}\n` +
-        `└ Ping Role: ${tiktok.pingRole ? `<@&${tiktok.pingRole}>` : '`No vinculado`'}\n\n` +
+        `└ Rol que se menciona: ${tiktok.pingRole ? `<@&${tiktok.pingRole}>` : '`No vinculado`'}\n\n` +
         `👁️ **The Vigil (Twitch)**\n` +
-        `└ Live Channel: ${twitch.liveChannel ? `<#${twitch.liveChannel}>` : '`No vinculado`'}\n` +
+        `└ Canal de directos: ${twitch.liveChannel ? `<#${twitch.liveChannel}>` : '`No vinculado`'}\n` +
         `└ Users: ${twitch.users?.length || 0}\n` +
-        `└ Ping Role: ${twitch.pingRole ? `<@&${twitch.pingRole}>` : '`No vinculado`'}\n\n` +
+        `└ Rol que se menciona: ${twitch.pingRole ? `<@&${twitch.pingRole}>` : '`No vinculado`'}\n\n` +
         `📀 **Eternal Records (YouTube)**\n` +
-        `└ Live Channel: ${youtube.liveChannel ? `<#${youtube.liveChannel}>` : '`No vinculado`'}\n` +
+        `└ Canal de directos: ${youtube.liveChannel ? `<#${youtube.liveChannel}>` : '`No vinculado`'}\n` +
         `└ Video Channel: ${youtube.videoChannel ? `<#${youtube.videoChannel}>` : '`No vinculado`'}\n` +
         `└ Shorts Channel: ${youtube.shortChannel ? `<#${youtube.shortChannel}>` : '`No vinculado`'}\n` +
         `└ Users: ${youtube.users?.length || 0}\n` +
-        `└ Ping Role: ${youtube.pingRole ? `<@&${youtube.pingRole}>` : '`No vinculado`'}\n\n` +
-        `🎨 **Branding**\n` +
-        `└ Name: ${branding.name || '`No configurado`'}\n` +
+        `└ Rol que se menciona: ${youtube.pingRole ? `<@&${youtube.pingRole}>` : '`No vinculado`'}\n\n` +
+        `🎨 **Nombre y logo**\n` +
+        `└ Nombre: ${branding.name || '`No configurado`'}\n` +
         `└ Avatar: ${branding.avatar ? '✅ Configurado' : '`No configurado`'}`;
       break;
 
@@ -544,10 +544,10 @@ async function testPanel(guildId) {
       sectionContent =
         '```\n' +
         '📋 COMANDOS DE GESTIÓN\n' +
-        '├─ /tiktok-add <usuario>     → Añade un usuario a monitorear\n' +
-        '├─ /tiktok-remove <usuario>  → Elimina un usuario del monitoreo\n' +
-        '├─ /tiktok-list              → Muestra los usuarios monitoreados\n' +
-        '├─ /tiktok-clear             → Elimina todos los usuarios\n' +
+        '├─ /tiktok-add <usuario>     → Sigue una cuenta\n' +
+        '├─ /tiktok-remove <usuario>  → Deja de seguir una cuenta\n' +
+        '├─ /tiktok-list              → Cuentas que sigue el bot\n' +
+        '├─ /tiktok-clear             → Deja de seguir todas\n' +
         '│\n' +
         '⚙️ COMANDOS DE CONFIGURACIÓN\n' +
         '├─ /tiktok-setchannel live <#canal>   → Canal para directos\n' +
@@ -558,10 +558,10 @@ async function testPanel(guildId) {
         '└─ /tiktok-test <usuario>    → Prueba una cuenta TikTok\n' +
         '```\n\n' +
         '📊 **Estado actual:**\n' +
-        `└ Live Channel: ${tiktok.liveChannel ? `<#${tiktok.liveChannel}>` : '`No configurado`'}\n` +
+        `└ Canal de directos: ${tiktok.liveChannel ? `<#${tiktok.liveChannel}>` : '`No configurado`'}\n` +
         `└ Video Channel: ${tiktok.videoChannel ? `<#${tiktok.videoChannel}>` : '`No configurado`'}\n` +
-        `└ Usuarios monitoreados: ${tiktok.users?.length || 0}\n` +
-        `└ Ping Role: ${tiktok.pingRole ? `<@&${tiktok.pingRole}>` : '`No configurado`'}`;
+        `└ Cuentas seguidas: ${tiktok.users?.length || 0}\n` +
+        `└ Rol que se menciona: ${tiktok.pingRole ? `<@&${tiktok.pingRole}>` : '`No configurado`'}`;
       break;
 
     case 'twitch':
@@ -569,22 +569,22 @@ async function testPanel(guildId) {
       sectionContent =
         '```\n' +
         '📋 COMANDOS DE GESTIÓN\n' +
-        '├─ /twitch-add <streamer>     → Añade un streamer a monitorear\n' +
-        '├─ /twitch-remove <streamer>  → Elimina un streamer del monitoreo\n' +
-        '├─ /twitch-list               → Muestra los streamers monitoreados\n' +
-        '├─ /twitch-clear              → Elimina todos los streamers\n' +
+        '├─ /twitch-add <canal>        → Sigue un canal\n' +
+        '├─ /twitch-remove <canal>     → Deja de seguir un canal\n' +
+        '├─ /twitch-list               → Canales que sigue el bot\n' +
+        '├─ /twitch-clear              → Deja de seguir todos\n' +
         '│\n' +
         '⚙️ COMANDOS DE CONFIGURACIÓN\n' +
         '├─ /twitch-setchannel <#canal> → Canal para notificaciones\n' +
         '└─ /twitch-setpingrole <rol>   → Configura rol a etiquetar\n' +
         '│\n' +
         '🧪 COMANDOS DE PRUEBA\n' +
-        '└─ /twitch-test <streamer>    → Prueba un streamer de Twitch\n' +
+        '└─ /twitch-test <canal>       → Prueba un aviso de Twitch\n' +
         '```\n\n' +
         '📊 **Estado actual:**\n' +
-        `└ Live Channel: ${twitch.liveChannel ? `<#${twitch.liveChannel}>` : '`No configurado`'}\n` +
-        `└ Streamers monitoreados: ${twitch.users?.length || 0}\n` +
-        `└ Ping Role: ${twitch.pingRole ? `<@&${twitch.pingRole}>` : '`No configurado`'}`;
+        `└ Canal de directos: ${twitch.liveChannel ? `<#${twitch.liveChannel}>` : '`No configurado`'}\n` +
+        `└ Canales seguidos: ${twitch.users?.length || 0}\n` +
+        `└ Rol que se menciona: ${twitch.pingRole ? `<@&${twitch.pingRole}>` : '`No configurado`'}`;
       break;
 
     case 'youtube':
@@ -592,10 +592,10 @@ async function testPanel(guildId) {
       sectionContent =
         '```\n' +
         '📋 COMANDOS DE GESTIÓN\n' +
-        '├─ /youtube-add <canal>       → Añade un canal a monitorear\n' +
-        '├─ /youtube-remove <canal>    → Elimina un canal del monitoreo\n' +
-        '├─ /youtube-list              → Muestra los canales monitoreados\n' +
-        '├─ /youtube-clear             → Elimina todos los canales\n' +
+        '├─ /youtube-add <canal>       → Sigue un canal\n' +
+        '├─ /youtube-remove <canal>    → Deja de seguir un canal\n' +
+        '├─ /youtube-list              → Canales que sigue el bot\n' +
+        '├─ /youtube-clear             → Deja de seguir todos\n' +
         '│\n' +
         '⚙️ COMANDOS DE CONFIGURACIÓN\n' +
         '├─ /youtube-setchannel live <#canal>   → Canal para directos\n' +
@@ -607,22 +607,22 @@ async function testPanel(guildId) {
         '└─ /youtube-test <tipo> <canal> → Prueba notificaciones de YouTube\n' +
         '```\n\n' +
         '📊 **Estado actual:**\n' +
-        `└ Live Channel: ${youtube.liveChannel ? `<#${youtube.liveChannel}>` : '`No configurado`'}\n` +
+        `└ Canal de directos: ${youtube.liveChannel ? `<#${youtube.liveChannel}>` : '`No configurado`'}\n` +
         `└ Video Channel: ${youtube.videoChannel ? `<#${youtube.videoChannel}>` : '`No configurado`'}\n` +
         `└ Shorts Channel: ${youtube.shortChannel ? `<#${youtube.shortChannel}>` : '`No configurado`'}\n` +
-        `└ Canales monitoreados: ${youtube.users?.length || 0}\n` +
-        `└ Ping Role: ${youtube.pingRole ? `<@&${youtube.pingRole}>` : '`No configurado`'}`;
+        `└ Canales seguidos: ${youtube.users?.length || 0}\n` +
+        `└ Rol que se menciona: ${youtube.pingRole ? `<@&${youtube.pingRole}>` : '`No configurado`'}`;
       break;
 
     case 'branding':
-      sectionTitle = '🎨 **The Forge - Branding Commands**';
+      sectionTitle = '🎨 **The Forge · Nombre y logo**';
       sectionContent =
         '```\n' +
-        '🎨 COMANDOS DE BRANDING\n' +
-        '├─ /branding                   → Muestra la configuración actual\n' +
-        '├─ /setbotname <nombre>        → Configura el nombre del bot\n' +
-        '├─ /setbotavatar <url>         → Configura el avatar del bot\n' +
-        '└─ /resetbranding              → Restablece el branding\n' +
+        '🎨 NOMBRE Y LOGO\n' +
+        '├─ /branding                   → Muestra el nombre y el logo\n' +
+        '├─ /setbotname <nombre>        → Cambia el nombre\n' +
+        '├─ /setbotavatar <enlace>      → Cambia el logo\n' +
+        '└─ /resetbranding              → Vuelve a los de la cuenta\n' +
         '```\n\n' +
         '📊 **Estado actual:**\n' +
         `└ Nombre: ${branding.name || '`No configurado`'}\n` +
@@ -630,19 +630,19 @@ async function testPanel(guildId) {
       break;
 
     case 'test':
-      sectionTitle = '🧪 **Test Commands**';
+      sectionTitle = '🧪 **Pruebas**';
       sectionContent =
         '```\n' +
         '🧪 COMANDOS DE PRUEBA\n' +
-        '├─ /testbranding <tipo>        → Prueba el branding (general/welcome/goodbye/twitch/tiktok/tiktokvideo)\n' +
-        '├─ /youtube-test <tipo> <canal> → Prueba YouTube (live/video/short/all)\n' +
-        '├─ /twitch-test <streamer>     → Prueba un streamer de Twitch\n' +
-        '└─ /tiktok-test <usuario>      → Prueba una cuenta de TikTok\n' +
+        '├─ /testbranding <tipo>        → Envía un mensaje de prueba\n' +
+        '├─ /youtube-test <tipo> <canal> → Prueba un aviso de YouTube\n' +
+        '├─ /twitch-test <canal>        → Prueba un aviso de Twitch\n' +
+        '└─ /tiktok-test <usuario>      → Prueba un aviso de TikTok\n' +
         '```\n\n' +
         '📋 **Instrucciones:**\n' +
-        '• Los embeds de prueba se enviarán a los canales configurados\n' +
-        '• Verifica que el bot tenga permisos en los canales de destino\n' +
-        '• Si no ves el mensaje, revisa los permisos de webhook';
+        '• Los mensajes de prueba salen en los canales elegidos\n' +
+        '• El bot necesita permiso para escribir en esos canales\n' +
+        '• Si no ves el mensaje, dale al bot el permiso «Gestionar webhooks» en ese canal';
       break;
 
     default:

@@ -1,5 +1,6 @@
 const { Events, PermissionFlagsBits } = require('discord.js');
 const { getGuildConfig } = require('../../database/mongoManager');
+const { friendlyError } = require('../../utils/userMessage');
 
 // Pruebas rápidas desde el chat, para ver la bienvenida y la despedida tal y
 // como salen de verdad.
@@ -27,7 +28,7 @@ module.exports = {
     try {
       await sender(message.member, message.channel, config);
     } catch (error) {
-      await message.reply(`❌ No pude enviar la prueba: ${error.message}`).catch(() => null);
+      await message.reply(`❌ No pude enviar la prueba. ${friendlyError(error)}`).catch(() => null);
       return;
     }
     setTimeout(() => message.delete().catch(() => {}), 2000);

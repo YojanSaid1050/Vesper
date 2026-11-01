@@ -3,19 +3,24 @@ const { monitorVideos: tiktokVideos, monitorLives: tiktokLives } = require('../.
 const { monitorStreams: twitchStreams } = require('../../platforms/twitch/monitors');
 const { monitorVideos: youtubeVideos, monitorShorts: youtubeShorts, monitorLives: youtubeLives } = require('../../platforms/youtube/monitors');
 
+const PLATFORM_LABELS = {
+  tiktok_videos: 'Videos de TikTok', tiktok_lives: 'Directos de TikTok', tiktok_all: 'TikTok', twitch: 'Directos de Twitch',
+  youtube_videos: 'Videos de YouTube', youtube_shorts: 'Shorts de YouTube', youtube_lives: 'Directos de YouTube', youtube_all: 'YouTube', all: 'Todas las plataformas'
+};
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('forcecheck')
-    .setDescription('Fuerza la verificación manual de una plataforma específica')
+    .setDescription('Revisa ahora mismo si hay directos o videos nuevos')
     .addStringOption(option =>
       option.setName('plataforma')
-        .setDescription('Plataforma a forzar')
+        .setDescription('Qué revisar')
         .setRequired(true)
         .addChoices(
           { name: '📹 TikTok - Videos', value: 'tiktok_videos' },
-          { name: '🔴 TikTok - Lives', value: 'tiktok_lives' },
+          { name: '🔴 TikTok - Directos', value: 'tiktok_lives' },
           { name: '📹 TikTok - Todos', value: 'tiktok_all' },
-          { name: '🎮 Twitch - Streams', value: 'twitch' },
+          { name: '🎮 Twitch - Directos', value: 'twitch' },
           { name: '📹 YouTube - Videos', value: 'youtube_videos' },
           { name: '📱 YouTube - Shorts', value: 'youtube_shorts' },
           { name: '🔴 YouTube - Lives', value: 'youtube_lives' },
@@ -157,8 +162,8 @@ module.exports = {
     
     // Crear embed con resultados
     const embed = new EmbedBuilder()
-      .setTitle('✅ Verificación completada')
-      .setDescription(`**Plataforma:** ${plataforma}\n**Tiempo total:** ${totalDuration}ms\n\n**Resumen:** ✅ ${successCount} | ❌ ${errorCount}`)
+      .setTitle('✅ Revisión terminada')
+      .setDescription(`**Revisado:** ${PLATFORM_LABELS[plataforma] || 'Todas las plataformas'}\n**Tardó:** ${Math.max(1, Math.round(totalDuration / 1000))} s\n\n**Resumen:** ✅ ${successCount} | ❌ ${errorCount}`)
       .setColor(errorCount > 0 ? '#ED4245' : '#57F287')
       .setTimestamp()
       .addFields(

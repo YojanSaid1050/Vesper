@@ -17,6 +17,7 @@ const { buildMessage } = require('../EmbedCatalog');
 const { sendBrandedMessage, editBrandedMessage, deleteBrandedMessage, sendTemporaryBranded } = require('../../utils/webhookSender');
 const { CAPABILITIES, canWithGuildConfig } = require('../PermissionService');
 const providers = require('./providers');
+const { friendlyError } = require('../../utils/userMessage');
 
 const ROW = 1;
 const BUTTON = 2;
@@ -231,7 +232,7 @@ async function handleMusicRequest(message, client) {
       await temporary(message.channel, `➕ ${message.author}, añadí **${linkText(result.item.title)}** en la posición ${result.position}.`, 6_000);
     }
   } catch (error) {
-    await temporary(message.channel, `❌ ${message.author}, ${String(error.message || error).slice(0, 300)}`);
+    await temporary(message.channel, `❌ ${message.author}, ${friendlyError(error, 'no pude poner esa canción. Prueba con otra.')}`);
   }
   return true;
 }
@@ -318,7 +319,7 @@ async function handleMusicButton(interaction, client) {
       await music.setVolume(guildId, Math.max(1, Math.min(100, player.volume + delta)));
     }
   } catch (error) {
-    await ephemeral(interaction, `❌ ${String(error.message || error).slice(0, 300)}`);
+    await ephemeral(interaction, `❌ ${friendlyError(error)}`);
   }
   refreshController(client, guildId, 300);
   return true;

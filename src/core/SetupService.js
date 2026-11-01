@@ -1,4 +1,4 @@
-const { MODULE_DEFAULTS, isModuleEnabledConfig } = require('../config/guildPolicy');
+const { MODULE_DEFAULTS, MODULE_LABELS, isModuleEnabledConfig } = require('../config/guildPolicy');
 const { joinWithinLimit } = require('../utils/discordLimits');
 
 function configured(value) {
@@ -32,7 +32,7 @@ function setupChecks(config = {}) {
 
 function moduleSummary(config = {}) {
   return Object.keys(MODULE_DEFAULTS)
-    .map(name => `${isModuleEnabledConfig(config, name) ? '🟢' : '⚫'} ${name}`)
+    .map(name => `${isModuleEnabledConfig(config, name) ? '🟢' : '⚫'} ${MODULE_LABELS[name] || name}`)
     .join('\n');
 }
 

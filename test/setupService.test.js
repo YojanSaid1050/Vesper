@@ -25,7 +25,7 @@ test('el asistente reconoce canales, cuentas y roles configurados', () => {
     permissions: { moderatorRoles: ['8'] }
   });
   assert.equal(status.percentage, 100);
-  assert.match(moduleSummary({ features: { music: true } }), /🟢 music/);
+  assert.match(moduleSummary({ features: { music: true } }), /🟢 Música/);
   assert.equal(mentionList(['8']), '<@&8>');
   assert.equal(mentionList(['7'], 'channel'), '<#7>');
 });
@@ -35,4 +35,16 @@ test('los comandos manuales de moderación están disponibles en satélites', ()
     const command = require(`../src/commands/moderation/${path}`);
     assert.notEqual(command.scope, 'main');
   }
+});
+
+test('los errores técnicos nunca llegan tal cual a Discord', () => {
+  const { friendlyError } = require('../src/utils/userMessage');
+  // Lo que escribe Vesper para la persona pasa igual.
+  assert.equal(friendlyError(new Error('Elige un canal de texto.')), 'Elige un canal de texto.');
+  // Lo que viene de Discord o de una librería se traduce o se cambia por una frase clara.
+  assert.equal(friendlyError(Object.assign(new Error('Missing Permissions'), { code: 50013 })), 'No tengo permisos suficientes para hacer eso.');
+  assert.equal(friendlyError(new Error('Request failed with status code 400')), 'Algo falló. Inténtalo de nuevo en un momento.');
+  assert.equal(friendlyError(new Error("Cannot read properties of undefined (reading 'user')"), 'No pude.'), 'No pude.');
+  assert.equal(friendlyError(new Error('E11000 duplicate key error collection: vesper.tickets')), 'Algo falló. Inténtalo de nuevo en un momento.');
+  assert.equal(friendlyError(new Error('No se pudo conectar con https://api.audius.co.')), 'Algo falló. Inténtalo de nuevo en un momento.');
 });

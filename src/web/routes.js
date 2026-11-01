@@ -193,7 +193,7 @@ function embedDefaultsFor(guildId, guildName) {
     const memberRemove = require('../events/guild/memberRemove');
     return {
       layout: 'components_v2',
-      note: 'Este servidor nace con el diseño original en contenedor Components V2. Puedes cambiar el texto, el color del borde y la imagen, y también pasarlo al embed clásico si lo prefieres.',
+      note: 'Este servidor nace con su diseño original en bloque moderno. Puedes cambiar el texto, el color del borde y la imagen, y también pasarlo al embed clásico si lo prefieres.',
       supportsFooter: true,
       supportsThumbnail: true,
       welcome: {
@@ -987,9 +987,16 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
       if (!context.access.configure) return res.status(403).json({ error: 'No tienes acceso a la auditoría web.' });
       const rows = await WebAuditLog.find({ guildId: req.params.guildId }).sort({ createdAt: -1 }).limit(100).lean();
       const showOwnerEmail = isGlobalOwner(req.webSession);
+      // Se enseña el nombre de quien hizo el cambio, no su número de cuenta.
+      const guild = context.access.guild;
+      const actorName = id => {
+        if (!id) return null;
+        const member = guild?.members?.cache?.get(id);
+        return member?.displayName || context.client.users?.cache?.get(id)?.username || 'Un administrador';
+      };
       return res.json({ audit: rows.map(row => ({
         id: String(row._id),
-        actorDiscordId: row.actorDiscordId,
+        actorName: actorName(row.actorDiscordId),
         actorGoogleEmail: showOwnerEmail ? row.actorGoogleEmail : row.actorGoogleEmail ? 'Cuenta Google del propietario' : null,
         action: row.action,
         target: row.target,

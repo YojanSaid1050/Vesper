@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, ChannelType, PermissionFlagsBits } = require('discord.js');
 const { CAPABILITIES } = require('../../core/PermissionService');
+const { friendlyError } = require('../../utils/userMessage');
 
 // La interfaz fija de las salas de voz temporales: 15 botones dentro del
 // bloque para cambiar nombre, límite, privacidad y quién puede entrar.
@@ -19,7 +20,7 @@ module.exports = {
       const result = await publishInterface(client, interaction.guildId, channel.id);
       return interaction.editReply(`✅ Interfaz de salas publicada en <#${result.channelId}>. Los botones actúan sobre la sala en la que esté cada persona.`);
     } catch (error) {
-      return interaction.editReply(`❌ ${String(error.message || error).slice(0, 400)}`);
+      return interaction.editReply(`❌ ${friendlyError(error)}`);
     }
   }
 };

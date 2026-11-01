@@ -9,7 +9,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('vesper-modulo')
     .setDescription('Activa o desactiva un módulo desde el servidor principal.')
-    .addStringOption(option => option.setName('servidor').setDescription('ID del servidor objetivo').setRequired(true))
+    .addStringOption(option => option.setName('servidor').setDescription('Número del servidor').setRequired(true))
     .addStringOption(option => option.setName('modulo').setDescription('Módulo que deseas cambiar').setRequired(true)
       .addChoices(...Object.keys(MODULE_DEFAULTS).map(name => ({ name, value: name }))))
     .addBooleanOption(option => option.setName('activo').setDescription('Estado nuevo').setRequired(true)),

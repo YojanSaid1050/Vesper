@@ -2,12 +2,13 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { updateGuildSection, getGuildConfig } = require('../../database/mongoManager');
 const { mainPanel } = require('../../dashboard/panels');
+const { friendlyError } = require('../../utils/userMessage');
 
 module.exports = {
   scope: 'main',
   data: new SlashCommandBuilder()
     .setName('config-dashboard')
-    .setDescription('Crea o reinicia el dashboard de configuración.')
+    .setDescription('Publica el panel de control en este canal.')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -48,11 +49,11 @@ module.exports = {
         currentMode: 'default'
       });
 
-      await interaction.editReply({ content: '✅ Dashboard creado correctamente.' });
+      await interaction.editReply({ content: '✅ Panel de control publicado.' });
       
     } catch (error) {
       console.error('Error en config-dashboard:', error);
-      await interaction.editReply({ content: `❌ Error: ${error.message}` });
+      await interaction.editReply({ content: `❌ ${friendlyError(error)}` });
     }
   }
 };

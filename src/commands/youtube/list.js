@@ -6,7 +6,7 @@ const { getChannelInfo } = require('../../platforms/youtube/utils');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('youtube-list')
-    .setDescription('Muestra la lista de canales de YouTube monitoreados')
+    .setDescription('Muestra los canales de YouTube que sigue el bot')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -17,7 +17,7 @@ module.exports = {
     const { liveChannel, videoChannel, shortChannel } = config.youtube || {};
 
     if (users.length === 0) {
-      return interaction.editReply({ content: '📋 No hay canales de YouTube configurados para monitorear.\n\nUsa `/youtube-add` para agregar uno.' });
+      return interaction.editReply({ content: '📋 No hay canales de YouTube que siga el bot.\n\nUsa `/youtube-add` para agregar uno.' });
     }
 
     const channelInfoList = [];
@@ -28,7 +28,7 @@ module.exports = {
     }
 
     const embed = new EmbedBuilder()
-      .setTitle('📺 Canales de YouTube monitoreados')
+      .setTitle('📺 Canales de YouTube que sigue el bot')
       .setColor(0xFF0000)
       .addFields(
         // Un valor de campo admite 1024 caracteres: con ~20 canales de nombre

@@ -16,6 +16,25 @@ const MODULE_DEFAULTS = Object.freeze({
   starboard: false
 });
 
+// Nombre de cada módulo tal como lo lee la persona en Discord.
+const MODULE_LABELS = Object.freeze({
+  tiktok: 'Avisos de TikTok',
+  twitch: 'Avisos de Twitch',
+  youtube: 'Avisos de YouTube',
+  welcome: 'Bienvenidas',
+  goodbye: 'Despedidas',
+  logs: 'Registros',
+  boosts: 'Boosts',
+  deals: 'Juegos gratis',
+  music: 'Música',
+  tempvoice: 'Salas temporales',
+  moderation: 'Moderación automática',
+  tickets: 'Tickets',
+  suggestions: 'Sugerencias',
+  selfroles: 'Autorroles',
+  starboard: 'Destacados'
+});
+
 // ------------------------------------------------------------------
 // Planes: qué tiene cada servidor
 // ------------------------------------------------------------------
@@ -178,6 +197,7 @@ function commandAvailable(command, guildId) {
 
 module.exports = {
   MODULE_DEFAULTS,
+  MODULE_LABELS,
   csvSet,
   getMainGuildId,
   getApprovedGuildIds,

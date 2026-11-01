@@ -3,9 +3,10 @@ const { EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const { getMongoStatus, getGuildConfig } = require('../database/mongoManager');
 const { getMonitorStats } = require('../platforms');
 const { getCacheStats: getTikTokStats } = require('../platforms/tiktok/checks');
-const { MODULE_DEFAULTS, isModuleEnabledConfig } = require('../config/guildPolicy');
+const { MODULE_DEFAULTS, MODULE_LABELS, isModuleEnabledConfig } = require('../config/guildPolicy');
 const mainGuild = require('../config/mainGuild');
 const { getAllProviderMetrics } = require('./ProviderMetrics');
+const { friendlyError } = require('../utils/userMessage');
 
 function mark(value) {
   return value ? '✅' : '❌';
@@ -42,20 +43,21 @@ async function diagnosticSnapshot(client) {
 async function buildDiagnosticsEmbed(client) {
   const data = await diagnosticSnapshot(client);
   const monitorLines = data.monitors.length
-    ? data.monitors.map(item => `${item.disabledUntil ? '🔴' : item.isActive ? '🟢' : '🟡'} ${item.name}: ${item.lastRunTime ? `<t:${Math.floor(new Date(item.lastRunTime).getTime() / 1000)}:R>` : 'sin ejecución'}${item.disabledUntil ? ` · reintento <t:${Math.floor(new Date(item.disabledUntil).getTime() / 1000)}:R>` : ''}`).join('\n')
-    : 'No hay monitores activos.';
+    ? data.monitors.map(item => `${item.disabledUntil ? '🔴' : item.isActive ? '🟢' : '🟡'} ${item.name}: ${item.lastRunTime ? `<t:${Math.floor(new Date(item.lastRunTime).getTime() / 1000)}:R>` : 'todavía no ha revisado'}${item.disabledUntil ? ` · vuelve a probar <t:${Math.floor(new Date(item.disabledUntil).getTime() / 1000)}:R>` : ''}`).join('\n')
+    : 'No hay revisiones automáticas activas.';
+  const youtubeUse = Math.min(100, Math.round((data.providerMetrics.youtube.units / 10000) * 100));
+  const tiktokReader = data.tiktok.browser?.ready ? 'listo' : data.tiktok.browser?.installed ? 'en espera' : 'modo sencillo';
   return new EmbedBuilder()
-    .setTitle('Diagnóstico de Vesper')
+    .setTitle('Estado de Vesper')
     .setColor(data.discord.ready && data.mongo.connected ? 0x57F287 : 0xFEE75C)
     .addFields(
-      { name: 'Discord', value: `${mark(data.discord.ready)} Conexión\nLatencia: ${data.discord.ping} ms\nServidores: ${data.discord.guilds}`, inline: true },
-      { name: 'MongoDB', value: `${mark(data.mongo.connected)} Conexión\nLatencia: ${data.mongo.latency ?? 'N/D'} ms`, inline: true },
-      { name: 'APIs y cuota desde el arranque', value: `${mark(data.twitch.configured)} Twitch · ${data.providerMetrics.twitch.calls} llamadas${data.providerMetrics.twitch.remaining !== null ? ` · ${data.providerMetrics.twitch.remaining}/${data.providerMetrics.twitch.limit} restantes` : ''}\n${mark(data.youtube.configured)} YouTube · ${data.providerMetrics.youtube.units}/10000 unidades estimadas\n${mark(data.tiktok.provider === 'self_hosted' || data.tiktok.mode === 'integrated')} TikTok · US$0.00`, inline: true },
-      { name: 'TikTok gratuito', value: `Navegador: ${data.tiktok.browser?.ready ? 'listo' : data.tiktok.browser?.installed ? 'instalado/en espera' : 'no detectado'}\nÚltimo éxito: ${data.tiktok.lastSuccess || 'sin datos'}\nÚltimo error: ${data.tiktok.lastError?.message || 'ninguno'}`.slice(0, 1024) },
-      { name: 'Música', value: `${mark(data.music.available)} Motor de audio\nSesiones: ${data.music.players || 0}\nSonando: ${data.music.playing || 0}`, inline: true },
-      { name: 'Monitores', value: monitorLines.slice(0, 1024) }
+      { name: 'Discord', value: `${mark(data.discord.ready)} Conectado\nRespuesta: ${data.discord.ping} ms\nServidores: ${data.discord.guilds}`, inline: true },
+      { name: 'Datos guardados', value: `${mark(data.mongo.connected)} ${data.mongo.connected ? 'Disponibles' : 'Sin conexión'}`, inline: true },
+      { name: 'Avisos de redes', value: `${mark(data.twitch.configured)} Twitch\n${mark(data.youtube.configured)} YouTube · uso de hoy ${youtubeUse}%\n${mark(data.tiktok.provider === 'self_hosted' || data.tiktok.mode === 'integrated')} TikTok`, inline: true },
+      { name: 'TikTok', value: `Lector: ${tiktokReader}\nÚltima lectura correcta: ${data.tiktok.lastSuccess || 'todavía ninguna'}${data.tiktok.lastError ? `\nÚltimo problema: ${friendlyError(data.tiktok.lastError, 'TikTok no respondió.')}` : ''}`.slice(0, 1024) },
+      { name: 'Música', value: `${mark(data.music.available)} Reproductor\nServidores escuchando: ${data.music.players || 0}\nSonando ahora: ${data.music.playing || 0}`, inline: true },
+      { name: 'Revisiones automáticas', value: monitorLines.slice(0, 1024) }
     )
-    .setFooter({ text: 'No se muestran credenciales ni secretos' })
     .setTimestamp();
 }
 
@@ -165,7 +167,7 @@ async function buildAuditEmbed(guild) {
     .addFields(
       { name: 'Canales comprobados', value: audit.checks.join('\n').slice(0, 1024) || 'No hay canales configurados.' },
       { name: 'Pendientes', value: audit.issues.map(item => `• ${item}`).join('\n').slice(0, 1024) || 'Ninguno.' },
-      { name: 'Módulos', value: Object.keys(MODULE_DEFAULTS).map(name => `${isModuleEnabledConfig(audit.config, name) ? '🟢' : '⚫'} ${name}`).join('\n'), inline: true }
+      { name: 'Módulos', value: Object.keys(MODULE_DEFAULTS).map(name => `${isModuleEnabledConfig(audit.config, name) ? '🟢' : '⚫'} ${MODULE_LABELS[name] || name}`).join('\n'), inline: true }
     )
     .setFooter({ text: 'La auditoría nunca cambia la configuración automáticamente' })
     .setTimestamp();

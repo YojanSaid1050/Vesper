@@ -5,6 +5,7 @@ const { isModuleEnabledConfig } = require('../../config/guildPolicy');
 const { voicePermissionIssues } = require('../../core/MusicService');
 const providers = require('../../core/music/providers');
 const sources = require('../../core/music/sources');
+const { friendlyError } = require('../../utils/userMessage');
 
 function trackName(track) {
   return track?.info?.title || 'Canción desconocida';
@@ -18,8 +19,8 @@ async function probeSources() {
   return results.map(result => {
     const seconds = (result.ms / 1000).toFixed(1).replace('.', ',');
     if (result.ok) return `✅ **${result.label}** · ${seconds} s`;
-    const hint = result.botCheck ? ' (bloqueo anti-bot de YouTube a este alojamiento)' : '';
-    return `❌ **${result.label}** · ${String(result.detail).slice(0, 140)}${hint}`;
+    if (result.botCheck) return `❌ **${result.label}** · YouTube no deja usarlo ahora mismo`;
+    return `❌ **${result.label}** · ${friendlyError(result.detail, 'no responde ahora mismo')}`;
   });
 }
 
@@ -40,7 +41,7 @@ module.exports = {
     .addSubcommand(command => command.setName('diagnostico').setDescription('Comprueba configuración, conexión y permisos de voz'))
     .addSubcommand(command => command.setName('controlador').setDescription('Publica el controlador de música con botones (Gestionar servidor)')
       .addChannelOption(option => option.setName('canal').setDescription('Canal de texto; por defecto, este').addChannelTypes(ChannelType.GuildText)))
-    .addSubcommand(command => command.setName('reproducir').setDescription('Busca o reproduce una canción').addStringOption(option => option.setName('busqueda').setDescription('Título o URL').setRequired(true)))
+    .addSubcommand(command => command.setName('reproducir').setDescription('Busca o reproduce una canción').addStringOption(option => option.setName('busqueda').setDescription('Nombre de la canción o enlace').setRequired(true)))
     .addSubcommand(command => command.setName('pausar').setDescription('Pausa la canción actual'))
     .addSubcommand(command => command.setName('continuar').setDescription('Continúa la reproducción'))
     .addSubcommand(command => command.setName('saltar').setDescription('Vota para saltar la canción'))
@@ -61,19 +62,18 @@ module.exports = {
         const voiceChannel = interaction.member?.voice?.channel;
         const permissionIssues = voiceChannel ? voicePermissionIssues(interaction.guild, voiceChannel) : [];
         const moduleEnabled = isModuleEnabledConfig(config, 'music');
-        await interaction.editReply('🔎 Probando cada fuente de música desde el alojamiento… (puede tardar un minuto)').catch(() => null);
-        const sourceRows = status.available ? await probeSources() : ['⚠️ sin motor de audio'];
+        await interaction.editReply('🔎 Probando de dónde puede sacar música el bot… (puede tardar un minuto)').catch(() => null);
+        const sourceRows = status.available ? await probeSources() : ['⚠️ el reproductor no está disponible'];
         const ffmpegTest = status.available ? await sources.ffmpegSelfTest() : null;
         const sourceState = providers.status();
         const anyWorking = sourceRows.some(row => row.startsWith('✅'));
         const rows = [
-          `**Módulo:** ${moduleEnabled ? '✅ activo' : '❌ desactivado'}`,
-          `**Motor de audio:** ${status.available ? '✅ integrado en el bot (yt-dlp + ffmpeg)' : '❌ no disponible'}`,
+          `**Música:** ${moduleEnabled ? '✅ activada' : '❌ desactivada'}`,
+          `**Reproductor:** ${status.available ? '✅ listo' : '❌ no disponible'}`,
           `**Fuentes de música** (en orden de uso):\n${sourceRows.map(row => `> ${row}`).join('\n')}`,
-          ...(sourceState.youtubeBlocked ? [`**YouTube:** en pausa hasta <t:${Math.floor(sourceState.youtubeBlockedUntil / 1000)}:t> por el bloqueo anti-bot; mientras tanto suenan las otras fuentes.`] : []),
-          ...(ffmpegTest && !ffmpegTest.mpegts ? ['**ffmpeg:** ⚠️ no puede leer MPEG-TS en este alojamiento; se usan formatos directos (MP3/WebM) y las emisiones HLS pueden fallar.'] : []),
-          `**Cookies de YouTube:** ${sourceState.cookies ? '✅ configuradas' : 'no configuradas'} · **Proxy:** ${sourceState.proxy ? '✅ configurado' : 'no'}`,
-          `**Canal de solicitudes:** ${config.music?.requestChannel ? `<#${config.music.requestChannel}>` : 'cualquier canal de texto'}`,
+          ...(sourceState.youtubeBlocked ? [`**YouTube:** no responde hasta <t:${Math.floor(sourceState.youtubeBlockedUntil / 1000)}:t>; mientras tanto suenan las otras fuentes.`] : []),
+          ...(ffmpegTest && !ffmpegTest.mpegts ? ['**Radios y directos:** ⚠️ algunos pueden no sonar; las canciones normales funcionan.'] : []),
+          `**Canal de pedidos:** ${config.music?.requestChannel ? `<#${config.music.requestChannel}>` : 'cualquier canal de texto'}`,
           `**Canal de voz configurado:** ${config.music?.preferredVoiceChannel ? `<#${config.music.preferredVoiceChannel}>` : 'cualquier canal de voz'}`,
           `**Tu canal de voz:** ${voiceChannel ? `🔊 ${voiceChannel.name}` : '❌ no estás en uno'}`,
           `**Permisos de Vesper:** ${!voiceChannel ? '⚠️ entra a un canal para comprobarlos' : permissionIssues.length ? `❌ faltan ${permissionIssues.join(', ')}` : '✅ Ver canal, Conectar y Hablar'}`,
@@ -138,7 +138,7 @@ module.exports = {
       if (subcommand === 'volumen') { const level = interaction.options.getInteger('nivel'); await music.setVolume(interaction.guildId, level); return interaction.reply(`🔊 Volumen ajustado a ${level}%.`); }
       if (subcommand === 'detener') { await music.stop(interaction.guildId); return interaction.reply('⏹️ Reproducción detenida y sesión cerrada.'); }
     } catch (error) {
-      const message = String(error.message || error).slice(0, 500);
+      const message = friendlyError(error, 'No pude hacer eso con la música. Inténtalo de nuevo en un momento.');
       if (interaction.deferred || interaction.replied) return interaction.editReply(`❌ ${message}`).catch(() => null);
       return interaction.reply({ content: `❌ ${message}`, flags: 64 }).catch(() => null);
     }

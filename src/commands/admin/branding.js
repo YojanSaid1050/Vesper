@@ -4,7 +4,7 @@ const { getGuildConfig } = require('../../database/mongoManager');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('branding')
-    .setDescription('Muestra la configuración actual del branding para webhooks')
+    .setDescription('Muestra el nombre y el logo con los que publica el bot')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -12,11 +12,11 @@ module.exports = {
     const branding = config.branding || {};
 
     const embed = new EmbedBuilder()
-      .setTitle('🎨 Branding para Webhooks')
-      .setDescription('Esta configuración solo afecta a los mensajes enviados por webhooks, NO al bot principal.')
+      .setTitle('🎨 Nombre y logo del bot')
+      .setDescription('Así firma el bot sus mensajes en este servidor. Su cuenta de Discord sigue igual.')
       .addFields(
-        { name: '📝 Nombre en webhooks', value: branding.name || 'Nombre del bot', inline: false },
-        { name: '🖼️ Avatar en webhooks', value: branding.avatar || 'Avatar del bot', inline: false }
+        { name: '📝 Nombre', value: branding.name || 'El de la cuenta del bot', inline: false },
+        { name: '🖼️ Logo', value: branding.avatar ? 'Imagen propia (se ve al lado)' : 'El de la cuenta del bot', inline: false }
       )
       .setColor('#ffffff')
       .setTimestamp();

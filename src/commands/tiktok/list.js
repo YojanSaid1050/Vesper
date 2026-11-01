@@ -4,7 +4,7 @@ const { getGuildConfig } = require('../../database/mongoManager');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('tiktok-list')
-    .setDescription('Muestra la lista de usuarios de TikTok monitoreados')
+    .setDescription('Muestra las cuentas de TikTok que sigue el bot')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -14,11 +14,11 @@ module.exports = {
     const { liveChannel, videoChannel } = config.tiktok || {};
 
     if (users.length === 0) {
-      return interaction.editReply({ content: '📋 No hay usuarios de TikTok configurados para monitorear.\n\nUsa `/tiktok-add` para agregar uno.' });
+      return interaction.editReply({ content: '📋 No hay usuarios de TikTok que siga el bot.\n\nUsa `/tiktok-add` para agregar uno.' });
     }
 
     const embed = new EmbedBuilder()
-      .setTitle('🎵 Usuarios de TikTok monitoreados')
+      .setTitle('🎵 Cuentas de TikTok que sigue el bot')
       .setColor(0x000000)
       .addFields(
         { name: '🎭 Usuarios vigilados', value: users.slice(0, 25).map(u => `• **${u}**`).join('\n') + (users.length > 25 ? `\n\n*... y ${users.length - 25} más*` : '') || 'Ninguno', inline: false },
