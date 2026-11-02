@@ -40,7 +40,7 @@ module.exports = {
       
     } catch (error) {
       console.error('Error en twitch-add:', error);
-      await interaction.editReply({ content: `❌ No pude comprobar ese canal. ${friendlyError(error, 'Inténtalo de nuevo en un momento.')}` });
+      await interaction.editReply({ content: `❌ No pude comprobar ese canal. ${friendlyError(error, 'Inténtalo de nuevo en un momento.', interaction)}` });
     }
   }
 };

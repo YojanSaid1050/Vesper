@@ -7,7 +7,7 @@ const Suggestion = require('../database/models/Suggestion');
 const WebAuditLog = require('../database/models/WebAuditLog');
 const { getGuildConfig, updateGuildSection, setGuildPlan, updateCommunitySection, addGuildListItem, removeGuildListItem } = require('../database/mongoManager');
 const { setupChecks } = require('../core/SetupService');
-const { isModuleEnabledConfig, guildTier, isAnyMainGuild, guildPlan, lockedFeatures, featureAvailable, identitySources, PREMIUM_FEATURES, MAIN_ONLY_FEATURES } = require('../config/guildPolicy');
+const { isModuleEnabledConfig, isTechnicalGuild, guildTier, isAnyMainGuild, guildPlan, lockedFeatures, featureAvailable, identitySources, PREMIUM_FEATURES, MAIN_ONLY_FEATURES } = require('../config/guildPolicy');
 const {
   createCase,
   getCase,
@@ -1012,7 +1012,10 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     const candidateStatus = Number(error.statusCode || error.status || 500);
     const status = Number.isInteger(candidateStatus) && candidateStatus >= 400 && candidateStatus <= 599 ? candidateStatus : 500;
     if (status >= 500) console.error('❌ Error en panel web:', error);
-    return res.status(status).json({ error: status >= 500 ? 'Ocurrió un error interno en el panel.' : error.message });
+    // En el servidor de pruebas el panel enseña también qué falló de verdad.
+    const guildId = String(req.originalUrl || '').match(/\/guilds\/(\d{5,25})/)?.[1];
+    const detail = isTechnicalGuild(guildId) ? require('../utils/userMessage').technicalDetail(error) : undefined;
+    return res.status(status).json({ error: status >= 500 ? 'Ocurrió un error interno en el panel.' : error.message, ...(detail ? { detail } : {}) });
   });
 }
 

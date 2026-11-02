@@ -38,7 +38,7 @@ module.exports = {
       
     } catch (error) {
       console.error('Error en tiktok-remove:', error);
-      await interaction.editReply({ content: `❌ No pude quitar esa cuenta. ${friendlyError(error)}` });
+      await interaction.editReply({ content: `❌ No pude quitar esa cuenta. ${friendlyError(error, interaction)}` });
     }
   }
 };

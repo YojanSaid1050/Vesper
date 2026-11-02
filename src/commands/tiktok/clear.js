@@ -58,7 +58,7 @@ module.exports = {
           console.error('Error en confirmación tiktok-clear:', error);
           // Si la confirmación ya se envió, `update` lanza
           // InteractionAlreadyReplied y el usuario no se entera de nada.
-          const aviso = { content: `❌ No pude borrar la lista. ${friendlyError(error)}`, embeds: [], components: [] };
+          const aviso = { content: `❌ No pude borrar la lista. ${friendlyError(error, interaction)}`, embeds: [], components: [] };
           if (i.replied || i.deferred) await i.followUp({ content: aviso.content, flags: 64 }).catch(() => null);
           else await i.update(aviso).catch(() => null);
         }
@@ -77,7 +77,7 @@ module.exports = {
 
     } catch (error) {
       console.error('Error en tiktok-clear:', error);
-      await interaction.reply({ content: `❌ ${friendlyError(error)}`, flags: 64 });
+      await interaction.reply({ content: `❌ ${friendlyError(error, interaction)}`, flags: 64 });
     }
   }
 };

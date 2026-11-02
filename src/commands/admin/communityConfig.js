@@ -197,7 +197,7 @@ module.exports = {
       const suggestion = await reviewSuggestion(interaction.guild, interaction.options.getString('mensaje').trim(), interaction.options.getString('estado'), interaction.user.id, interaction.options.getString('nota'));
       return interaction.reply({ content: `✅ Sugerencia de <@${suggestion.userId}> actualizada a **${suggestion.status}**.`, flags: 64, allowedMentions: { parse: [] } });
     } catch (error) {
-      return interaction.reply({ content: `❌ ${friendlyError(error)}`, flags: 64 });
+      return interaction.reply({ content: `❌ ${friendlyError(error, interaction)}`, flags: 64 });
     }
   }
 };

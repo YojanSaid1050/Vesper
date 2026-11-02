@@ -78,7 +78,7 @@ async function processModalAsync(interaction, client, callback) {
     } catch (error) {
       console.error('Error en procesamiento asíncrono:', error);
       await interaction.followUp({ 
-        content: `❌ ${friendlyError(error)}`, 
+        content: `❌ ${friendlyError(error, interaction)}`, 
         flags: 64 
       });
     }

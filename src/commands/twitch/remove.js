@@ -38,7 +38,7 @@ module.exports = {
       
     } catch (error) {
       console.error('Error en twitch-remove:', error);
-      await interaction.editReply({ content: `❌ No pude quitar ese canal. ${friendlyError(error)}` });
+      await interaction.editReply({ content: `❌ No pude quitar ese canal. ${friendlyError(error, interaction)}` });
     }
   }
 };

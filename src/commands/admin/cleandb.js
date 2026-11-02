@@ -59,9 +59,9 @@ module.exports = {
             }
 
             const resultEmbed = new EmbedBuilder()
-                .setTitle(failure ? '⚠️ Limpieza incompleta' : '✅ Base de datos limpiada')
+                .setTitle(failure ? '⚠️ No se borró todo' : '✅ Datos borrados')
                 .setDescription(failure
-                    ? `Se eliminaron **${deleted}** de **${guilds.length}** servidores antes de fallar.\n\nMotivo: ${friendlyError(failure)}`
+                    ? `Se eliminaron **${deleted}** de **${guilds.length}** servidores antes de fallar.\n\nMotivo: ${friendlyError(failure, interaction)}`
                     : `Se eliminaron **${deleted}** servidores.\n\nYa no queda ningún dato guardado.`)
                 .setColor(failure ? 0xFAA61A : 0x00FF00)
                 .setTimestamp();

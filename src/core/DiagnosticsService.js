@@ -6,7 +6,8 @@ const { getCacheStats: getTikTokStats } = require('../platforms/tiktok/checks');
 const { MODULE_DEFAULTS, MODULE_LABELS, isModuleEnabledConfig } = require('../config/guildPolicy');
 const mainGuild = require('../config/mainGuild');
 const { getAllProviderMetrics } = require('./ProviderMetrics');
-const { friendlyError } = require('../utils/userMessage');
+const { friendlyError, technicalDetail } = require('../utils/userMessage');
+const { isTechnicalGuild } = require('../config/guildPolicy');
 
 function mark(value) {
   return value ? '✅' : '❌';
@@ -36,30 +37,51 @@ async function diagnosticSnapshot(client) {
     tiktok: tiktok.provider || {},
     music,
     providerMetrics,
+    musicErrors: require('./music/providers').status().lastErrors,
     monitors
   };
 }
 
-async function buildDiagnosticsEmbed(client) {
+async function buildDiagnosticsEmbed(client, guildId = null) {
   const data = await diagnosticSnapshot(client);
   const monitorLines = data.monitors.length
     ? data.monitors.map(item => `${item.disabledUntil ? '🔴' : item.isActive ? '🟢' : '🟡'} ${item.name}: ${item.lastRunTime ? `<t:${Math.floor(new Date(item.lastRunTime).getTime() / 1000)}:R>` : 'todavía no ha revisado'}${item.disabledUntil ? ` · vuelve a probar <t:${Math.floor(new Date(item.disabledUntil).getTime() / 1000)}:R>` : ''}`).join('\n')
     : 'No hay revisiones automáticas activas.';
   const youtubeUse = Math.min(100, Math.round((data.providerMetrics.youtube.units / 10000) * 100));
   const tiktokReader = data.tiktok.browser?.ready ? 'listo' : data.tiktok.browser?.installed ? 'en espera' : 'modo sencillo';
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setTitle('Estado de Vesper')
     .setColor(data.discord.ready && data.mongo.connected ? 0x57F287 : 0xFEE75C)
     .addFields(
       { name: 'Discord', value: `${mark(data.discord.ready)} Conectado\nRespuesta: ${data.discord.ping} ms\nServidores: ${data.discord.guilds}`, inline: true },
       { name: 'Datos guardados', value: `${mark(data.mongo.connected)} ${data.mongo.connected ? 'Disponibles' : 'Sin conexión'}`, inline: true },
       { name: 'Avisos de redes', value: `${mark(data.twitch.configured)} Twitch\n${mark(data.youtube.configured)} YouTube · uso de hoy ${youtubeUse}%\n${mark(data.tiktok.provider === 'self_hosted' || data.tiktok.mode === 'integrated')} TikTok`, inline: true },
-      { name: 'TikTok', value: `Lector: ${tiktokReader}\nÚltima lectura correcta: ${data.tiktok.lastSuccess || 'todavía ninguna'}${data.tiktok.lastError ? `\nÚltimo problema: ${friendlyError(data.tiktok.lastError, 'TikTok no respondió.')}` : ''}`.slice(0, 1024) },
+      { name: 'TikTok', value: `Lector: ${tiktokReader}\nÚltima lectura correcta: ${data.tiktok.lastSuccess || 'todavía ninguna'}${data.tiktok.lastError ? `\nÚltimo problema: ${friendlyError(data.tiktok.lastError, 'TikTok no respondió.', guildId)}` : ''}`.slice(0, 1024) },
       { name: 'Música', value: `${mark(data.music.available)} Reproductor\nServidores escuchando: ${data.music.players || 0}\nSonando ahora: ${data.music.playing || 0}`, inline: true },
       { name: 'Revisiones automáticas', value: monitorLines.slice(0, 1024) }
     )
     .setTimestamp();
+  if (isTechnicalGuild(guildId)) embed.addFields(...technicalFields(data));
+  return embed;
 }
+
+// Lo que solo se enseña en el servidor de pruebas: números exactos, el error
+// tal cual de cada pieza y de dónde sale la música.
+function technicalFields(data) {
+  const memory = process.memoryUsage();
+  const sources = data.music.sources || {};
+  const sourceErrors = Object.entries(data.musicErrors || {})
+    .map(([provider, item]) => `${provider}: ${item.message} (<t:${Math.floor(item.at / 1000)}:R>)`).join('\n');
+  const field = (name, value) => ({ name, value: String(value || '—').slice(0, 600) });
+  return [
+    field('🔧 Sistema', `Node ${process.version} · ${process.platform}/${process.arch}\nEncendido: ${Math.round(process.uptime() / 60)} min · memoria ${Math.round(memory.rss / 1048576)} MB (heap ${Math.round(memory.heapUsed / 1048576)} MB)`),
+    field('🔧 Datos (MongoDB)', `Estado: ${data.mongo.connected ? 'conectado' : 'desconectado'} · ping ${data.mongo.latency ?? 'N/D'} ms${data.mongo.lastError ? `\nÚltimo error: ${data.mongo.lastError}` : ''}`),
+    field('🔧 Cuotas', `Twitch: ${data.providerMetrics.twitch.calls} llamadas${data.providerMetrics.twitch.remaining !== null ? ` · ${data.providerMetrics.twitch.remaining}/${data.providerMetrics.twitch.limit} restantes` : ''}\nYouTube: ${data.providerMetrics.youtube.units}/10000 unidades\nTikTok: ${data.tiktok.provider || data.tiktok.mode || 'N/D'}`),
+    field('🔧 TikTok', `Navegador: ${data.tiktok.browser?.ready ? 'listo' : data.tiktok.browser?.installed ? 'instalado' : 'no detectado'}\nÚltimo error: ${data.tiktok.lastError ? technicalDetail(data.tiktok.lastError) : 'ninguno'}`),
+    field('🔧 Música', `yt-dlp: ${data.music.ytdlp ? 'sí' : 'no'} · ffmpeg: ${data.music.ffmpeg ? 'sí' : 'no'}\nOrden: ${(sources.order || []).join(' → ') || 'N/D'}${sources.youtubeBlocked ? ` · YouTube bloqueado hasta <t:${Math.floor(sources.youtubeBlockedUntil / 1000)}:t>` : ''}\nCookies: ${sources.cookies ? 'sí' : 'no'} · proxy: ${sources.proxy ? 'sí' : 'no'}\nÚltimo error: ${data.music.lastError || 'ninguno'}${sourceErrors ? `\n${sourceErrors}` : ''}`)
+  ];
+}
+
 
 async function auditGuild(guild) {
   const config = await getGuildConfig(guild.id);

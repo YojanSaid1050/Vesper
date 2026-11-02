@@ -146,7 +146,7 @@ module.exports = {
         } catch (error) {
           console.error('Error resetting config:', error);
           await i.editReply({ 
-            content: `❌ No pude restablecer la configuración. ${friendlyError(error)}`,
+            content: `❌ No pude restablecer la configuración. ${friendlyError(error, interaction)}`,
             components: [],
             embeds: []
           });

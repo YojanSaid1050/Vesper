@@ -17,7 +17,7 @@ module.exports = {
     } catch (error) {
       const motivo = /Missing Permissions|50013/.test(String(error?.message))
         ? 'Me falta el permiso «Gestionar mensajes» en este canal.'
-        : `Discord no permitió borrar los mensajes. ${friendlyError(error, '')}`.trim();
+        : `Discord no permitió borrar los mensajes. ${friendlyError(error, '', interaction)}`.trim();
       return interaction.editReply({ content: `❌ ${motivo}` });
     }
 

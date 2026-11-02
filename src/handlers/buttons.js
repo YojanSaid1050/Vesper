@@ -102,10 +102,10 @@ async function handleButton(interaction, client) {
   if (customId.startsWith('main_')) {
     if (!await requireCapability(interaction, CAPABILITIES.MAIN_ADMIN)) return;
     if (customId === 'main_refresh') return safeUpdate(await controlCenterPayload(interaction.guild));
-    if (customId === 'main_diagnostics') return interaction.reply({ embeds: [await buildDiagnosticsEmbed(client)], flags: 64 });
+    if (customId === 'main_diagnostics') return interaction.reply({ embeds: [await buildDiagnosticsEmbed(client, interaction.guildId)], flags: 64 });
     if (customId === 'main_audit') return interaction.reply({ embeds: [await buildAuditEmbed(interaction.guild)], flags: 64 });
     if (customId === 'main_modules') return interaction.reply({ ...(await modulesPayload(interaction.guild.id)), flags: 64 });
-    if (customId === 'main_history') return interaction.reply({ ...(await historyPayload()), flags: 64 });
+    if (customId === 'main_history') return interaction.reply({ ...(await historyPayload(null, interaction.guildId)), flags: 64 });
   }
 
   if (!await requireAdministrator(interaction)) return;

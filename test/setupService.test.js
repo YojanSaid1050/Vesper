@@ -48,3 +48,21 @@ test('los errores técnicos nunca llegan tal cual a Discord', () => {
   assert.equal(friendlyError(new Error('E11000 duplicate key error collection: vesper.tickets')), 'Algo falló. Inténtalo de nuevo en un momento.');
   assert.equal(friendlyError(new Error('No se pudo conectar con https://api.audius.co.')), 'Algo falló. Inténtalo de nuevo en un momento.');
 });
+
+test('en Embers Void los errores enseñan también el detalle técnico', () => {
+  const { friendlyError } = require('../src/utils/userMessage');
+  const previous = process.env.MAIN_GUILD_ID;
+  process.env.MAIN_GUILD_ID = '111111111111111111';
+  try {
+    const error = Object.assign(new Error('Request failed with status code 400'), { code: 'ERR_BAD_REQUEST' });
+    const enPruebas = friendlyError(error, { guildId: '111111111111111111' });
+    assert.match(enPruebas, /^Algo falló\. Inténtalo de nuevo en un momento\.\n-# 🔧 Request failed with status code 400 · código ERR_BAD_REQUEST/);
+    // En cualquier otro servidor, solo la frase clara.
+    assert.equal(friendlyError(error, { guildId: '222222222222222222' }), 'Algo falló. Inténtalo de nuevo en un momento.');
+    // Las causas de cada fuente de música también se ven.
+    const music = Object.assign(new Error('No encontré esa canción en ninguna fuente.'), { causes: [{ provider: 'soundcloud', error: new Error('DRM protected') }] });
+    assert.match(friendlyError(music, 'x', '111111111111111111'), /soundcloud: DRM protected/);
+  } finally {
+    if (previous === undefined) delete process.env.MAIN_GUILD_ID; else process.env.MAIN_GUILD_ID = previous;
+  }
+});

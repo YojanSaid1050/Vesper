@@ -144,7 +144,8 @@ async function api(path, options = {}) {
   const payload = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     if (response.status === 401) showLogin();
-    throw new Error(payload?.error || `El servidor respondió ${response.status}.`);
+    // El servidor de pruebas recibe además el detalle técnico del fallo.
+    throw new Error([payload?.error || 'No se pudo completar. Inténtalo de nuevo.', payload?.detail ? `Detalle técnico: ${payload.detail}` : ''].filter(Boolean).join(' · '));
   }
   return payload;
 }
@@ -4271,6 +4272,8 @@ function renderResumen() {
     eyebrow: 'Detalle',
     title: 'Todo lo guardado',
     description: 'Cada ajuste con su valor, ya traducido a nombres de canales y roles.',
+    // Solo en el servidor de pruebas: la configuración guardada tal cual.
+    actions: data.guild.tier === 'primary_main' ? '<button class="button quiet sm" type="button" id="copy-config">Copiar configuración técnica</button>' : '',
     body: `
       <details class="more-options">
         <summary>Ver todos los ajustes</summary>
@@ -4865,6 +4868,14 @@ function bindModulos(root) {
 
 function bindResumen(root) {
   root.querySelectorAll('[data-meter]').forEach(bar => bar.style.setProperty('--meter', `${bar.dataset.meter}%`));
+  root.querySelector('#copy-config')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(state.data.config, null, 2));
+      toast('Configuración copiada.', 'ok');
+    } catch {
+      toast('El navegador no dejó copiar. Prueba de nuevo.', 'bad');
+    }
+  });
 }
 
 /* ---------------------------------------------------------------- */

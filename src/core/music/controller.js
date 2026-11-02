@@ -216,8 +216,9 @@ async function handleMusicRequest(message, client) {
   const query = String(message.content || '').trim();
   if (!query) return false;
 
-  // El canal queda limpio: la petición se ve en el controlador.
-  setTimeout(() => message.delete().catch(() => null), 1_500).unref?.();
+  // Se nota al momento que el bot la recibió; el mensaje se borra en cuanto
+  // la canción entra en la cola, para que el canal quede limpio.
+  message.react?.('🔎')?.catch?.(() => null);
   const request = {
     guildId: message.guild.id,
     guild: message.guild,
@@ -226,13 +227,13 @@ async function handleMusicRequest(message, client) {
     user: message.author
   };
   try {
-    await message.channel.sendTyping?.().catch(() => null);
-    const result = await client.music.enqueue(request, query.slice(0, 300));
+    message.channel.sendTyping?.().catch(() => null);
+    const result = await client.music.enqueue(request, query.slice(0, 300)).finally(() => message.delete().catch(() => null));
     if (result.position > 0) {
       await temporary(message.channel, `➕ ${message.author}, añadí **${linkText(result.item.title)}** en la posición ${result.position}.`, 6_000);
     }
   } catch (error) {
-    await temporary(message.channel, `❌ ${message.author}, ${friendlyError(error, 'no pude poner esa canción. Prueba con otra.')}`);
+    await temporary(message.channel, `❌ ${message.author}, ${friendlyError(error, 'no pude poner esa canción. Prueba con otra.', message)}`);
   }
   return true;
 }
@@ -319,7 +320,7 @@ async function handleMusicButton(interaction, client) {
       await music.setVolume(guildId, Math.max(1, Math.min(100, player.volume + delta)));
     }
   } catch (error) {
-    await ephemeral(interaction, `❌ ${friendlyError(error)}`);
+    await ephemeral(interaction, `❌ ${friendlyError(error, interaction)}`);
   }
   refreshController(client, guildId, 300);
   return true;

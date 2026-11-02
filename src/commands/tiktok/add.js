@@ -57,7 +57,7 @@ module.exports = {
             
         } catch (error) {
             console.error('Error en tiktok-add:', error);
-            await interaction.editReply({ content: `❌ No pude comprobar esa cuenta. ${friendlyError(error, 'Inténtalo de nuevo en un momento.')}` });
+            await interaction.editReply({ content: `❌ No pude comprobar esa cuenta. ${friendlyError(error, 'Inténtalo de nuevo en un momento.', interaction)}` });
         }
     }
 };

@@ -53,7 +53,7 @@ module.exports = {
       
     } catch (error) {
       console.error('Error en config-dashboard:', error);
-      await interaction.editReply({ content: `❌ ${friendlyError(error)}` });
+      await interaction.editReply({ content: `❌ ${friendlyError(error, interaction)}` });
     }
   }
 };

@@ -1,5 +1,30 @@
 # Changelog
 
+## 3.9.5 — Música más rápida y Embers Void en modo técnico
+
+### Música
+- **Las canciones aparecen en unos 3-4 s en vez de 7.** SoundCloud abre a la
+  vez los cinco primeros resultados y suena el primero que se pueda
+  reproducir; antes se abrían uno tras otro y las primeras, casi siempre
+  protegidas o muestras de 30 s, hacían esperar.
+- SoundCloud y Audius se consultan a la vez; YouTube sigue de último.
+- El bot entra al canal de voz mientras busca, en vez de esperar a entrar.
+- Lo pedido en la última media hora sale al instante.
+- La siguiente canción se deja lista 30 s antes de que acabe la actual: no
+  hay silencio entre canciones.
+- `/musica reproducir` responde al momento y, en el canal del controlador, la
+  petición recibe 🔎 en cuanto se lee y se borra al entrar en la cola.
+
+### Embers Void, servidor de pruebas
+- Los errores salen con la frase clara y, debajo, el detalle técnico: el
+  error original, su código, la causa y dónde pasó.
+- El diagnóstico del centro de control añade sistema, datos, cuotas, TikTok
+  y música con sus números y su último error. `/musica diagnostico` añade
+  herramientas, cookies, proxy y orden de fuentes.
+- En el panel web, los fallos traen su detalle técnico y vuelve «Copiar
+  configuración técnica». `TECHNICAL_GUILD_IDS` añade otros servidores.
+- En los demás servidores todo sigue en lenguaje sencillo.
+
 ## 3.9.4 — Todo en el idioma de quien lo usa
 
 Nada de lo que ve la gente, en el panel o en Discord, habla ya de código.

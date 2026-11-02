@@ -141,6 +141,14 @@ function getThemedMainGuildIds() {
   return csvSet(process.env.THEMED_MAIN_GUILD_IDS);
 }
 
+// Servidores donde los errores y diagnósticos enseñan el detalle técnico.
+// Por defecto, Embers Void: es el servidor de pruebas. TECHNICAL_GUILD_IDS
+// añade otros (por ejemplo, un servidor de desarrollo).
+function isTechnicalGuild(guildId) {
+  if (!guildId) return false;
+  return isMainGuild(guildId) || csvSet(process.env.TECHNICAL_GUILD_IDS).has(String(guildId));
+}
+
 function isThemedMainGuild(guildId) {
   return Boolean(guildId && getThemedMainGuildIds().has(String(guildId)) && !isMainGuild(guildId));
 }
@@ -205,6 +213,7 @@ module.exports = {
   isMainGuild,
   isThemedMainGuild,
   isAnyMainGuild,
+  isTechnicalGuild,
   PLAN_FEATURES,
   PREMIUM_FEATURES,
   MAIN_ONLY_FEATURES,

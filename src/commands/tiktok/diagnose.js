@@ -51,7 +51,7 @@ module.exports = {
       lines.push(`🧭 Lector de videos: ${stats.provider.browser.ready ? 'listo' : stats.provider.browser.installed ? 'se activa al buscar videos' : 'modo sencillo'}.`);
       await interaction.editReply({ content: lines.join('\n') });
     } catch (error) {
-      lines.push(`❌ No pude comprobar la cuenta. ${friendlyError(error)}`);
+      lines.push(`❌ No pude comprobar la cuenta. ${friendlyError(error, interaction)}`);
       await interaction.editReply({ content: lines.join('\n') });
     }
   }

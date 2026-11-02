@@ -58,7 +58,10 @@ class ErrorHandler {
   }
 
   static async handleInteraction(interaction, error) {
-    const message = this.handle(error, 'Interaction');
+    let message = this.handle(error, 'Interaction');
+    // En el servidor de pruebas se ve además qué falló exactamente.
+    const { isTechnicalGuild } = require('../config/guildPolicy');
+    if (isTechnicalGuild(interaction?.guildId)) message += `\n-# 🔧 ${require('../utils/userMessage').technicalDetail(error)}`;
     const EPHEMERAL = 64; // MessageFlags.Ephemeral; `ephemeral: true` está obsoleto.
 
     try {

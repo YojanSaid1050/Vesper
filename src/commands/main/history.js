@@ -20,7 +20,7 @@ module.exports = {
     if (guildId) filter.guildId = guildId.trim();
     if (platform) filter.platform = platform;
     const rows = await recentNotifications(filter, 15);
-    const lines = rows.map(notificationLine);
+    const lines = rows.map(row => notificationLine(row, interaction.guildId));
     await interaction.reply({ content: lines.join('\n\n').slice(0, 1900) || 'No hay avisos para ese filtro.', flags: 64 });
   }
 };

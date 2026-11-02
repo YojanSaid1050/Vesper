@@ -39,17 +39,17 @@ async function modulesPayload(guildId) {
 
 // Un aviso del historial contado con palabras: plataforma, cuenta, qué fue y
 // cuándo, y si falló, por qué.
-function notificationLine(row) {
+function notificationLine(row, viewerGuildId = null) {
   const icon = row.status === 'sent' || row.status === 'ended' ? '✅' : row.status === 'failed' ? '❌' : '⏳';
   const when = `<t:${Math.floor(new Date(row.createdAt).getTime() / 1000)}:R>`;
-  const failure = row.error ? `\n${friendlyError(row.error, 'No se pudo publicar.')}` : '';
+  const failure = row.error ? `\n${friendlyError(row.error, 'No se pudo publicar.', viewerGuildId)}` : '';
   return `${icon} **${PLATFORM_NAMES[row.platform] || row.platform}** · ${row.account}\n${EVENT_NAMES[row.eventType] || 'Aviso'} · ${when}${failure}`;
 }
 
-async function historyPayload(guildId = null) {
+async function historyPayload(guildId = null, viewerGuildId = null) {
   const rows = await recentNotifications(guildId ? { guildId } : {}, 10);
   const description = rows.length
-    ? rows.map(notificationLine).join('\n\n')
+    ? rows.map(row => notificationLine(row, viewerGuildId)).join('\n\n')
     : 'Todavía no hay notificaciones registradas.';
   return { embeds: [new EmbedBuilder().setTitle('Historial reciente').setDescription(description.slice(0, 4000)).setColor(0x5865F2)] };
 }

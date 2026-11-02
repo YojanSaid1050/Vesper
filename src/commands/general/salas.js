@@ -20,7 +20,7 @@ module.exports = {
       const result = await publishInterface(client, interaction.guildId, channel.id);
       return interaction.editReply(`✅ Interfaz de salas publicada en <#${result.channelId}>. Los botones actúan sobre la sala en la que esté cada persona.`);
     } catch (error) {
-      return interaction.editReply(`❌ ${friendlyError(error)}`);
+      return interaction.editReply(`❌ ${friendlyError(error, interaction)}`);
     }
   }
 };

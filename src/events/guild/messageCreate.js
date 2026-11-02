@@ -28,7 +28,7 @@ module.exports = {
     try {
       await sender(message.member, message.channel, config);
     } catch (error) {
-      await message.reply(`❌ No pude enviar la prueba. ${friendlyError(error)}`).catch(() => null);
+      await message.reply(`❌ No pude enviar la prueba. ${friendlyError(error, message)}`).catch(() => null);
       return;
     }
     setTimeout(() => message.delete().catch(() => {}), 2000);
