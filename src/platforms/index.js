@@ -46,19 +46,19 @@ function startAllMonitors(client) {
     // ==================================================
     if (process.env.YOUTUBE_API_KEY) {
         monitors.push(new MonitorService({
-            name: 'YouTube Lives',
+            name: 'Directos de YouTube',
             interval: INTERVALS.YOUTUBE_LIVE,
             maxConsecutiveErrors: 5,
             executeFunction: youtubeMonitors.monitorLives
         }));
         monitors.push(new MonitorService({
-            name: 'YouTube Videos',
+            name: 'Videos de YouTube',
             interval: INTERVALS.YOUTUBE_VIDEO,
             maxConsecutiveErrors: 5,
             executeFunction: youtubeMonitors.monitorVideos
         }));
         monitors.push(new MonitorService({
-            name: 'YouTube Shorts',
+            name: 'Shorts de YouTube',
             interval: INTERVALS.YOUTUBE_SHORTS,
             maxConsecutiveErrors: 5,
             executeFunction: youtubeMonitors.monitorShorts
@@ -72,7 +72,7 @@ function startAllMonitors(client) {
     // ==================================================
     if (process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET) {
         monitors.push(new MonitorService({
-            name: 'Twitch Streams',
+            name: 'Directos de Twitch',
             interval: INTERVALS.TWITCH_STREAM,
             maxConsecutiveErrors: 5,
             executeFunction: twitchMonitors.monitorStreams
@@ -86,13 +86,13 @@ function startAllMonitors(client) {
     // ==================================================
     if (String(process.env.TIKTOK_ENABLED || 'true').toLowerCase() !== 'false') {
         monitors.push(new MonitorService({
-            name: 'TikTok Lives',
+            name: 'Directos de TikTok',
             interval: INTERVALS.TIKTOK_LIVE,
             maxConsecutiveErrors: 3,
             executeFunction: tiktokMonitors.monitorLives
         }));
         monitors.push(new MonitorService({
-            name: 'TikTok Videos',
+            name: 'Videos de TikTok',
             interval: INTERVALS.TIKTOK_VIDEO,
             maxConsecutiveErrors: 3,
             executeFunction: tiktokMonitors.monitorVideos

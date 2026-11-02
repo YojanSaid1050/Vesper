@@ -32,6 +32,7 @@ const { getGuildConfig } = require('../database/mongoManager');
 const { isModuleEnabledConfig, featureAvailable } = require('../config/guildPolicy');
 const sources = require('./music/sources');
 const providers = require('./music/providers');
+const { friendlyError } = require('../utils/userMessage');
 
 const DEFAULTS = Object.freeze({
   volume: 50,
@@ -52,6 +53,7 @@ function sessionDefaults(config = {}) {
     loop: false,
     skipVotes: new Set(),
     idleTimer: null,
+    prefetchTimer: null,
     startedAt: 0,
     pausedAt: 0,
     elapsedBeforeSeek: 0,
@@ -82,6 +84,9 @@ function formatDuration(seconds) {
 
 // Cada pista lleva también un `info` con la forma antigua, para que los
 // comandos y las pruebas que ya existían sigan funcionando sin tocarlos.
+// Cuántos segundos antes del final se deja lista la siguiente canción.
+const PREFETCH_LEAD_SECONDS = 30;
+
 function withLegacyShape(track) {
   return {
     ...track,
@@ -251,6 +256,10 @@ class MusicService {
   async enqueue(interaction, query) {
     const { config, voiceChannel } = await this.ensureAllowed(interaction);
     const hadPlayer = this.players.has(interaction.guildId);
+    // La búsqueda arranca ya, mientras el bot entra al canal de voz: así la
+    // espera es la más larga de las dos y no la suma.
+    const searching = this.loadTrack(query);
+    searching.catch(() => null);
     const player = await this.join(interaction.guild, voiceChannel, interaction.channelId, config.music || {});
     try {
       const maxQueue = Number(player.settings.maxQueue || DEFAULTS.maxQueue);
@@ -259,7 +268,7 @@ class MusicService {
       const pending = player.queue.filter(item => item.requesterId === interaction.user.id).length;
       if (pending >= maxPerUser) throw new Error(`Cada usuario puede tener máximo ${maxPerUser} canciones pendientes`);
 
-      const track = await this.loadTrack(query);
+      const track = await searching;
       if (!track) throw new Error('No encontré una canción para esa búsqueda');
       const info = track.info || {};
       if (info.isStream && player.settings.allowLive === false) throw new Error('Los directos están desactivados en el reproductor');
@@ -278,10 +287,11 @@ class MusicService {
       if (!player.current) {
         await this.advance(interaction.guildId);
         if (player.current !== item && !player.queue.includes(item)) {
-          throw new Error(this.lastError || 'No pude iniciar esa canción. Revisa /musica diagnostico e inténtalo otra vez.');
+          throw new Error(this.lastError || 'No pude iniciar esa canción. Prueba con otra o inténtalo otra vez.');
         }
       } else {
         this.changed(interaction.guildId);
+        this.schedulePrefetch(interaction.guildId);
       }
       return { item, position: player.current === item ? 0 : player.queue.indexOf(item) + 1 };
     } catch (error) {
@@ -336,7 +346,7 @@ class MusicService {
       if (now) now.quietStart = false;
     } catch (error) {
       this.lastError = error.message;
-      this.announce(player, `⚠️ No pude reproducir **${player.current?.title || 'esa canción'}**: ${error.message}`);
+      this.announce(player, `⚠️ No pude reproducir **${player.current?.title || 'esa canción'}**. ${friendlyError(error, 'Paso a la siguiente.', guildId)}`);
       player.loop = false;
       await this.advance(guildId);
     }
@@ -392,6 +402,7 @@ class MusicService {
     player.pausedAt = 0;
     player.elapsedBeforeSeek = seekSeconds;
     session.audio.play(resource);
+    this.schedulePrefetch(guildId);
     handle.process.once('close', code => {
       if (code && this.players.get(guildId)?.current === player.current) {
         const message = sources.friendlyFfmpegError(handle.errorText());
@@ -399,6 +410,32 @@ class MusicService {
         this.announce(player, `⚠️ El audio se interrumpió: ${message}`);
       }
     });
+  }
+
+  // Deja lista la siguiente canción poco antes de que acabe la actual: la
+  // dirección del audio caduca a los pocos minutos, y renovarla justo al
+  // cambiar dejaba unos segundos de silencio entre canción y canción.
+  schedulePrefetch(guildId) {
+    const player = this.players.get(guildId);
+    if (!player) return;
+    if (player.prefetchTimer) clearTimeout(player.prefetchTimer);
+    player.prefetchTimer = null;
+    const next = player.queue[0];
+    if (!next || !player.current || player.current.live) return;
+    const remaining = Math.max(0, Number(player.current.duration || 0) - this.elapsed(player));
+    player.prefetchTimer = setTimeout(() => this.prefetch(guildId).catch(() => null), Math.max(0, remaining - PREFETCH_LEAD_SECONDS) * 1000);
+    player.prefetchTimer.unref?.();
+  }
+
+  async prefetch(guildId) {
+    const next = this.players.get(guildId)?.queue?.[0];
+    if (!next || next.prefetching) return;
+    next.prefetching = true;
+    try {
+      await providers.resolveStream(next, { attempt: 0 });
+    } finally {
+      next.prefetching = false;
+    }
   }
 
   // Segundos reproducidos de la canción actual.
@@ -527,6 +564,7 @@ class MusicService {
     this.players.delete(guildId);
     this.connections.delete(guildId);
     if (player?.idleTimer) clearTimeout(player.idleTimer);
+    if (player?.prefetchTimer) clearTimeout(player.prefetchTimer);
     if (player) player.idleTimer = null;
     player?.process?.kill?.('SIGKILL');
     if (session) {

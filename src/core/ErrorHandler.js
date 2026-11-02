@@ -12,17 +12,17 @@ class ErrorHandler {
       case 'RATE_LIMIT':
         return '⏰ Demasiadas solicitudes. Por favor, espera un momento.';
       case 'API_KEY':
-        return '🔑 Error de API. Contacta al administrador.';
+        return '🔑 Ese servicio no respondió. Avisa al propietario del bot.';
       case 'NOT_FOUND':
-        return '🔍 No se encontró el recurso solicitado.';
+        return '🔍 No encontré lo que buscabas.';
       case 'PERMISSION':
         return '🔒 No tengo permisos para hacer eso.';
       case 'NETWORK':
-        return '🌐 Error de red. Intenta nuevamente.';
+        return '🌐 No hubo conexión. Inténtalo de nuevo.';
       case 'TIMEOUT':
-        return '⏱️ La solicitud expiró. Intenta nuevamente.';
+        return '⏱️ Tardó demasiado. Inténtalo de nuevo.';
       case 'DATABASE':
-        return '💾 Error de base de datos. Contacta al administrador.';
+        return '💾 No pude guardar los datos. Inténtalo de nuevo en un momento.';
       default:
         return '❌ Ocurrió un error inesperado.';
     }
@@ -58,7 +58,10 @@ class ErrorHandler {
   }
 
   static async handleInteraction(interaction, error) {
-    const message = this.handle(error, 'Interaction');
+    let message = this.handle(error, 'Interaction');
+    // En el servidor de pruebas se ve además qué falló exactamente.
+    const { isTechnicalGuild } = require('../config/guildPolicy');
+    if (isTechnicalGuild(interaction?.guildId)) message += `\n-# 🔧 ${require('../utils/userMessage').technicalDetail(error)}`;
     const EPHEMERAL = 64; // MessageFlags.Ephemeral; `ephemeral: true` está obsoleto.
 
     try {

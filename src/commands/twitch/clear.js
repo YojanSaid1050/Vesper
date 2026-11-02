@@ -3,11 +3,12 @@ const { getGuildConfig, updateGuildSection } = require('../../database/mongoMana
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 const { CAPABILITIES, requireCapability } = require('../../core/PermissionService');
 const { clearGuildCache } = require('../../platforms/twitch/monitors');
+const { friendlyError } = require('../../utils/userMessage');
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('twitch-clear')
-    .setDescription('Elimina TODOS los streamers de Twitch del monitoreo')
+    .setDescription('Deja de seguir TODOS los canales de Twitch')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -17,12 +18,12 @@ module.exports = {
       const currentCount = currentUsers.length;
 
       if (currentCount === 0) {
-        return interaction.reply({ content: '📋 No hay streamers de Twitch configurados para eliminar.', flags: 64 });
+        return interaction.reply({ content: '📋 No hay canales de Twitch configurados para eliminar.', flags: 64 });
       }
 
       const confirmEmbed = new EmbedBuilder()
         .setTitle('⚠️ Confirmar eliminación')
-        .setDescription(`Estás a punto de eliminar **${currentCount}** streamers de la lista de monitoreo.\n\n${currentUsers.slice(0, 20).map(u => `• ${u}`).join('\n')}${currentCount > 20 ? `\n\n*... y ${currentCount - 20} más*` : ''}\n\nEsta acción no se puede deshacer.`)
+        .setDescription(`Estás a punto de eliminar **${currentCount}** canales de las cuentas que sigue el bot.\n\n${currentUsers.slice(0, 20).map(u => `• ${u}`).join('\n')}${currentCount > 20 ? `\n\n*... y ${currentCount - 20} más*` : ''}\n\nEsta acción no se puede deshacer.`)
         .setColor(0x9146FF);
 
       await interaction.reply({
@@ -45,7 +46,7 @@ module.exports = {
           if (i.customId === 'twitch_clear_confirm') {
             await updateGuildSection(interaction.guildId, 'twitch', { users: [] });
             await clearGuildCache(interaction.guildId);
-            await i.update({ content: `✅ Se eliminaron **${currentCount}** streamers del monitoreo de Twitch.`, embeds: [], components: [] });
+            await i.update({ content: `✅ Se eliminaron **${currentCount}** canales de las que seguía el bot en Twitch.`, embeds: [], components: [] });
             
             // Refrescar dashboard automáticamente
             const activePanel = await getActivePanel(interaction.guildId);
@@ -57,7 +58,7 @@ module.exports = {
           console.error('Error en confirmación twitch-clear:', error);
           // Si la confirmación ya se envió, `update` lanza
           // InteractionAlreadyReplied y el usuario no se entera de nada.
-          const aviso = { content: `❌ Error al eliminar: ${error.message}`, embeds: [], components: [] };
+          const aviso = { content: `❌ No pude borrar la lista. ${friendlyError(error, interaction)}`, embeds: [], components: [] };
           if (i.replied || i.deferred) await i.followUp({ content: aviso.content, flags: 64 }).catch(() => null);
           else await i.update(aviso).catch(() => null);
         }
@@ -76,7 +77,7 @@ module.exports = {
 
     } catch (error) {
       console.error('Error en twitch-clear:', error);
-      await interaction.reply({ content: `❌ Error al procesar la solicitud: ${error.message}`, flags: 64 });
+      await interaction.reply({ content: `❌ ${friendlyError(error, interaction)}`, flags: 64 });
     }
   }
 };

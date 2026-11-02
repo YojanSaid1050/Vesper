@@ -8,8 +8,8 @@ const { isValidImageUrl } = require('../../utils/imageUrlValidator');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('setbotavatar')
-    .setDescription('Configura el avatar usado en los webhooks (no afecta al avatar del bot)')
-    .addStringOption(opt => opt.setName('url').setDescription('URL de la imagen').setRequired(true))
+    .setDescription('Cambia el logo con el que publica el bot en este servidor')
+    .addStringOption(opt => opt.setName('url').setDescription('Enlace de la imagen').setRequired(true))
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -25,7 +25,7 @@ module.exports = {
     
     if (!isValid) {
       return interaction.editReply({ 
-        content: '❌ URL inválida. Asegúrate de que la URL apunte a una imagen válida (jpg, jpeg, png, gif, webp).' 
+        content: '❌ Ese enlace no lleva a una imagen. Copia el enlace de una imagen (JPG, PNG, GIF o WEBP) que se pueda abrir sin iniciar sesión.' 
       });
     }
 
@@ -36,8 +36,8 @@ module.exports = {
     clearWebhookCache(interaction.guild.id);
     
     const embed = new EmbedBuilder()
-      .setTitle('✅ Avatar actualizado')
-      .setDescription('La nueva imagen se usará en los webhooks.\n\n> ⚠️ **Nota:** Esto NO cambia el avatar del bot principal.')
+      .setTitle('✅ Logo actualizado')
+      .setDescription('Desde ahora el bot firma sus mensajes con esta imagen en este servidor.\n\n> Su cuenta de Discord sigue igual.')
       .setImage(url)
       .setColor('#57F287')
       .setTimestamp();

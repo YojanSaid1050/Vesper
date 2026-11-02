@@ -144,7 +144,8 @@ async function api(path, options = {}) {
   const payload = response.status === 204 ? null : await response.json().catch(() => null);
   if (!response.ok) {
     if (response.status === 401) showLogin();
-    throw new Error(payload?.error || `El servidor respondió ${response.status}.`);
+    // El servidor de pruebas recibe además el detalle técnico del fallo.
+    throw new Error([payload?.error || 'No se pudo completar. Inténtalo de nuevo.', payload?.detail ? `Detalle técnico: ${payload.detail}` : ''].filter(Boolean).join(' · '));
   }
   return payload;
 }
@@ -392,7 +393,7 @@ function musicSourcesCallout(sources) {
   const order = (sources.order || []).map(key => SOURCE_NAMES[key] || key).join(' → ');
   const extras = [sources.cookies ? 'cookies de YouTube' : null, sources.proxy ? 'proxy' : null].filter(Boolean);
   const blocked = sources.youtubeBlocked
-    ? ` YouTube está bloqueando al alojamiento: hasta las ${new Date(sources.youtubeBlockedUntil).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false })} las canciones salen de la siguiente fuente.`
+    ? ` YouTube no responde ahora mismo: hasta las ${new Date(sources.youtubeBlockedUntil).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: false })} las canciones salen de la siguiente fuente.`
     : '';
   return `
     <div class="callout ${sources.youtubeBlocked ? 'warn' : 'info'}">
@@ -452,8 +453,7 @@ const VARIABLES = [
   ['{username}', 'su nombre de usuario'],
   ['{displayName}', 'su apodo en el servidor'],
   ['{server}', 'nombre del servidor'],
-  ['{memberCount}', 'total de miembros'],
-  ['{userId}', 'su ID']
+  ['{memberCount}', 'total de miembros']
 ];
 
 const TIER_LABELS = {
@@ -470,9 +470,37 @@ const AUDIT_LABELS = {
   'config.update': 'Cambió la configuración',
   'config.messageTheme': 'Aplicó un paquete de mensajes',
   'fixedPanel.publish': 'Publicó un panel con botones',
-  'fixedPanel.remove': 'Quitó un panel con botones'
+  'fixedPanel.remove': 'Quitó un panel con botones',
+  'plan.update': 'Cambió el plan',
+  'customEmbed.send': 'Envió una publicación',
+  'social.add': 'Añadió una cuenta que avisar',
+  'social.remove': 'Quitó una cuenta que avisar',
+  'suggestion.approved': 'Aprobó una sugerencia',
+  'suggestion.rejected': 'Rechazó una sugerencia',
+  'suggestion.open': 'Reabrió una sugerencia',
+  'case.note': 'Añadió una nota a un caso'
 };
+function auditLabel(action) {
+  if (AUDIT_LABELS[action]) return AUDIT_LABELS[action];
+  if (/^community\..+\.publish$/.test(action)) return 'Publicó un panel de comunidad';
+  if (action.startsWith('case.')) return 'Actualizó un caso de moderación';
+  return 'Cambió un ajuste';
+}
 const AUDIT_TARGETS = { 'music-controller': 'Controlador de música', 'tempvoice-interface': 'Interfaz de salas' };
+// Qué parte se tocó, en palabras del panel y no con el nombre interno del ajuste.
+const AUDIT_AREAS = {
+  general: 'Canales', profile: 'Apariencia', branding: 'Nombre y logo', embeds: 'Mensajes', alerts: 'Registros',
+  features: 'Funciones', moderation: 'Moderación', music: 'Música', tempVoice: 'Salas temporales', community: 'Comunidad',
+  tiktok: 'TikTok', twitch: 'Twitch', youtube: 'YouTube', deals: 'Juegos gratis', permissions: 'Permisos', dashboard: 'Panel'
+};
+const SOCIAL_NAMES = { tiktok: 'TikTok', twitch: 'Twitch', youtube: 'YouTube' };
+function auditWhere(item) {
+  if (AUDIT_TARGETS[item.metadata?.panel]) return AUDIT_TARGETS[item.metadata.panel];
+  if (item.action.startsWith('social.')) return SOCIAL_NAMES[String(item.target || '').split(':')[0]] || '—';
+  if (item.action.startsWith('case.') && item.target) return `Caso ${item.target}`;
+  return item.metadata?.theme || auditAreas(item.metadata?.fields) || '—';
+}
+const auditAreas = fields => [...new Set((fields || []).map(field => AUDIT_AREAS[String(field).split('.')[0]] || 'Otros ajustes'))].join(', ');
 const SUGGESTION_LABELS = { open: 'Pendiente', approved: 'Aprobada', rejected: 'Rechazada' };
 
 /* ---------------------------------------------------------------- */
@@ -1055,7 +1083,7 @@ function healthIssues() {
     issues.push({
       level: 'warn',
       title: 'El reproductor de música no está disponible',
-      detail: health.music.reason || 'Faltan las herramientas de audio en el alojamiento.',
+      detail: health.music.reason || 'La música no está disponible ahora mismo. Inténtalo más tarde.',
       action: { section: 'musica', label: 'Ver música' }
     });
   }
@@ -1484,8 +1512,8 @@ function renderIdentidad() {
         </div>
       </div>
       <div class="field wide">
-        <label for="profile-avatar">Avatar de los mensajes (URL HTTPS)</label>
-        <input id="profile-avatar" type="url" maxlength="500" placeholder="https://…" value="${escapeHtml(profile.avatar || '')}">
+        <label for="profile-avatar">Imagen de los mensajes (enlace)</label>
+        <input id="profile-avatar" type="url" maxlength="500" placeholder="Pega aquí el enlace de la imagen" value="${escapeHtml(profile.avatar || '')}">
         <span class="hint">El avatar de la cuenta de Discord es global y no se cambia aquí; este solo afecta a este servidor.</span>
       </div>
       <div class="field wide">
@@ -1504,18 +1532,18 @@ function renderIdentidad() {
     <form id="form-branding" class="form">
       <div class="form-row">
         <div class="field">
-          <label for="branding-name">Nombre en webhooks</label>
+          <label for="branding-name">Nombre en los mensajes</label>
           <input id="branding-name" type="text" maxlength="80" value="${escapeHtml(branding.name || '')}"
                  placeholder="${escapeHtml(identity.account?.username || 'Vesper')}">
           <span class="hint">${isMain ? 'Solo se usa si no hay nombre visible arriba.' : 'Vacío: el nombre de la cuenta del bot.'}</span>
         </div>
         <div class="field">
-          <label for="branding-avatar">Avatar en webhooks (URL HTTPS)</label>
-          <input id="branding-avatar" type="url" maxlength="500" placeholder="https://…" value="${escapeHtml(branding.avatar || '')}">
+          <label for="branding-avatar">Logo en los mensajes (enlace)</label>
+          <input id="branding-avatar" type="url" maxlength="500" placeholder="Pega aquí el enlace de la imagen" value="${escapeHtml(branding.avatar || '')}">
           <span class="hint">${isMain ? 'Alternativa de reserva si no hay avatar de identidad.' : 'Vacío: el avatar de la cuenta del bot.'}</span>
         </div>
       </div>
-      ${formActions('Guardar branding')}
+      ${formActions('Guardar nombre y logo')}
     </form>`;
 
   return `
@@ -1523,7 +1551,7 @@ function renderIdentidad() {
       eyebrow: 'Vista previa',
       title: 'Así te ve un miembro',
       description: 'Así te ve un miembro.',
-      ayuda: 'El nombre y el avatar salen del primer valor relleno: primero la identidad de este servidor, luego el branding y, si no hay nada, la cuenta de Discord del bot.',
+      ayuda: 'El nombre y la imagen salen de lo primero que esté relleno: la identidad de este servidor, después el nombre y logo de abajo y, si no hay nada, los de la cuenta de Discord del bot.',
       body: `
         <div class="preview-shell">
           <div class="discord-message" id="identity-preview"></div>
@@ -1540,11 +1568,11 @@ function renderIdentidad() {
     })}
 
     ${card({
-      eyebrow: 'Branding',
+      eyebrow: 'Nombre y logo',
       title: isMain ? 'Valores de reserva' : 'Nombre y logo del bot',
       description: isMain ? 'Valores de reserva.' : 'Con los que publica en este servidor.',
       ayuda: isMain
-        ? 'Son los que usaban los comandos /setbotname, /setbotavatar y /branding. Se aplican solo cuando la identidad de arriba está vacía.'
+        ? 'Se usan solo cuando la identidad de arriba está vacía.'
         : 'Los mensajes del bot (bienvenidas, avisos, paneles, música, salas…) salen con este nombre y esta imagen. Discord no deja cambiar el avatar de la lista de miembros por servidor, así que allí se sigue viendo la cuenta del bot.',
       body: brandingForm
     })}`;
@@ -1574,8 +1602,8 @@ function identityValues() {
   return {
     name: profileName || brandingName || account.username || 'Vesper',
     avatar: profileAvatar || brandingAvatar || account.avatar || null,
-    nameSource: profileName ? 'Identidad' : brandingName ? 'Branding' : 'Cuenta del bot',
-    avatarSource: profileAvatar ? 'Identidad' : brandingAvatar ? 'Branding' : 'Cuenta del bot',
+    nameSource: profileName ? 'Identidad' : brandingName ? 'Nombre y logo' : 'Cuenta del bot',
+    avatarSource: profileAvatar ? 'Identidad' : brandingAvatar ? 'Nombre y logo' : 'Cuenta del bot',
     account
   };
 }
@@ -1641,9 +1669,7 @@ const FORMAT_TOOLS = [
       { label: '❝', prefix: '> ', title: 'Cita de una línea' },
       { label: '❞', prefix: '>>> ', title: 'Cita que sigue hasta el final del mensaje' },
       { label: '•', prefix: '- ', title: 'Lista con puntos' },
-      { label: '1.', prefix: '1. ', title: 'Lista numerada' },
-      { label: '‹›', wrap: '`', title: 'Código en línea' },
-      { label: '⌗', wrap: '```\n', title: 'Bloque de código' }
+      { label: '1.', prefix: '1. ', title: 'Lista numerada' }
     ]
   },
   {
@@ -1878,22 +1904,17 @@ const FORMAT_GUIDE = [
     ['> Texto', 'Cita: una barra vertical a la izquierda.'],
     ['>>> Texto', 'Cita larga: todo lo que venga después queda dentro.'],
     ['- Texto', 'Punto de lista. Con dos espacios delante se anida.'],
-    ['1. Texto', 'Lista numerada.'],
-    ['`Texto`', 'Código en línea, con fondo oscuro.'],
-    ['``` … ```', 'Bloque de código de varias líneas: tres acentos graves en su propia línea, arriba y abajo del texto.']
+    ['1. Texto', 'Lista numerada.']
   ] },
   { group: 'Enlaces y menciones', rows: [
     ['[Visítanos](https://…)', 'Enlace con el texto que tú quieras. Solo funciona dentro de un embed, no en un mensaje normal.'],
     ['{user}', 'Menciona a la persona del evento; Discord la pinta en azul.'],
-    ['<@&ID>', 'Menciona un rol concreto por su identificador.'],
-    ['<#ID>', 'Enlaza a un canal.'],
-    ['<t:1700000000:R>', 'Fecha que se actualiza sola («hace 3 minutos»).']
+    ['@rol o #canal', 'Escríbelos en Discord y copia el resultado aquí: se ven como mención o enlace.']
   ] },
   { group: 'Trucos de maquetación', rows: [
     ['Línea en blanco', 'Separa párrafos. Dentro de un embed se respetan todas las que dejes.'],
     ['⠀ (espacio Braille)', 'Un espacio que Discord no recorta, útil para centrar a ojo.'],
-    ['─────────', 'Una línea de guiones largos hace de separador dentro del texto.'],
-    ['Emojis del servidor', 'Escribe <:nombre:ID> y sale el emoji personalizado, también en los embeds.']
+    ['─────────', 'Una línea de guiones largos hace de separador dentro del texto.']
   ] }
 ];
 
@@ -1934,7 +1955,7 @@ function formatGuideCard() {
           </div>
           <div class="guide-block">
             <h4>Adornos y letras decorativas</h4>
-            <p class="hint">Las letras raras de los diseños del servidor (𝐴 𝑛𝑒𝑤 𝑤𝑎𝑛𝑑𝑒𝑟𝑒𝑟, 𝑾𝒆𝒍𝒄𝒐𝒎𝒆…) no son una fuente: son caracteres de Unicode. Oprime «Símbolos y letras…» encima de cualquier caja de texto para elegirlos e insertarlos donde tengas el cursor.</p>
+            <p class="hint">Las letras raras de los diseños del servidor (𝐴 𝑛𝑒𝑤 𝑤𝑎𝑛𝑑𝑒𝑟𝑒𝑟, 𝑾𝒆𝒍𝒄𝒐𝒎𝒆…) no son una fuente: son símbolos especiales. Oprime «Símbolos y letras…» encima de cualquier caja de texto para elegirlos e insertarlos donde tengas el cursor.</p>
           </div>
         </div>
       </details>`
@@ -1961,7 +1982,7 @@ function layoutChooser(idPrefix, dataAttr, kind, saved, factoryLayout) {
       </span>
     </label>`;
 
-  const factoryName = factoryLayout === 'components_v2' ? 'contenedor V2' : 'embed clásico';
+  const factoryName = factoryLayout === 'components_v2' ? 'bloque moderno' : 'embed clásico';
 
   return `
     <div class="field wide">
@@ -1969,9 +1990,9 @@ function layoutChooser(idPrefix, dataAttr, kind, saved, factoryLayout) {
       <div class="layout-choice" role="radiogroup" aria-label="Formato del mensaje">
         ${option('auto', 'El de siempre', `Lo que trae de fábrica aquí: ${factoryName}.`)}
         ${option('classic', 'Embed clásico', 'Barra de color al lado, miniatura, campos y pie con la hora.')}
-        ${option('components_v2', 'Contenedor V2', 'Bloque con borde de color y títulos grandes. El estilo de Embers Void.')}
+        ${option('components_v2', 'Bloque moderno', 'Bloque con borde de color y títulos grandes. El estilo de Embers Void.')}
       </div>
-      <span class="hint">Cambiar de formato no borra lo que escribiste.${help('El mismo contenido se pinta de las dos maneras. El contenedor V2 no tiene miniatura y muestra el pie como texto pequeño.')}</span>
+      <span class="hint">Cambiar de formato no borra lo que escribiste.${help('El mismo contenido se ve de las dos maneras. El bloque moderno no tiene miniatura y muestra el pie como texto pequeño.')}</span>
     </div>`;
 }
 
@@ -2019,9 +2040,9 @@ function embedEditorCard(kind) {
           </div>
           ${footerField}
           <div class="field wide">
-            <label for="embed-${kind}-image">Imagen o GIF (URL HTTPS)</label>
+            <label for="embed-${kind}-image">Imagen o GIF (enlace)</label>
             <input id="embed-${kind}-image" type="url" maxlength="500" data-embed="${kind}"
-                   value="${escapeHtml(saved.image || '')}" placeholder="${escapeHtml(fallback.image || 'https://…')}">
+                   value="${escapeHtml(saved.image || '')}" placeholder="${fallback.image ? 'Vacío: se usa la imagen de fábrica' : 'Pega aquí el enlace de la imagen'}">
           </div>
           <div class="form-row">
             <div class="field">
@@ -2144,8 +2165,8 @@ function renderBienvenidas() {
     ${formatGuideCard()}
 
     ${card({
-      eyebrow: 'Variables',
-      title: 'Variables disponibles',
+      eyebrow: 'Datos',
+      title: 'Datos que puedes insertar',
       description: `${defaults.note || ''} Oprime una para escribirla donde tengas el cursor.`,
       body: `<ul class="var-list">${variables}</ul>`
     })}
@@ -2222,7 +2243,7 @@ function messageEditorMarkup(item) {
   const layoutField = item.plainText
     ? ''
     : item.fixedLayout
-      ? '<p class="hint">Este mensaje siempre sale como contenedor V2, porque es la única forma de llevar los botones dentro del bloque.</p>'
+      ? '<p class="hint">Este mensaje siempre sale como bloque moderno, porque es la única forma de llevar los botones dentro.</p>'
       : layoutChooser('msg', 'data-msg', item.id, saved.layout, item.defaultLayout);
 
   // Discord no aplica formato al título de un embed clásico: sale tal cual. En
@@ -2243,7 +2264,7 @@ function messageEditorMarkup(item) {
       ${formatToolbar(`msg-${item.id}-title`, { compact: true })}
       <input id="msg-${item.id}-title" type="text" maxlength="240" data-msg="${item.id}"
              value="${escapeHtml(saved.title || '')}" placeholder="${escapeHtml(factory.title || 'Sin título')}">
-      <span class="hint" data-title-hint="${item.id}"${classicNow ? '' : ' hidden'}>En el embed clásico el título sale sin formato. Para agrandar la letra, cambia a Contenedor V2.</span>
+      <span class="hint" data-title-hint="${item.id}"${classicNow ? '' : ' hidden'}>En el embed clásico el título sale sin formato. Para agrandar la letra, cambia a Bloque moderno.</span>
     </div>`;
 
   const footerField = item.supports.footer ? `
@@ -2255,9 +2276,9 @@ function messageEditorMarkup(item) {
 
   const imageField = item.supports.image ? `
     <div class="field">
-      <label for="msg-${item.id}-image">Imagen (URL HTTPS)</label>
+      <label for="msg-${item.id}-image">Imagen (enlace)</label>
       <input id="msg-${item.id}-image" type="url" maxlength="500" data-msg="${item.id}"
-             value="${escapeHtml(saved.image || '')}" placeholder="${escapeHtml(factory.image || 'https://…')}">
+             value="${escapeHtml(saved.image || '')}" placeholder="${factory.image ? 'Vacío: se usa la imagen de fábrica' : 'Pega aquí el enlace de la imagen'}">
     </div>` : '';
 
   const colorField = item.plainText ? '' : `
@@ -2724,7 +2745,7 @@ function customButtonMarkup(button = {}, index = 0) {
         </div>
       </div>
       <div class="composer-row-main" data-button-panel="link">
-        <div class="field grow"><label for="custom-button-url-${index}">Enlace HTTPS</label><input id="custom-button-url-${index}" data-button-url type="url" maxlength="500" value="${escapeHtml(button.url || '')}" placeholder="https://…" pattern="https://.*"></div>
+        <div class="field grow"><label for="custom-button-url-${index}">Enlace HTTPS</label><input id="custom-button-url-${index}" data-button-url type="url" maxlength="500" value="${escapeHtml(button.url || '')}" placeholder="Pega aquí el enlace de la imagen" pattern="https://.*"></div>
       </div>
       <div class="composer-row-main" data-button-panel="channel">
         <div class="field grow"><label for="custom-button-channel-${index}">Canal</label><select id="custom-button-channel-${index}" data-button-channel>${selectOptions(channels, button.channelId, 'Elige un canal')}</select></div>
@@ -2794,7 +2815,7 @@ function renderPublicar() {
                 </div>
                 <div class="field">
                   <label for="custom-title-url">Enlace del título (opcional)</label>
-                  <input id="custom-title-url" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.url || '')}" placeholder="https://…">
+                  <input id="custom-title-url" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.url || '')}" placeholder="Pega aquí el enlace de la imagen">
                 </div>
               </div>
               <div class="field wide">
@@ -2813,12 +2834,12 @@ function renderPublicar() {
                 </div>
                 <div class="field">
                   <label for="custom-author-url">Enlace del autor</label>
-                  <input id="custom-author-url" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.author.url || '')}" placeholder="https://…">
+                  <input id="custom-author-url" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.author.url || '')}" placeholder="Pega aquí el enlace de la imagen">
                 </div>
               </div>
               <div class="field wide">
-                <label for="custom-author-icon">Icono del autor (URL HTTPS)</label>
-                <input id="custom-author-icon" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.author.iconUrl || '')}" placeholder="https://…">
+                <label for="custom-author-icon">Icono del autor (enlace)</label>
+                <input id="custom-author-icon" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.author.iconUrl || '')}" placeholder="Pega aquí el enlace de la imagen">
               </div>
               <div class="form-row">
                 <div class="field">
@@ -2826,8 +2847,8 @@ function renderPublicar() {
                   <input id="custom-footer" type="text" maxlength="2048" value="${escapeHtml(draft.embed.footer.text || '')}" placeholder="Pie opcional">
                 </div>
                 <div class="field">
-                  <label for="custom-footer-icon">Icono del pie (URL HTTPS)</label>
-                  <input id="custom-footer-icon" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.footer.iconUrl || '')}" placeholder="https://…">
+                  <label for="custom-footer-icon">Icono del pie (enlace)</label>
+                  <input id="custom-footer-icon" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.footer.iconUrl || '')}" placeholder="Pega aquí el enlace de la imagen">
                 </div>
               </div>
               <label class="check"><input id="custom-timestamp" type="checkbox"${draft.embed.timestamp ? ' checked' : ''}><span>Añadir fecha y hora del envío</span></label>
@@ -2841,13 +2862,13 @@ function renderPublicar() {
                   <div class="color-field"><input id="custom-color" type="color" value="${escapeHtml(draft.embed.color || '#5865F2')}"></div>
                 </div>
                 <div class="field">
-                  <label for="custom-thumbnail">Miniatura (URL HTTPS)</label>
-                  <input id="custom-thumbnail" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.thumbnail || '')}" placeholder="https://…">
+                  <label for="custom-thumbnail">Miniatura (enlace)</label>
+                  <input id="custom-thumbnail" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.thumbnail || '')}" placeholder="Pega aquí el enlace de la imagen">
                 </div>
               </div>
               <div class="field wide">
-                <label for="custom-image">Imagen principal o GIF (URL HTTPS)</label>
-                <input id="custom-image" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.image || '')}" placeholder="https://…">
+                <label for="custom-image">Imagen principal o GIF (enlace)</label>
+                <input id="custom-image" type="url" maxlength="500" pattern="https://.*" value="${escapeHtml(draft.embed.image || '')}" placeholder="Pega aquí el enlace de la imagen">
                 <span class="hint">Usa un enlace directo público. Discord admite PNG, JPG, WebP y GIF.</span>
               </div>
             </details>
@@ -3133,7 +3154,7 @@ const PLATFORMS = [
     channels: [['liveChannel', 'Canal de directos'], ['videoChannel', 'Canal de videos']] },
   { id: 'twitch', name: 'Twitch', placeholder: 'nombre del streamer',
     channels: [['liveChannel', 'Canal de directos']] },
-  { id: 'youtube', name: 'YouTube', placeholder: 'URL, @handle o nombre del canal',
+  { id: 'youtube', name: 'YouTube', placeholder: 'Enlace, @usuario o nombre del canal',
     channels: [['liveChannel', 'Canal de directos'], ['videoChannel', 'Canal de videos'], ['shortChannel', 'Canal de Shorts']] }
 ];
 
@@ -3228,7 +3249,7 @@ function renderOfertas() {
       description: `${botLabel()} consulta cada media hora y publica solo lo que no haya publicado antes en este servidor.`,
       body: `
         <div class="grid-3">
-          <div class="stat"><small>Epic Games</small><strong>Juegos gratis</strong><span class="stat-note">El regalo semanal y el de la semana siguiente. Endpoint público de su tienda.</span></div>
+          <div class="stat"><small>Epic Games</small><strong>Juegos gratis</strong><span class="stat-note">El regalo semanal y el de la semana siguiente.</span></div>
           <div class="stat"><small>Sorteos</small><strong>Llaves y DLC</strong><span class="stat-note">Steam, GOG, Ubisoft, itch.io y más, vía GamerPower. Sin clave.</span></div>
           <div class="stat"><small>Steam</small><strong>Rebajas</strong><span class="stat-note">Ofertas de la portada por encima del descuento que elijas.</span></div>
         </div>`
@@ -3401,7 +3422,7 @@ function renderModeracion() {
   const newCase = canModerate ? card({
     eyebrow: 'Manual',
     title: 'Registrar una sanción',
-    description: 'Busca al miembro por su nombre; no hace falta copiar IDs.',
+    description: 'Busca al miembro por su nombre.',
     body: `
       ${!moderationOn && canConfigure ? moduleOffCallout('moderation', 'El módulo de moderación está apagado.', 'Actívalo para que funcionen los filtros y se puedan registrar casos.') : ''}
       ${!moderationOn && !canConfigure ? '<div class="callout warn"><strong>El módulo de moderación está apagado.</strong><span>Pide a un administrador que lo active para poder registrar casos.</span></div>' : ''}
@@ -3711,8 +3732,8 @@ function renderMusica() {
   return `
     ${!config.features?.music ? moduleOffCallout('music', 'El módulo de música está apagado.', 'Mientras siga apagado, /musica no responde en este servidor.') : ''}
     ${health.music?.available === false
-      ? `<div class="callout warn"><strong>El reproductor no está disponible.</strong><span>${escapeHtml(health.music.reason || 'Faltan las herramientas de audio en el alojamiento.')}</span></div>`
-      : `<div class="callout ok"><strong>El reproductor está listo.</strong><span>${botLabel()} busca y reproduce por su cuenta, dentro del mismo proceso. No hace falta ningún servidor de música aparte ni pagar nada.</span></div>`}
+      ? `<div class="callout warn"><strong>El reproductor no está disponible.</strong><span>${escapeHtml(health.music.reason || 'La música no está disponible ahora mismo. Inténtalo más tarde.')}</span></div>`
+      : `<div class="callout ok"><strong>El reproductor está listo.</strong><span>${botLabel()} busca y reproduce por su cuenta. No hace falta ningún otro bot de música ni pagar nada.</span></div>`}
     ${musicSourcesCallout(health.music?.sources)}
 
     ${fixedPanelCard({
@@ -4135,7 +4156,7 @@ function renderResumen() {
     ['Embeds', [
       ['Bienvenida', embedSummary('welcome')],
       ['Despedida', embedSummary('goodbye')],
-      ['Formato', data.embedDefaults?.layout === 'components_v2' ? 'Components V2 (diseño propio)' : 'Embed clásico']
+      ['Formato', data.embedDefaults?.layout === 'components_v2' ? 'Bloque moderno' : 'Embed clásico']
     ]],
     ['TikTok', [
       ['Directos', nameOf(channels, config.tiktok?.liveChannel)],
@@ -4251,7 +4272,8 @@ function renderResumen() {
     eyebrow: 'Detalle',
     title: 'Todo lo guardado',
     description: 'Cada ajuste con su valor, ya traducido a nombres de canales y roles.',
-    actions: '<button class="button quiet sm" type="button" id="copy-config">Copiar como JSON</button>',
+    // Solo en el servidor de pruebas: la configuración guardada tal cual.
+    actions: data.guild.tier === 'primary_main' ? '<button class="button quiet sm" type="button" id="copy-config">Copiar configuración técnica</button>' : '',
     body: `
       <details class="more-options">
         <summary>Ver todos los ajustes</summary>
@@ -4274,7 +4296,7 @@ function renderAuditoria() {
   return card({
     eyebrow: 'Trazabilidad',
     title: 'Cambios hechos desde el panel',
-    description: 'Los últimos 100 movimientos. Se conservan según WEB_AUDIT_DAYS.',
+    description: 'Los últimos 100 cambios hechos desde el panel.',
     body: '<div id="audit-body"><div class="skeleton block"></div></div>'
   });
 }
@@ -4287,17 +4309,16 @@ async function loadAudit() {
     const rows = (result.audit || []).map(item => `
       <tr>
         <td>${escapeHtml(formatDate(item.createdAt))}</td>
-        <td class="mono">${escapeHtml(item.actorDiscordId || item.actorGoogleEmail || 'Desconocido')}</td>
-        <td>${escapeHtml(AUDIT_LABELS[item.action] || item.action)}</td>
-        <td class="wrap">${escapeHtml(item.target || AUDIT_TARGETS[item.metadata?.panel] || item.metadata?.theme || '—')}</td>
-        <td class="wrap">${escapeHtml((item.metadata?.fields || []).join(', ') || '—')}</td>
+        <td>${escapeHtml(item.actorName || item.actorGoogleEmail || 'Desconocido')}</td>
+        <td>${escapeHtml(auditLabel(item.action))}</td>
+        <td class="wrap">${escapeHtml(auditWhere(item))}</td>
       </tr>`).join('');
 
     body.innerHTML = rows
-      ? `<div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Responsable</th><th>Acción</th><th>Objetivo</th><th>Campos</th></tr></thead><tbody>${rows}</tbody></table></div>`
+      ? `<div class="table-scroll"><table><thead><tr><th>Fecha</th><th>Quién</th><th>Qué hizo</th><th>Dónde</th></tr></thead><tbody>${rows}</tbody></table></div>`
       : emptyBlock('Sin movimientos', 'Todavía nadie ha cambiado nada desde el panel.');
   } catch (error) {
-    body.innerHTML = `<div class="callout danger"><strong>No se pudo cargar la auditoría.</strong><span>${escapeHtml(error.message)}</span></div>`;
+    body.innerHTML = `<div class="callout danger"><strong>No se pudo cargar el historial.</strong><span>${escapeHtml(error.message)}</span></div>`;
   }
 }
 
@@ -4436,7 +4457,7 @@ function bindIdentidad(root) {
     saveConfig({ branding: {
       name: $('#branding-name').value.trim() || null,
       avatar: $('#branding-avatar').value.trim() || null
-    } }, 'Branding actualizado.', event.submitter);
+    } }, 'Nombre y logo guardados.', event.submitter);
   });
 }
 
@@ -4848,17 +4869,11 @@ function bindModulos(root) {
 function bindResumen(root) {
   root.querySelectorAll('[data-meter]').forEach(bar => bar.style.setProperty('--meter', `${bar.dataset.meter}%`));
   root.querySelector('#copy-config')?.addEventListener('click', async () => {
-    const json = JSON.stringify(state.data.config, null, 2);
     try {
-      await navigator.clipboard.writeText(json);
-      toast('Configuración copiada al portapapeles.', 'ok');
+      await navigator.clipboard.writeText(JSON.stringify(state.data.config, null, 2));
+      toast('Configuración copiada.', 'ok');
     } catch {
-      const view = window.open('', '_blank');
-      if (!view) return toast('El navegador bloqueó la copia y la ventana emergente.', 'bad');
-      view.document.title = 'Configuración de Vesper';
-      const pre = view.document.createElement('pre');
-      pre.textContent = json;
-      view.document.body.appendChild(pre);
+      toast('El navegador no dejó copiar. Prueba de nuevo.', 'bad');
     }
   });
 }
@@ -5442,9 +5457,9 @@ function showLogin() {
     message.hidden = false;
     actions.push('<a class="button" href="/panel">Reintentar</a>');
   } else if (!state.publicConfig?.enabled) {
-    actions.push('<div class="callout danger"><strong>El panel está desactivado.</strong><span>Pon WEB_DASHBOARD_ENABLED=true en el alojamiento.</span></div>');
+    actions.push('<div class="callout danger"><strong>El panel está desactivado.</strong><span>El propietario del bot tiene que activarlo.</span></div>');
   } else if (!state.publicConfig.ready) {
-    actions.push('<div class="callout danger"><strong>Falta la clave de sesión.</strong><span>Configura WEB_SESSION_SECRET con al menos 32 caracteres.</span></div>');
+    actions.push('<div class="callout danger"><strong>El panel no está listo todavía.</strong><span>El propietario del bot tiene que terminar de configurarlo.</span></div>');
   } else {
     if (state.publicConfig.discordEnabled) actions.push('<a class="button" href="/auth/discord">Continuar con Discord</a>');
     if (state.publicConfig.googleEnabled) actions.push('<a class="button quiet" href="/auth/google">Continuar con Google</a>');

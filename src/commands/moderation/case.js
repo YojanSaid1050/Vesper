@@ -54,7 +54,7 @@ function ownCaseEmbed(record) {
 }
 
 function idOption(option) {
-  return option.setName('id').setDescription('ID visible del caso').setRequired(true).setMinLength(6).setMaxLength(24);
+  return option.setName('id').setDescription('Código del caso (por ejemplo A1B2C3)').setRequired(true).setMinLength(6).setMaxLength(24);
 }
 
 module.exports = {

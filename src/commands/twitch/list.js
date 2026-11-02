@@ -4,7 +4,7 @@ const { getGuildConfig } = require('../../database/mongoManager');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('twitch-list')
-    .setDescription('Muestra la lista de streamers de Twitch monitoreados')
+    .setDescription('Muestra los canales de Twitch que sigue el bot')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -14,17 +14,17 @@ module.exports = {
     const liveChannel = config.twitch?.liveChannel;
 
     if (users.length === 0) {
-      return interaction.editReply({ content: '📋 No hay streamers de Twitch configurados para monitorear.\n\nUsa `/twitch-add` para agregar uno.' });
+      return interaction.editReply({ content: '📋 No hay canales de Twitch que siga el bot.\n\nUsa `/twitch-add` para agregar uno.' });
     }
 
     const embed = new EmbedBuilder()
-      .setTitle('📺 Streamers de Twitch monitoreados')
+      .setTitle('📺 Canales de Twitch que sigue el bot')
       .setColor(0x9146FF)
       .addFields(
         { name: '🎭 Streamers vigilados', value: users.slice(0, 25).map(u => `• **${u}**`).join('\n') + (users.length > 25 ? `\n\n*... y ${users.length - 25} más*` : '') || 'Ninguno', inline: false },
         { name: '🔴 Canal de Directos', value: liveChannel ? `<#${liveChannel}>` : '`No configurado`', inline: true }
       )
-      .setFooter({ text: `${users.length} streamers en total` });
+      .setFooter({ text: `${users.length} canales en total` });
 
     await interaction.editReply({ embeds: [embed] });
   }

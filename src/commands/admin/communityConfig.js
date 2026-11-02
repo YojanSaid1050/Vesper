@@ -8,12 +8,13 @@ const { CAPABILITIES } = require('../../core/PermissionService');
 const { joinWithinLimit, LIMITS } = require('../../utils/discordLimits');
 const { getGuildConfig, updateCommunitySection, updateGuildSection } = require('../../database/mongoManager');
 const { publishSelfRolePanel, publishTicketPanel, reviewSuggestion } = require('../../core/CommunityService');
-const { isModuleEnabledConfig } = require('../../config/guildPolicy');
+const { isModuleEnabledConfig, MODULE_LABELS } = require('../../config/guildPolicy');
+const { friendlyError } = require('../../utils/userMessage');
 
 const TEXT_TYPES = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
 
 function moduleLine(config, name, detail) {
-  return `${isModuleEnabledConfig(config, name) ? '🟢' : '⚫'} **${name}** · ${detail}`;
+  return `${isModuleEnabledConfig(config, name) ? '🟢' : '⚫'} **${MODULE_LABELS[name] || name}** · ${detail}`;
 }
 
 function statusEmbed(guild, config) {
@@ -59,7 +60,7 @@ module.exports = {
       .addBooleanOption(option => option.setName('activo').setDescription('Activa o desactiva autorroles'))
       .addRoleOption(option => option.setName('rol').setDescription('Rol que se modificará'))
       .addStringOption(option => option.setName('etiqueta').setDescription('Nombre visible').setMaxLength(80))
-      .addStringOption(option => option.setName('emoji').setDescription('Emoji Unicode o personalizado').setMaxLength(100))
+      .addStringOption(option => option.setName('emoji').setDescription('Emoji que cuenta como estrella').setMaxLength(100))
       .addStringOption(option => option.setName('descripcion').setDescription('Texto breve opcional').setMaxLength(100))
       .addChannelOption(option => option.setName('panel').setDescription('Canal para publicar').addChannelTypes(...TEXT_TYPES)))
     .addSubcommand(command => command.setName('starboard').setDescription('Configura mensajes destacados.')
@@ -72,7 +73,7 @@ module.exports = {
         { name: 'Añadir', value: 'add' }, { name: 'Retirar', value: 'remove' }, { name: 'Limpiar', value: 'clear' }
       )))
     .addSubcommand(command => command.setName('revisar_sugerencia').setDescription('Cambia el estado de una sugerencia.')
-      .addStringOption(option => option.setName('mensaje').setDescription('ID del mensaje de sugerencia').setRequired(true))
+      .addStringOption(option => option.setName('mensaje').setDescription('Enlace del mensaje de la sugerencia').setRequired(true))
       .addStringOption(option => option.setName('estado').setDescription('Estado nuevo').setRequired(true).addChoices(
         { name: 'Pendiente', value: 'open' }, { name: 'Aprobada', value: 'approved' }, { name: 'Rechazada', value: 'rejected' }
       ))
@@ -196,7 +197,7 @@ module.exports = {
       const suggestion = await reviewSuggestion(interaction.guild, interaction.options.getString('mensaje').trim(), interaction.options.getString('estado'), interaction.user.id, interaction.options.getString('nota'));
       return interaction.reply({ content: `✅ Sugerencia de <@${suggestion.userId}> actualizada a **${suggestion.status}**.`, flags: 64, allowedMentions: { parse: [] } });
     } catch (error) {
-      return interaction.reply({ content: `❌ ${error.message}`, flags: 64 });
+      return interaction.reply({ content: `❌ ${friendlyError(error, interaction)}`, flags: 64 });
     }
   }
 };

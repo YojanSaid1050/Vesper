@@ -1,5 +1,54 @@
 # Changelog
 
+## 3.9.5 — Música más rápida y Embers Void en modo técnico
+
+### Música
+- **Las canciones aparecen en unos 3-4 s en vez de 7.** SoundCloud abre a la
+  vez los cinco primeros resultados y suena el primero que se pueda
+  reproducir; antes se abrían uno tras otro y las primeras, casi siempre
+  protegidas o muestras de 30 s, hacían esperar.
+- SoundCloud y Audius se consultan a la vez; YouTube sigue de último.
+- El bot entra al canal de voz mientras busca, en vez de esperar a entrar.
+- Lo pedido en la última media hora sale al instante.
+- La siguiente canción se deja lista 30 s antes de que acabe la actual: no
+  hay silencio entre canciones.
+- `/musica reproducir` responde al momento y, en el canal del controlador, la
+  petición recibe 🔎 en cuanto se lee y se borra al entrar en la cola.
+
+### Embers Void, servidor de pruebas
+- Los errores salen con la frase clara y, debajo, el detalle técnico: el
+  error original, su código, la causa y dónde pasó.
+- El diagnóstico del centro de control añade sistema, datos, cuotas, TikTok
+  y música con sus números y su último error. `/musica diagnostico` añade
+  herramientas, cookies, proxy y orden de fuentes.
+- En el panel web, los fallos traen su detalle técnico y vuelve «Copiar
+  configuración técnica». `TECHNICAL_GUILD_IDS` añade otros servidores.
+- En los demás servidores todo sigue en lenguaje sencillo.
+
+## 3.9.4 — Todo en el idioma de quien lo usa
+
+Nada de lo que ve la gente, en el panel o en Discord, habla ya de código.
+
+### Panel
+- Fuera «URL HTTPS», «webhooks», «Contenedor V2», «JSON», «Unicode» y los
+  nombres de ajustes internos. Las imágenes piden «el enlace» y el formato
+  moderno se llama **Bloque moderno**.
+- Se quitan de la guía de formato el código en línea, los bloques de código
+  y las menciones escritas a mano con números.
+- El **historial de cambios** dice quién (su nombre, no su número), qué hizo y
+  dónde, con palabras del panel.
+- Se quita «Copiar como JSON».
+
+### Discord
+- Los errores que venían de Discord o de otros servicios en inglés
+  («Missing Permissions», «Request failed…») salen ahora como una frase clara.
+- Descripciones de comandos, opciones y respuestas sin «webhooks», «branding»,
+  «caché», «monitoreo», «streamer», «Live Channel» ni «Ping Role».
+- El estado del bot, el diagnóstico de música y el de TikTok hablan del
+  reproductor, de los avisos y de las cuentas, no de herramientas internas.
+- Las funciones se nombran en español (Bienvenidas, Registros, Música…) en
+  todas las listas.
+
 ## 3.9.3 — Todo con el nombre y el logo del servidor, y planes en orden
 
 ### Mensajes con la identidad del servidor

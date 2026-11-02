@@ -302,7 +302,7 @@ async function reviewSuggestion(guild, messageId, status, reviewerId, note) {
     { returnDocument: 'after' }
   );
   if (!suggestion) {
-    const error = new Error('No existe una sugerencia con ese ID de mensaje.');
+    const error = new Error('No encontré esa sugerencia. Copia el enlace del mensaje de la sugerencia.');
     error.statusCode = 404;
     throw error;
   }

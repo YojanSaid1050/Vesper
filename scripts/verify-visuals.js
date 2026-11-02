@@ -7,10 +7,12 @@ const crypto = require('crypto');
 // elegir entre el contenedor V2 y el embed clásico. La estructura del
 // contenedor no ha cambiado y, sin configuración guardada, el resultado
 // publicado sigue siendo idéntico carácter a carácter (lo comprueban las
-// pruebas de test/embedTemplates.test.js).
+// pruebas de test/embedTemplates.test.js). panels.js cambió solo de texto: las
+// palabras técnicas (webhook, Ping Role, streamer…) pasaron a lenguaje de
+// usuario; la estructura del panel es la misma.
 const expected = {
   'src/dashboard/mainPanel.js': '00cd1da3ee2b1532910ea49725cf6a67bf2065c334209e5597a541b9cbe6308f',
-  'src/dashboard/panels.js': '942dc96ca37cb1b667d125bf49a535cf1df6601892e369eebcf9bf1f7d6edd14',
+  'src/dashboard/panels.js': '9bef1a4f2b59c8bde97d6ffc0aaafbaf86090528a5b61ef7ed2c9ac2f03249cd',
   'src/platforms/tiktok/embeds.js': '0a06d0a9e526446c4ca33475c6416bbe2d26313a6bb393faef834407ccdbb63e',
   'src/platforms/twitch/embeds.js': '988af1299227d0d4ae614a1ebf28a14b794b0017bccb934b0ad1c12958a1bb86',
   'src/platforms/youtube/embeds.js': 'dfa42f78860420dce60bc628104052014bbc892f8bfcc15dd0985c3aa0df455f',

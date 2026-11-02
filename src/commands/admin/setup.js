@@ -12,7 +12,7 @@ const {
   addGuildListItem,
   removeGuildListItem
 } = require('../../database/mongoManager');
-const { MODULE_DEFAULTS } = require('../../config/guildPolicy');
+const { MODULE_DEFAULTS, MODULE_LABELS } = require('../../config/guildPolicy');
 const { setupChecks, moduleSummary, mentionList } = require('../../core/SetupService');
 
 const TEXT_CHANNEL_TYPES = [ChannelType.GuildText, ChannelType.GuildAnnouncement];
@@ -58,7 +58,7 @@ function statusEmbed(guild, config) {
       { name: 'DJ', value: mentionList(config.permissions?.musicDjRoles), inline: true },
       { name: 'Exclusiones', value: `Canales: ${mentionList(config.moderation?.exemptChannels, 'channel')}\nRoles: ${mentionList(config.moderation?.exemptRoles)}` }
     )
-    .setFooter({ text: 'Usa los demás subcomandos de /vesper-setup para completar la configuración' })
+    .setFooter({ text: 'Completa lo que falta con las demás opciones de /vesper-setup o desde el panel' })
     .setTimestamp();
 }
 
@@ -89,21 +89,21 @@ module.exports = {
       .addStringOption(option => option.setName('limpiar').setDescription('Borra una asignación existente').addChoices(
         { name: 'Bienvenida', value: 'general.welcomeChannel' },
         { name: 'Despedida', value: 'general.goodbyeChannel' },
-        { name: 'Logs', value: 'general.logChannel' },
-        { name: 'Logs de bots', value: 'general.botLogChannel' },
+        { name: 'Registros', value: 'general.logChannel' },
+        { name: 'Registros de bots', value: 'general.botLogChannel' },
         { name: 'Canal de música', value: 'music.requestChannel' },
         { name: 'Rol de bots', value: 'general.botRole' },
-        { name: 'TikTok live', value: 'tiktok.liveChannel' },
-        { name: 'TikTok videos', value: 'tiktok.videoChannel' },
-        { name: 'Twitch live', value: 'twitch.liveChannel' },
-        { name: 'YouTube live', value: 'youtube.liveChannel' },
-        { name: 'YouTube videos', value: 'youtube.videoChannel' },
-        { name: 'YouTube Shorts', value: 'youtube.shortChannel' }
+        { name: 'Directos de TikTok', value: 'tiktok.liveChannel' },
+        { name: 'Videos de TikTok', value: 'tiktok.videoChannel' },
+        { name: 'Directos de Twitch', value: 'twitch.liveChannel' },
+        { name: 'Directos de YouTube', value: 'youtube.liveChannel' },
+        { name: 'Videos de YouTube', value: 'youtube.videoChannel' },
+        { name: 'Shorts de YouTube', value: 'youtube.shortChannel' }
       )))
     .addSubcommand(command => {
       command.setName('modulos').setDescription('Activa o desactiva módulos en este servidor.');
       for (const name of Object.keys(MODULE_DEFAULTS)) {
-        command.addBooleanOption(option => option.setName(name).setDescription(`Estado del módulo ${name}`));
+        command.addBooleanOption(option => option.setName(name).setDescription(`Activar o apagar: ${MODULE_LABELS[name] || name}`));
       }
       return command;
     })
@@ -196,7 +196,7 @@ module.exports = {
         const [section, key] = clear.split('.');
         if (!updates[section]) updates[section] = {};
         updates[section][key] = null;
-        changed.push(`limpieza de ${clear}`);
+        changed.push('se quitó una asignación');
       }
       if (!Object.keys(updates).length) {
         return interaction.reply({ content: 'Selecciona al menos un canal, rol o elemento para limpiar.', flags: 64 });
@@ -216,7 +216,7 @@ module.exports = {
       if (!Object.keys(values).length) return interaction.reply({ content: 'Indica al menos un módulo.', flags: 64 });
       await updateGuildSection(guildId, 'features', values);
       if (values.music === false) await client.music?.stop?.(guildId).catch(() => null);
-      return interaction.reply({ content: `✅ Módulos actualizados: ${Object.entries(values).map(([name, active]) => `${name} ${active ? '🟢' : '⚫'}`).join(' · ')}`, flags: 64 });
+      return interaction.reply({ content: `✅ Módulos actualizados: ${Object.entries(values).map(([name, active]) => `${MODULE_LABELS[name] || name} ${active ? '🟢' : '⚫'}`).join(' · ')}`, flags: 64 });
     }
 
     if (subcommand === 'permisos') {

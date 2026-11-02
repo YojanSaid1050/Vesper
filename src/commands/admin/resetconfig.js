@@ -8,6 +8,7 @@ const { clearGuildCache: clearYouTubeGuildCache } = require('../../platforms/you
 const { CAPABILITIES, requireCapability } = require('../../core/PermissionService');
 const { createDefaultGuildConfig } = require('../../config/defaultGuild');
 const { moduleDefaults } = require('../../config/guildPolicy');
+const { friendlyError } = require('../../utils/userMessage');
 
 // Inicializar limpiadores de caché
 const twitchCache = new CacheManager('./data/twitch');
@@ -51,7 +52,7 @@ function cleanAllGuildCache(guildId) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('resetconfig')
-    .setDescription('Resetea TODA la configuración del servidor (canales, usuarios, branding)')
+    .setDescription('Borra TODA la configuración del bot en este servidor (canales, cuentas, nombre y logo)')
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -83,13 +84,13 @@ module.exports = {
       .addFields(
         { name: '📋 General', value: hasGeneral ? '✅ Canales configurados' : '❌ Sin datos', inline: true },
         { name: '🎭 TikTok', value: hasTikTok ? `✅ ${config.tiktok?.users?.length || 0} usuarios, canales configurados` : '❌ Sin datos', inline: true },
-        { name: '📺 Twitch', value: hasTwitch ? `✅ ${config.twitch?.users?.length || 0} streamers, canal configurado` : '❌ Sin datos', inline: true },
+        { name: '📺 Twitch', value: hasTwitch ? `✅ ${config.twitch?.users?.length || 0} canales, canal configurado` : '❌ Sin datos', inline: true },
         { name: '📀 YouTube', value: hasYouTube ? `✅ ${config.youtube?.users?.length || 0} canales, canales configurados` : '❌ Sin datos', inline: true },
-        { name: '🎨 Branding', value: hasBranding ? '✅ Nombre/Avatar configurado' : '❌ Sin datos', inline: true },
+        { name: '🎨 Nombre y logo', value: hasBranding ? '✅ Personalizados' : '❌ Sin datos', inline: true },
         { name: '🌐 Comunidad', value: hasCommunity ? '✅ Módulos configurados' : '❌ Sin datos', inline: true },
         { name: '🧩 Módulos', value: hasModuleChanges ? '✅ Estados personalizados' : '❌ Valores iniciales', inline: true }
       )
-      .setFooter({ text: 'Esta acción no se puede deshacer. Se eliminarán: canales, usuarios monitoreados, branding y caché.' });
+      .setFooter({ text: 'No se puede deshacer. Se borran: canales, cuentas seguidas, nombre y logo.' });
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('confirm_reset_config').setLabel('✅ SÍ, RESETEAR TODO').setStyle(ButtonStyle.Danger),
@@ -145,7 +146,7 @@ module.exports = {
         } catch (error) {
           console.error('Error resetting config:', error);
           await i.editReply({ 
-            content: `❌ Error al resetear la configuración: ${error.message}`,
+            content: `❌ No pude restablecer la configuración. ${friendlyError(error, interaction)}`,
             components: [],
             embeds: []
           });

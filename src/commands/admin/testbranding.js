@@ -14,7 +14,7 @@ const { buildGoodbyePayload } = require('../../events/guild/memberRemove');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('testbranding')
-    .setDescription('Prueba el branding configurado')
+    .setDescription('Envía un mensaje de prueba con el nombre y el logo del bot')
     .addStringOption(opt => opt.setName('tipo').setDescription('Tipo de mensaje de prueba').setRequired(true).addChoices(
       { name: 'General', value: 'general' },
       { name: 'Welcome', value: 'welcome' },
@@ -76,7 +76,7 @@ module.exports = {
           components: [{
             type: 17, accent_color: 16777215, spoiler: false,
             components: [
-              { type: 10, content: '# 🎨 Branding Test' },
+              { type: 10, content: '# 🎨 Mensaje de prueba' },
               { type: 14, spacing: 1 },
               { type: 10, content: `### Configuración actual\n\n**Nombre**\n${branding.name || 'Sin configurar'}\n\n**Avatar**\n${branding.avatar || 'Sin configurar'}\n\n**Servidor**\n${interaction.guild.name}\n\n✅ El branding funciona correctamente.` }
             ]

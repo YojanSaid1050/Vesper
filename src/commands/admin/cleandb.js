@@ -1,11 +1,12 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { deleteGuild, getAllGuilds } = require('../../database/mongoManager');
 const { requireBotOwner } = require('../../utils/interactionGuards');
+const { friendlyError } = require('../../utils/userMessage');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('resetalldb')
-        .setDescription('⚠️ ELIMINA TODA la base de datos (acción irreversible)')
+        .setDescription('⚠️ Borra TODOS los datos guardados de todos los servidores (no se puede deshacer)')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
     async execute(interaction) {
@@ -15,8 +16,8 @@ module.exports = {
         const count = guilds.length;
 
         const embed = new EmbedBuilder()
-            .setTitle('⚠️⚠️⚠️ ELIMINAR TODA LA BASE DE DATOS ⚠️⚠️⚠️')
-            .setDescription(`Estás a punto de eliminar **TODOS** los datos de la base de datos.\n\n📊 Servidores afectados: **${count}**\n\n**Esta acción es IRREVERSIBLE.**`)
+            .setTitle('⚠️⚠️⚠️ BORRAR TODOS LOS DATOS ⚠️⚠️⚠️')
+            .setDescription(`Estás a punto de borrar **TODOS** los datos guardados del bot.\n\n📊 Servidores afectados: **${count}**\n\n**Esta acción es IRREVERSIBLE.**`)
             .setColor(0xFF0000)
             .setFooter({ text: 'Operación exclusiva del propietario global de Vesper' });
 
@@ -58,10 +59,10 @@ module.exports = {
             }
 
             const resultEmbed = new EmbedBuilder()
-                .setTitle(failure ? '⚠️ Limpieza incompleta' : '✅ Base de datos limpiada')
+                .setTitle(failure ? '⚠️ No se borró todo' : '✅ Datos borrados')
                 .setDescription(failure
-                    ? `Se eliminaron **${deleted}** de **${guilds.length}** servidores antes de fallar.\n\nMotivo: ${String(failure.message).slice(0, 500)}`
-                    : `Se eliminaron **${deleted}** servidores de la base de datos.\n\nLa base de datos está completamente vacía.`)
+                    ? `Se eliminaron **${deleted}** de **${guilds.length}** servidores antes de fallar.\n\nMotivo: ${friendlyError(failure, interaction)}`
+                    : `Se eliminaron **${deleted}** servidores.\n\nYa no queda ningún dato guardado.`)
                 .setColor(failure ? 0xFAA61A : 0x00FF00)
                 .setTimestamp();
 

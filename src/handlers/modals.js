@@ -12,6 +12,7 @@ const { isValidImageUrl } = require('../utils/imageUrlValidator');
 const { clearUserState: clearTikTokUserState } = require('../platforms/tiktok/monitors');
 const { clearUserState: clearTwitchUserState } = require('../platforms/twitch/monitors');
 const { cleanYouTubeChannelCache } = require('../platforms/youtube/monitors');
+const { friendlyError } = require('../utils/userMessage');
 
 // ==================================================
 // FUNCIÓN PARA ACTUALIZAR EL DASHBOARD DIRECTAMENTE (como safeUpdate pero para modales)
@@ -77,7 +78,7 @@ async function processModalAsync(interaction, client, callback) {
     } catch (error) {
       console.error('Error en procesamiento asíncrono:', error);
       await interaction.followUp({ 
-        content: `❌ Error: ${error.message}`, 
+        content: `❌ ${friendlyError(error, interaction)}`, 
         flags: 64 
       });
     }
@@ -126,7 +127,7 @@ async function handleModal(interaction, client) {
       clearWebhookCache(guildId);
     }
     await interaction.reply({ 
-      content: `✅ Nombre de webhooks actualizado a: **${name}**\n\n> ⚠️ **Nota:** Esto NO cambia el nombre del bot principal.`, 
+      content: `✅ Desde ahora el bot firma sus mensajes como **${name}** en este servidor.`, 
       flags: 64 
     });
     
@@ -142,7 +143,7 @@ async function handleModal(interaction, client) {
     const avatar = interaction.fields.getTextInputValue('avatar_url')?.trim();
     
     if (!avatar) {
-      await interaction.reply({ content: '❌ URL inválida.', flags: 64 });
+      await interaction.reply({ content: '❌ Pega el enlace de una imagen.', flags: 64 });
       return;
     }
     
@@ -152,7 +153,7 @@ async function handleModal(interaction, client) {
     
     if (!isValid) {
       return interaction.editReply({ 
-        content: '❌ URL inválida. Asegúrate de que:\n• La URL sea válida\n• Apunte a una imagen (jpg, jpeg, png, gif, webp)\n• La imagen sea accesible públicamente' 
+        content: '❌ Ese enlace no lleva a una imagen. Copia el enlace de una imagen (JPG, PNG, GIF o WEBP) que se pueda abrir sin iniciar sesión.' 
       });
     }
     
@@ -160,7 +161,7 @@ async function handleModal(interaction, client) {
     clearWebhookCache(guildId);
     
     await interaction.editReply({ 
-      content: `✅ Avatar de webhooks actualizado.\n\n> ⚠️ **Nota:** Esto NO cambia el avatar del bot principal.`, 
+      content: '✅ Desde ahora el bot firma sus mensajes con esta imagen en este servidor.', 
       flags: 64 
     });
     
@@ -193,14 +194,14 @@ async function handleModal(interaction, client) {
       config.tiktok.users = normalizeUserArray(config.tiktok.users, 'tiktok');
       
       if (config.tiktok.users.includes(realUser)) {
-        return { message: `⚠️ El usuario **@${realUser}** ya está en la lista de monitoreo.` };
+        return { message: `⚠️ El usuario **@${realUser}** ya está entre las cuentas que sigue el bot.` };
       }
       
       config = await addGuildListItem(guildId, 'tiktok', 'users', realUser);
       
       const embed = new EmbedBuilder()
         .setTitle('✅ Usuario añadido')
-        .setDescription(`**@${realUser}** ha sido añadido a la lista de monitoreo.`)
+        .setDescription(`**@${realUser}** ha sido añadido a las cuentas que sigue el bot.`)
         .addFields(
           { name: '📊 Total usuarios', value: `${config.tiktok.users.length}`, inline: true },
           { name: '🎭 Nickname', value: user.nickname || realUser, inline: true }
@@ -232,13 +233,13 @@ async function handleModal(interaction, client) {
       const existingUser = config.tiktok.users.find(u => u === username);
       
       if (!existingUser) {
-        return { message: `❌ El usuario **@${username}** no está en la lista de monitoreo.\n\nUsa /tiktok-list para ver los usuarios actuales.` };
+        return { message: `❌ El usuario **@${username}** no está entre las cuentas que sigue el bot.\n\nUsa /tiktok-list para ver los cuentas que sigue.` };
       }
       
       config = await removeGuildListItem(guildId, 'tiktok', 'users', existingUser);
       await clearTikTokUserState(guildId, existingUser);
       
-      return { message: `✅ **@${existingUser}** eliminado de la lista de monitoreo.\n\n📋 Usuarios restantes: ${config.tiktok.users.length}` };
+      return { message: `✅ **@${existingUser}** eliminado de las cuentas que sigue el bot.\n\n📋 Cuentas restantes: ${config.tiktok.users.length}` };
     });
     return;
   }
@@ -258,7 +259,7 @@ async function handleModal(interaction, client) {
       const data = await verifyStreamer(username);
       
       if (!data?.exists) {
-        return { message: `❌ No se encontró el streamer **${username}** en Twitch.\n\nVerifica que el nombre sea correcto.` };
+        return { message: `❌ No se encontró el canal **${username}** en Twitch.\n\nVerifica que el nombre sea correcto.` };
       }
       
       let config = await getGuildConfig(guildId);
@@ -266,16 +267,16 @@ async function handleModal(interaction, client) {
       config.twitch.users = normalizeUserArray(config.twitch.users, 'twitch');
       
       if (config.twitch.users.includes(username)) {
-        return { message: `⚠️ El streamer **${data.name}** ya está en la lista de monitoreo.` };
+        return { message: `⚠️ El canal **${data.name}** ya está entre las cuentas que sigue el bot.` };
       }
       
       config = await addGuildListItem(guildId, 'twitch', 'users', username);
       
       const embed = new EmbedBuilder()
         .setTitle('✅ Streamer añadido')
-        .setDescription(`**${data.name}** ha sido añadido a la lista de monitoreo.`)
+        .setDescription(`**${data.name}** ha sido añadido a las cuentas que sigue el bot.`)
         .addFields(
-          { name: '📊 Total streamers', value: `${config.twitch.users.length}`, inline: true },
+          { name: '📊 Total canales', value: `${config.twitch.users.length}`, inline: true },
           { name: '🎭 Login', value: data.login, inline: true }
         )
         .setThumbnail(data.avatar)
@@ -306,13 +307,13 @@ async function handleModal(interaction, client) {
       const existingUser = config.twitch.users.find(u => u === username);
       
       if (!existingUser) {
-        return { message: `❌ El streamer **${username}** no está en la lista de monitoreo.\n\nUsa /twitch-list para ver los streamers actuales.` };
+        return { message: `❌ El canal **${username}** no está entre las cuentas que sigue el bot.\n\nUsa /twitch-list para ver los canales que sigue.` };
       }
       
       config = await removeGuildListItem(guildId, 'twitch', 'users', existingUser);
       await clearTwitchUserState(guildId, existingUser);
       
-      return { message: `✅ **${existingUser}** eliminado de la lista de monitoreo.\n\n📋 Streamers restantes: ${config.twitch.users.length}` };
+      return { message: `✅ **${existingUser}** eliminado de las cuentas que sigue el bot.\n\n📋 Canales restantes: ${config.twitch.users.length}` };
     });
     return;
   }
@@ -343,7 +344,7 @@ async function handleModal(interaction, client) {
       const exists = config.youtube.users.some(id => id === channelId);
       
       if (exists) {
-        return { message: `⚠️ El canal **${channel.name}** ya está en la lista de monitoreo.` };
+        return { message: `⚠️ El canal **${channel.name}** ya está entre las cuentas que sigue el bot.` };
       }
       
       config = await addGuildListItem(guildId, 'youtube', 'users', channelId);
@@ -352,7 +353,7 @@ async function handleModal(interaction, client) {
       
       const embed = new EmbedBuilder()
         .setTitle('✅ Canal añadido')
-        .setDescription(`**${channel.name}** ha sido añadido a la lista de monitoreo.`)
+        .setDescription(`**${channel.name}** ha sido añadido a las cuentas que sigue el bot.`)
         .addFields(
           { name: '📊 Total canales', value: `${config.youtube.users.length}`, inline: true },
           { name: '👥 Suscriptores', value: channel.subscribers?.toLocaleString() || 'N/A', inline: true },
@@ -403,14 +404,14 @@ async function handleModal(interaction, client) {
       }
       
       if (!foundChannelId) {
-        return { message: `❌ No se encontró el canal **${input}** en la lista de monitoreo.\n\nUsa /youtube-list para ver los canales actuales.` };
+        return { message: `❌ No se encontró el canal **${input}** entre las cuentas que sigue el bot.\n\nUsa /youtube-list para ver los canales que sigue.` };
       }
       
       config = await removeGuildListItem(guildId, 'youtube', 'users', foundChannelId);
       
       await cleanYouTubeChannelCache(guildId, foundChannelId);
       
-      return { message: `✅ **${foundChannelName || foundChannelId}** eliminado de la lista de monitoreo.\n\n📋 Canales restantes: ${config.youtube.users.length}` };
+      return { message: `✅ **${foundChannelName || foundChannelId}** eliminado de las cuentas que sigue el bot.\n\n📋 Canales restantes: ${config.youtube.users.length}` };
     });
     return;
   }

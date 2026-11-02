@@ -4,6 +4,7 @@ const { getGuildConfig, removeGuildListItem } = require('../../database/mongoMan
 const { verifyChannel } = require('../../platforms/youtube/utils');
 const { cleanYouTubeChannelCache } = require('../../platforms/youtube/monitors'); // NUEVA importación
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
+const { friendlyError } = require('../../utils/userMessage');
 
 // ELIMINAMOS la función cleanYouTubeGuild que borraba todo
 // Ya no es necesaria
@@ -11,8 +12,8 @@ const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('youtube-remove')
-    .setDescription('Elimina un canal de YouTube del monitoreo')
-    .addStringOption(option => option.setName('canal').setDescription('URL, @handle o nombre del canal a eliminar').setRequired(true))
+    .setDescription('Deja de seguir un canal de YouTube')
+    .addStringOption(option => option.setName('canal').setDescription('Enlace, @usuario o nombre del canal que quieres quitar').setRequired(true))
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
@@ -36,7 +37,7 @@ module.exports = {
       }
 
       if (!foundChannelId) {
-        return interaction.editReply({ content: `❌ No se encontró el canal \`${input}\` en la lista de monitoreo.\n\nUsa \`/youtube-list\` para ver los canales actuales.` });
+        return interaction.editReply({ content: `❌ No se encontró el canal \`${input}\` entre las cuentas que sigue el bot.\n\nUsa \`/youtube-list\` para ver los canales que sigue.` });
       }
 
       const updated = await removeGuildListItem(interaction.guildId, 'youtube', 'users', foundChannelId);
@@ -45,7 +46,7 @@ module.exports = {
       // NUEVO: Limpiar SOLO la caché del canal eliminado, no todo el guild
       await cleanYouTubeChannelCache(interaction.guildId, foundChannelId);
 
-      await interaction.editReply({ content: `✅ Se eliminó **${foundChannelName || foundChannelId}** de la lista de monitoreo.\n\n📋 Canales restantes: ${newUsers.length}` });
+      await interaction.editReply({ content: `✅ Se eliminó **${foundChannelName || foundChannelId}** de las cuentas que sigue el bot.\n\n📋 Canales restantes: ${newUsers.length}` });
       
       // Refrescar dashboard automáticamente
       const activePanel = await getActivePanel(interaction.guildId);
@@ -53,7 +54,7 @@ module.exports = {
       
     } catch (error) {
       console.error('Error en youtube-remove:', error);
-      await interaction.editReply({ content: `❌ Error al eliminar el canal: ${error.message}` });
+      await interaction.editReply({ content: `❌ No pude quitar ese canal. ${friendlyError(error, interaction)}` });
     }
   }
 };

@@ -124,7 +124,8 @@ test('escribir en el canal del controlador pide la canción y limpia el canal', 
   assert.equal(pedidos[0][1], 'joji slow dancing');
   assert.equal(pedidos[0][0].user, message.author);
   assert.match(enviados[0], /posición 2/);
-  await new Promise(resolve => setTimeout(resolve, 1_700));
+  // Ya no hay que esperar: se borra en cuanto la canción entra en la cola.
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(borrado, true);
 
   // En otro canal no se toca nada.

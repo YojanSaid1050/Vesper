@@ -7,7 +7,7 @@ const Suggestion = require('../database/models/Suggestion');
 const WebAuditLog = require('../database/models/WebAuditLog');
 const { getGuildConfig, updateGuildSection, setGuildPlan, updateCommunitySection, addGuildListItem, removeGuildListItem } = require('../database/mongoManager');
 const { setupChecks } = require('../core/SetupService');
-const { isModuleEnabledConfig, guildTier, isAnyMainGuild, guildPlan, lockedFeatures, featureAvailable, identitySources, PREMIUM_FEATURES, MAIN_ONLY_FEATURES } = require('../config/guildPolicy');
+const { isModuleEnabledConfig, isTechnicalGuild, guildTier, isAnyMainGuild, guildPlan, lockedFeatures, featureAvailable, identitySources, PREMIUM_FEATURES, MAIN_ONLY_FEATURES } = require('../config/guildPolicy');
 const {
   createCase,
   getCase,
@@ -193,7 +193,7 @@ function embedDefaultsFor(guildId, guildName) {
     const memberRemove = require('../events/guild/memberRemove');
     return {
       layout: 'components_v2',
-      note: 'Este servidor nace con el diseño original en contenedor Components V2. Puedes cambiar el texto, el color del borde y la imagen, y también pasarlo al embed clásico si lo prefieres.',
+      note: 'Este servidor nace con su diseño original en bloque moderno. Puedes cambiar el texto, el color del borde y la imagen, y también pasarlo al embed clásico si lo prefieres.',
       supportsFooter: true,
       supportsThumbnail: true,
       welcome: {
@@ -987,9 +987,16 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
       if (!context.access.configure) return res.status(403).json({ error: 'No tienes acceso a la auditoría web.' });
       const rows = await WebAuditLog.find({ guildId: req.params.guildId }).sort({ createdAt: -1 }).limit(100).lean();
       const showOwnerEmail = isGlobalOwner(req.webSession);
+      // Se enseña el nombre de quien hizo el cambio, no su número de cuenta.
+      const guild = context.access.guild;
+      const actorName = id => {
+        if (!id) return null;
+        const member = guild?.members?.cache?.get(id);
+        return member?.displayName || context.client.users?.cache?.get(id)?.username || 'Un administrador';
+      };
       return res.json({ audit: rows.map(row => ({
         id: String(row._id),
-        actorDiscordId: row.actorDiscordId,
+        actorName: actorName(row.actorDiscordId),
         actorGoogleEmail: showOwnerEmail ? row.actorGoogleEmail : row.actorGoogleEmail ? 'Cuenta Google del propietario' : null,
         action: row.action,
         target: row.target,
@@ -1005,7 +1012,10 @@ function mountWebDashboard(app, { getClient, runtimeHealth }) {
     const candidateStatus = Number(error.statusCode || error.status || 500);
     const status = Number.isInteger(candidateStatus) && candidateStatus >= 400 && candidateStatus <= 599 ? candidateStatus : 500;
     if (status >= 500) console.error('❌ Error en panel web:', error);
-    return res.status(status).json({ error: status >= 500 ? 'Ocurrió un error interno en el panel.' : error.message });
+    // En el servidor de pruebas el panel enseña también qué falló de verdad.
+    const guildId = String(req.originalUrl || '').match(/\/guilds\/(\d{5,25})/)?.[1];
+    const detail = isTechnicalGuild(guildId) ? require('../utils/userMessage').technicalDetail(error) : undefined;
+    return res.status(status).json({ error: status >= 500 ? 'Ocurrió un error interno en el panel.' : error.message, ...(detail ? { detail } : {}) });
   });
 }
 

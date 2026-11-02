@@ -29,6 +29,16 @@ const HTTP_TIMEOUT_MS = 12_000;
 const SOUNDCLOUD_FORMAT = ['protocol^=http', 'format_id*=opus', 'format_id*=mp3', null]
   .map(filter => `bestaudio${filter ? `[${filter}]` : ''}[format_id!*=preview]`).join('/') + '/best[format_id!*=preview]';
 const STREAM_TTL_MS = sources.STREAM_TTL_MS;
+// Cuántos resultados de SoundCloud se abren a la vez. Los primeros suelen ser
+// los oficiales, protegidos; abrir cinco en paralelo tarda lo mismo que uno.
+const SOUNDCLOUD_PARALLEL = Math.min(8, Math.max(1, Number(process.env.MUSIC_SOUNDCLOUD_PARALLEL || 5)));
+// Con una fuente secundaria lista, cuánto se espera todavía a la preferida
+// antes de poner la que ya está.
+const PREFERRED_GRACE_MS = Math.max(0, Number(process.env.MUSIC_PREFERRED_GRACE_MS ?? 1_500));
+// Lo pedido hace poco no se vuelve a buscar.
+const SEARCH_CACHE_MS = 30 * 60_000;
+const SEARCH_CACHE_SIZE = 200;
+const searchCache = new Map();
 
 const state = {
   youtubeBlockedUntil: 0,
@@ -142,24 +152,62 @@ async function fromYoutube(target, { limit = 1 } = {}) {
   }
 }
 
+// Un enlace de SoundCloud se lee entero de una vez: es una sola pista.
+async function soundcloudLink(url) {
+  const raw = await sources.run(sources.ytdlpPath(), [
+    ...sources.COMMON_ARGS, '--ignore-errors', '--no-playlist', '-f', SOUNDCLOUD_FORMAT, '-J', url
+  ]).catch(error => {
+    // Con --ignore-errors, yt-dlp sale con código 1 si alguna entrada falló
+    // aunque otras sí sirvan: se aprovecha lo que haya escrito.
+    if (error.stderr && /^\s*\{/.test(error.stdout || '')) return error.stdout;
+    throw error;
+  });
+  const parsed = JSON.parse(raw);
+  const entries = (Array.isArray(parsed.entries) ? parsed.entries : [parsed]).filter(Boolean);
+  return entries.map(entry => sources.trackFromJson(entry)).find(candidate => candidate?.streamUrl && candidate.duration > 35) || null;
+}
+
+function bestThumbnail(entry) {
+  const list = entry.thumbnails || [];
+  return list.find(item => item.id === 't500x500')?.url || list.at(-1)?.url || entry.thumbnail || null;
+}
+
+// Un resultado concreto de la búsqueda, ya con su audio. Devuelve null si no
+// sirve: protegido, muestra de 30 s u otra canción.
+async function soundcloudItem(query, position) {
+  try {
+    const raw = await sources.run(sources.ytdlpPath(), [
+      ...sources.COMMON_ARGS, '--no-playlist', '--playlist-items', String(position),
+      '-f', SOUNDCLOUD_FORMAT, '-J', `scsearch${SOUNDCLOUD_PARALLEL}:${query}`
+    ]);
+    const parsed = JSON.parse(raw);
+    const entry = (Array.isArray(parsed.entries) ? parsed.entries : [parsed]).find(Boolean);
+    const track = entry ? { ...sources.trackFromJson(entry), thumbnail: bestThumbnail(entry) } : null;
+    return track?.streamUrl && track.duration > 35 && relevant(query, track) ? track : null;
+  } catch (error) {
+    return { failure: error };
+  }
+}
+
+// Las primeras pistas de SoundCloud suelen ser las oficiales de los sellos,
+// protegidas, o muestras de 30 s. En vez de abrirlas una tras otra, se abre
+// cada resultado en su propio proceso a la vez y gana el primero, en el orden
+// de la búsqueda, que se pueda reproducir: unos 3-4 s en vez de 7.
 async function fromSoundcloud(query) {
   try {
-    const target = isSoundcloudUrl(query) ? query : `scsearch5:${query}`;
-    const raw = await sources.run(sources.ytdlpPath(), [
-      ...sources.COMMON_ARGS, '--ignore-errors', '--no-playlist', '-f', SOUNDCLOUD_FORMAT, '-J', target
-    ]).catch(error => {
-      // Con --ignore-errors, yt-dlp sale con código 1 si alguna entrada falló
-      // aunque otras sí sirvan: se aprovecha lo que haya escrito.
-      if (error.stderr && /^\s*\{/.test(error.stdout || '')) return error.stdout;
-      throw error;
-    });
-    const parsed = JSON.parse(raw);
-    const entries = (Array.isArray(parsed.entries) ? parsed.entries : [parsed]).filter(Boolean);
-    const track = entries
-      .map(entry => sources.trackFromJson(entry))
-      .find(candidate => candidate?.streamUrl && candidate.duration > 35 && (isSoundcloudUrl(query) || relevant(query, candidate)));
-    if (!track) throw new Error('SoundCloud no tiene esa canción completa.');
-    return [tagged(track, 'soundcloud')];
+    if (isSoundcloudUrl(query)) {
+      const track = await soundcloudLink(query);
+      if (!track) throw new Error('SoundCloud no tiene esa canción completa.');
+      return [tagged(track, 'soundcloud')];
+    }
+    const items = Array.from({ length: SOUNDCLOUD_PARALLEL }, (_, index) => soundcloudItem(query, index + 1));
+    let cause = null;
+    for (const pending of items) {
+      const result = await pending;
+      if (result?.streamUrl) return [tagged(result, 'soundcloud')];
+      if (result?.failure && !cause) cause = result.failure;
+    }
+    throw Object.assign(new Error('SoundCloud no tiene esa canción completa.'), cause ? { cause, stderr: cause.stderr } : {});
   } catch (error) {
     remember('soundcloud', error);
     throw error;
@@ -211,21 +259,88 @@ const SEARCHERS = { youtube: fromYoutube, soundcloud: fromSoundcloud, audius: fr
 
 function combinedError(errors, fallback = 'No encontré esa canción en ninguna fuente.') {
   if (!errors.length) return new Error(fallback);
-  const detail = errors.map(({ provider, error }) => `${PROVIDER_LABELS[provider]}: ${error.message}`).join(' · ');
-  return Object.assign(new Error(`${fallback} (${detail})`.slice(0, 400)), { causes: errors });
+  // El detalle de cada fuente se guarda para el diagnóstico; a la persona
+  // solo le llega la frase clara.
+  return Object.assign(new Error(fallback), { causes: errors });
 }
 
-// Busca un texto recorriendo las fuentes en orden hasta que una responda.
+// Lanza varias búsquedas a la vez y se queda con la de más prioridad que
+// responda. Si una secundaria ya tiene la canción, la preferida tiene
+// PREFERRED_GRACE_MS más para contestar; si no, suena la que ya está.
+function firstInOrder(tasks, graceMs = PREFERRED_GRACE_MS) {
+  return new Promise((resolve, reject) => {
+    const results = tasks.map(() => null);
+    let done = false;
+    let grace = null;
+    const finish = (fn, value) => { if (done) return; done = true; if (grace) clearTimeout(grace); fn(value); };
+    const settle = () => {
+      if (done) return;
+      for (let index = 0; index < results.length; index++) {
+        const result = results[index];
+        if (result?.ok) return finish(resolve, result.value);
+        if (!result) {
+          if (!grace && results.some((other, later) => later > index && other?.ok)) {
+            grace = setTimeout(() => finish(resolve, results.find(other => other?.ok).value), graceMs);
+            grace.unref?.();
+          }
+          return;
+        }
+      }
+      finish(reject, results.map(result => result.error));
+    };
+    tasks.forEach((task, index) => task.then(
+      value => { results[index] = { ok: true, value }; settle(); },
+      error => { results[index] = { ok: false, error }; settle(); }
+    ));
+  });
+}
+
+function cacheKey(text, exclude) {
+  return `${String(text).toLowerCase().replace(/\s+/g, ' ').trim()}|${[...exclude].sort().join(',')}|${providerOrder().join(',')}`;
+}
+
+function cached(key) {
+  const hit = searchCache.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.at > SEARCH_CACHE_MS) { searchCache.delete(key); return null; }
+  // Copias: la pista se modifica al sonar (dirección nueva, otra fuente…).
+  return hit.tracks.map(track => ({ ...track }));
+}
+
+function store(key, tracks) {
+  searchCache.delete(key);
+  searchCache.set(key, { at: Date.now(), tracks: tracks.map(track => ({ ...track })) });
+  while (searchCache.size > SEARCH_CACHE_SIZE) searchCache.delete(searchCache.keys().next().value);
+}
+
+// Busca un texto en las fuentes. Las ligeras se consultan a la vez; YouTube,
+// que casi siempre bloquea a los alojamientos y es la más lenta, solo entra
+// si las anteriores no la tienen (o si se configuró para ir primero).
 async function searchText(text, { exclude = [] } = {}) {
+  const key = cacheKey(text, exclude);
+  const hit = cached(key);
+  if (hit) return hit;
+
+  const usable = providerOrder().filter(provider => !exclude.includes(provider) && (provider !== 'youtube' || youtubeAvailable()));
+  const groups = [];
+  for (const provider of usable) {
+    const alone = provider === 'youtube';
+    if (alone || !groups.length || groups.at(-1).alone) groups.push({ alone, providers: [provider] });
+    else groups.at(-1).providers.push(provider);
+  }
+
   const errors = [];
-  for (const provider of providerOrder()) {
-    if (exclude.includes(provider)) continue;
-    if (provider === 'youtube' && !youtubeAvailable()) continue;
+  for (const group of groups) {
+    const tasks = group.providers.map(provider => SEARCHERS[provider](text).then(tracks => {
+      if (!tracks.length) throw new Error('Sin resultados.');
+      return tracks;
+    }));
     try {
-      const tracks = await SEARCHERS[provider](text);
-      if (tracks.length) return tracks;
-    } catch (error) {
-      errors.push({ provider, error });
+      const tracks = await firstInOrder(tasks);
+      store(key, tracks);
+      return tracks.map(track => ({ ...track }));
+    } catch (failures) {
+      (Array.isArray(failures) ? failures : [failures]).forEach((error, index) => errors.push({ provider: group.providers[index], error }));
     }
   }
   throw combinedError(errors);
@@ -250,7 +365,7 @@ async function fromYoutubeLink(url, limit) {
   if (order[0] === 'youtube' || playlist) {
     const tracks = await tryYoutube();
     if (tracks?.length) return tracks;
-    if (playlist) throw new Error('YouTube no deja reproducir listas desde este alojamiento. Pide las canciones por su nombre.');
+    if (playlist) throw new Error('Ahora mismo no se pueden reproducir listas de YouTube. Pide las canciones por su nombre.');
   }
 
   const title = await titleFromLink(url).catch(() => null);
@@ -374,7 +489,7 @@ async function probe(query = 'lofi hip hop') {
       if (provider === 'youtube' && track && !track.streamUrl) await resolveStream(track);
       results.push({ provider, label: PROVIDER_LABELS[provider], ok: true, ms: Date.now() - started, detail: track?.title || '' });
     } catch (error) {
-      results.push({ provider, label: PROVIDER_LABELS[provider], ok: false, ms: Date.now() - started, detail: error.message, botCheck: Boolean(error.botCheck) });
+      results.push({ provider, label: PROVIDER_LABELS[provider], ok: false, ms: Date.now() - started, detail: error.message, error, botCheck: Boolean(error.botCheck) });
     }
   }
   return results;
@@ -385,6 +500,7 @@ function reset() {
   state.youtubeReason = null;
   state.lastErrors = {};
   audiusHost = null;
+  searchCache.clear();
 }
 
 module.exports = {
@@ -400,5 +516,6 @@ module.exports = {
   isYoutubeUrl,
   isSpotifyUrl,
   PROVIDER_LABELS,
-  SOUNDCLOUD_FORMAT
+  SOUNDCLOUD_FORMAT,
+  firstInOrder
 };

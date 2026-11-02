@@ -3,6 +3,7 @@ const { getGuildConfig, addGuildListItem } = require('../../database/mongoManage
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 
 const { normalizeUsername } = require('../../platforms/tiktok/utils');
+const { friendlyError } = require('../../utils/userMessage');
 
 // La verificación de existencia usa el perfil público y no inicia Chromium.
 let verifyUserExists;
@@ -17,7 +18,7 @@ try {
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('tiktok-add')
-        .setDescription('Añade un usuario de TikTok para monitorear')
+        .setDescription('Avisa cuando esta cuenta de TikTok publique o entre en directo')
         .addStringOption(option => option.setName('usuario').setDescription('Usuario de TikTok').setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
@@ -42,13 +43,13 @@ module.exports = {
             const currentUsers = config.tiktok?.users || [];
 
             if (currentUsers.includes(input)) {
-                return interaction.editReply({ content: `⚠️ El usuario **${input}** ya está siendo monitoreado.` });
+                return interaction.editReply({ content: `⚠️ El usuario **${input}** ya lo sigue el bot.` });
             }
 
             const updated = await addGuildListItem(interaction.guildId, 'tiktok', 'users', input);
             const newUsers = updated.tiktok?.users || [];
 
-            await interaction.editReply({ content: `✅ Se añadió **${input}** a la lista de monitoreo.\n\n📋 Total de usuarios: ${newUsers.length}` });
+            await interaction.editReply({ content: `✅ Se añadió **${input}** a las cuentas que sigue el bot.\n\n📋 Total de cuentas: ${newUsers.length}` });
             
             // Refrescar dashboard automáticamente
             const activePanel = await getActivePanel(interaction.guildId);
@@ -56,7 +57,7 @@ module.exports = {
             
         } catch (error) {
             console.error('Error en tiktok-add:', error);
-            await interaction.editReply({ content: `❌ Error al verificar el usuario: ${error.message}. Intenta nuevamente.` });
+            await interaction.editReply({ content: `❌ No pude comprobar esa cuenta. ${friendlyError(error, 'Inténtalo de nuevo en un momento.', interaction)}` });
         }
     }
 };

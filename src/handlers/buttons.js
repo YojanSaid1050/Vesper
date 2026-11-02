@@ -102,10 +102,10 @@ async function handleButton(interaction, client) {
   if (customId.startsWith('main_')) {
     if (!await requireCapability(interaction, CAPABILITIES.MAIN_ADMIN)) return;
     if (customId === 'main_refresh') return safeUpdate(await controlCenterPayload(interaction.guild));
-    if (customId === 'main_diagnostics') return interaction.reply({ embeds: [await buildDiagnosticsEmbed(client)], flags: 64 });
+    if (customId === 'main_diagnostics') return interaction.reply({ embeds: [await buildDiagnosticsEmbed(client, interaction.guildId)], flags: 64 });
     if (customId === 'main_audit') return interaction.reply({ embeds: [await buildAuditEmbed(interaction.guild)], flags: 64 });
     if (customId === 'main_modules') return interaction.reply({ ...(await modulesPayload(interaction.guild.id)), flags: 64 });
-    if (customId === 'main_history') return interaction.reply({ ...(await historyPayload()), flags: 64 });
+    if (customId === 'main_history') return interaction.reply({ ...(await historyPayload(null, interaction.guildId)), flags: 64 });
   }
 
   if (!await requireAdministrator(interaction)) return;
@@ -170,7 +170,7 @@ async function handleButton(interaction, client) {
 
   if (customId === 'branding_avatar') {
     const modal = new ModalBuilder().setCustomId('branding_avatar_modal').setTitle('Editar Avatar');
-    const input = new TextInputBuilder().setCustomId('avatar_url').setLabel('URL de la Imagen').setRequired(true).setPlaceholder('https://imagen.com/avatar.png').setStyle(TextInputStyle.Short);
+    const input = new TextInputBuilder().setCustomId('avatar_url').setLabel('Enlace de la imagen').setRequired(true).setPlaceholder('Pega aquí el enlace de la imagen').setStyle(TextInputStyle.Short);
     modal.addComponents(new ActionRowBuilder().addComponents(input));
     return interaction.showModal(modal);
   }
@@ -350,8 +350,8 @@ async function handleButton(interaction, client) {
 
   if (customId === 'twitch_clear_all_users') {
     const embed = new EmbedBuilder()
-      .setTitle('⚠️ Eliminar todos los streamers de Twitch')
-      .setDescription('¿Estás seguro de que quieres eliminar **todos** los streamers de Twitch?\n\nEsta acción no se puede deshacer.')
+      .setTitle('⚠️ Eliminar todos los canales de Twitch')
+      .setDescription('¿Estás seguro de que quieres eliminar **todos** los canales de Twitch?\n\nEsta acción no se puede deshacer.')
       .setColor(0xff0000);
     const confirmButton = new ButtonBuilder().setCustomId('confirm_twitch_delete_all').setLabel('✅ Aceptar').setStyle(ButtonStyle.Danger);
     const cancelButton = new ButtonBuilder().setCustomId('cancel_action').setLabel('❌ Cancelar').setStyle(ButtonStyle.Secondary);
@@ -366,7 +366,7 @@ async function handleButton(interaction, client) {
     const modal = new ModalBuilder()
       .setCustomId(customId === 'youtube_add_user' ? 'youtube_add_modal' : 'youtube_remove_modal')
       .setTitle(customId === 'youtube_add_user' ? 'Añadir Canal de YouTube' : 'Eliminar Canal de YouTube');
-    const input = new TextInputBuilder().setCustomId('channel_input').setLabel('URL, @handle o nombre del canal').setPlaceholder('https://youtube.com/@canal').setRequired(true).setStyle(TextInputStyle.Short);
+    const input = new TextInputBuilder().setCustomId('channel_input').setLabel('Enlace, @usuario o nombre del canal').setPlaceholder('https://youtube.com/@canal').setRequired(true).setStyle(TextInputStyle.Short);
     modal.addComponents(new ActionRowBuilder().addComponents(input));
     return interaction.showModal(modal);
   }
@@ -417,7 +417,7 @@ async function handleButton(interaction, client) {
     await clearTwitchGuild(guildId);
     
     const successEmbed = new EmbedBuilder()
-      .setDescription('✅ Todos los streamers de Twitch han sido eliminados.')
+      .setDescription('✅ Todos los canales de Twitch han sido eliminados.')
       .setColor(0x00ff00);
     await interaction.editReply({ embeds: [successEmbed], components: [] });
     

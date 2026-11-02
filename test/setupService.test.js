@@ -25,7 +25,7 @@ test('el asistente reconoce canales, cuentas y roles configurados', () => {
     permissions: { moderatorRoles: ['8'] }
   });
   assert.equal(status.percentage, 100);
-  assert.match(moduleSummary({ features: { music: true } }), /🟢 music/);
+  assert.match(moduleSummary({ features: { music: true } }), /🟢 Música/);
   assert.equal(mentionList(['8']), '<@&8>');
   assert.equal(mentionList(['7'], 'channel'), '<#7>');
 });
@@ -34,5 +34,35 @@ test('los comandos manuales de moderación están disponibles en satélites', ()
   for (const path of ['warn', 'timeout', 'modhistory', 'case']) {
     const command = require(`../src/commands/moderation/${path}`);
     assert.notEqual(command.scope, 'main');
+  }
+});
+
+test('los errores técnicos nunca llegan tal cual a Discord', () => {
+  const { friendlyError } = require('../src/utils/userMessage');
+  // Lo que escribe Vesper para la persona pasa igual.
+  assert.equal(friendlyError(new Error('Elige un canal de texto.')), 'Elige un canal de texto.');
+  // Lo que viene de Discord o de una librería se traduce o se cambia por una frase clara.
+  assert.equal(friendlyError(Object.assign(new Error('Missing Permissions'), { code: 50013 })), 'No tengo permisos suficientes para hacer eso.');
+  assert.equal(friendlyError(new Error('Request failed with status code 400')), 'Algo falló. Inténtalo de nuevo en un momento.');
+  assert.equal(friendlyError(new Error("Cannot read properties of undefined (reading 'user')"), 'No pude.'), 'No pude.');
+  assert.equal(friendlyError(new Error('E11000 duplicate key error collection: vesper.tickets')), 'Algo falló. Inténtalo de nuevo en un momento.');
+  assert.equal(friendlyError(new Error('No se pudo conectar con https://api.audius.co.')), 'Algo falló. Inténtalo de nuevo en un momento.');
+});
+
+test('en Embers Void los errores enseñan también el detalle técnico', () => {
+  const { friendlyError } = require('../src/utils/userMessage');
+  const previous = process.env.MAIN_GUILD_ID;
+  process.env.MAIN_GUILD_ID = '111111111111111111';
+  try {
+    const error = Object.assign(new Error('Request failed with status code 400'), { code: 'ERR_BAD_REQUEST' });
+    const enPruebas = friendlyError(error, { guildId: '111111111111111111' });
+    assert.match(enPruebas, /^Algo falló\. Inténtalo de nuevo en un momento\.\n-# 🔧 Request failed with status code 400 · código ERR_BAD_REQUEST/);
+    // En cualquier otro servidor, solo la frase clara.
+    assert.equal(friendlyError(error, { guildId: '222222222222222222' }), 'Algo falló. Inténtalo de nuevo en un momento.');
+    // Las causas de cada fuente de música también se ven.
+    const music = Object.assign(new Error('No encontré esa canción en ninguna fuente.'), { causes: [{ provider: 'soundcloud', error: new Error('DRM protected') }] });
+    assert.match(friendlyError(music, 'x', '111111111111111111'), /soundcloud: DRM protected/);
+  } finally {
+    if (previous === undefined) delete process.env.MAIN_GUILD_ID; else process.env.MAIN_GUILD_ID = previous;
   }
 });
