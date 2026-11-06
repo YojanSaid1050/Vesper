@@ -543,10 +543,6 @@ function renderMarkdown(value, { mentions = true } = {}) {
 // Valores de ejemplo para la vista previa. Cubren todas las variables del
 // catálogo para que ningún marcador se quede sin sustituir en pantalla.
 const SAMPLE = {
-  user: '@nuevo-miembro',
-  username: 'nuevo-miembro',
-  userTag: 'nuevo-miembro#0001',
-  displayName: 'Nuevo miembro',
   userId: '123456789012345678',
   executor: 'Yojan',
   channel: '#general',
@@ -593,23 +589,50 @@ const SAMPLE = {
   queue: '2',
   loop: '',
   generator: '#➕ Crear sala',
-  ownerName: 'xyojansaidx',
-  handle: 'xyojansaidx',
   assets: `${location.origin}/panel/assets`
 };
 
 // `plain` imita lo que hace el bot en los huecos donde Discord no convierte
 // menciones: usa el nombre en vez del enlace al perfil.
-const SAMPLE_PLAIN = { user: '@Nuevo miembro', executor: '@Yojan' };
+const SAMPLE_PLAIN = { executor: '@Yojan' };
+
+// Lo que alguien escribe a mano creyendo que es un marcador («@usuario»,
+// «@nuevo-miembro»…) el bot lo cambia por la mención de verdad. La vista
+// previa hace lo mismo para enseñar lo que se va a publicar.
+const LITERAL_USER = /(^|[\s(¡¿"'«*_~>])@(usuario|user|miembro|member|nuevo[-_ ]?miembro|new[-_ ]?member|nombre)(?![\w-])/giu;
+const LITERAL_SERVER = /(^|[\s(¡¿"'«*_~>])@(servidor|server)(?![\w-])/giu;
+function literalPlaceholders(text) {
+  return String(text ?? '')
+    .replace(LITERAL_USER, (_, before) => `${before}{user}`)
+    .replace(LITERAL_SERVER, (_, before) => `${before}{server}`);
+}
+
+// En la vista previa, la persona del mensaje eres tú: así se ve una mención
+// real y no un nombre de ejemplo que dé ganas de copiar.
+function previewPerson() {
+  const discord = state.session?.user?.discord;
+  return discord?.globalName || discord?.username || state.session?.user?.google?.name?.split(' ')[0] || 'Miembro';
+}
 
 function sampleValues(text, { plain = false } = {}) {
   const guild = state.data?.guild;
-  return String(text ?? '').replace(/\{(\w+)\}/g, (match, name) => {
+  const person = previewPerson();
+  return literalPlaceholders(text).replace(/\{(\w+)\}/g, (match, name) => {
     if (name === 'server') return guild?.name || 'tu servidor';
     if (name === 'memberCount') return formatNumber(guild?.memberCount ?? 0);
+    if (name === 'user') return `@${person}`;
+    if (['username', 'displayName', 'userTag', 'handle', 'ownerName'].includes(name)) return person;
     if (plain && Object.hasOwn(SAMPLE_PLAIN, name)) return SAMPLE_PLAIN[name];
-    return Object.hasOwn(SAMPLE, name) ? SAMPLE[name] : match;
+    // Igual que en Discord: una variable sin dato se queda en blanco.
+    return Object.hasOwn(SAMPLE, name) ? SAMPLE[name] : '';
   });
+}
+
+// El título, el autor y el pie del embed clásico no admiten «#» ni «-#».
+function classicLine(text, { plain = false } = {}) {
+  let line = String(text ?? '').split('\n').map(part => part.replace(/^\s*(?:-#|#{1,3})\s+/, '')).join(plain ? ' ' : '\n');
+  if (plain) line = line.replace(/\*\*|__|~~|\|\||`/g, '');
+  return line.trim();
 }
 
 // Cabecera del mensaje: el autor que verá un miembro. Usa la identidad efectiva
@@ -635,9 +658,9 @@ function embedPreviewMarkup(values, options) {
   } = options;
   // El contenedor V2 sí convierte menciones en todas sus piezas; el embed
   // clásico, solo en el cuerpo.
-  const title = sampleValues(values.title, { plain: !componentsV2 });
+  const title = componentsV2 ? sampleValues(values.title) : classicLine(sampleValues(values.title, { plain: true }));
   const message = sampleValues(values.message);
-  const footer = sampleValues(values.footer, { plain: !componentsV2 });
+  const footer = componentsV2 ? sampleValues(values.footer) : classicLine(sampleValues(values.footer, { plain: true }), { plain: true });
 
   // Los recuadros que publica el aviso cuando nadie ha escrito un cuerpo
   // propio. Se pintan con datos de ejemplo para que la vista previa enseñe el
@@ -667,7 +690,7 @@ function embedPreviewMarkup(values, options) {
       ? `<div class="embed-subtext">${escapeHtml(sampleValues(values.author, { plain: true }))}</div>`
       : `<div class="embed-author">${authorIcon || memberAvatar
         ? `<img src="${escapeHtml(authorIcon || memberAvatar)}" alt="">`
-        : '<span class="embed-author-dot" aria-hidden="true"></span>'}<span>${escapeHtml(sampleValues(values.author, { plain: true }))}</span></div>`)
+        : '<span class="embed-author-dot" aria-hidden="true"></span>'}<span>${escapeHtml(classicLine(sampleValues(values.author, { plain: true }), { plain: true }))}</span></div>`)
     : '';
 
   const image = values.image

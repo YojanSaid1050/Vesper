@@ -12,6 +12,7 @@
 
 const { colorNumber, imageUrl, normalizeLayout, rendersMentions } = require('./EmbedTemplateService');
 const { containerPayload } = require('./EmbedLayouts');
+const { literalPlaceholders, classicLine } = require('../utils/messageText');
 const { themeLayer } = require('./MessageThemes');
 const { guildTier, featureAvailable } = require('../config/guildPolicy');
 
@@ -671,7 +672,7 @@ function buildMessage(kind, { config, vars: eventVars = {}, defaults = {}, field
   // en blanco": así el editor puede vaciarse para volver al diseño de fábrica.
   const resolve = (value, table = vars) => {
     if (value === null || value === undefined) return null;
-    const text = String(value);
+    const text = literalPlaceholders(String(value));
     return text.trim() ? substitute(text, table) : null;
   };
 
@@ -731,13 +732,17 @@ function buildMessage(kind, { config, vars: eventVars = {}, defaults = {}, field
   }
 
   const embed = { color, timestamp: new Date().toISOString() };
-  if (title) embed.title = title;
+  // El embed clásico no entiende «# Título» ni «-# nota» en el título, el pie
+  // o el autor: los enseña tal cual. Se quitan; el bloque moderno sí los usa.
+  const titleText = classicLine(title);
+  if (titleText) embed.title = titleText;
 
   // Quién provocó el aviso, con su foto de perfil pequeña arriba del todo.
   // Es lo que hace que un registro se lea de un vistazo: se reconoce a la
   // persona antes de leer una sola línea.
-  if (authorLine) {
-    embed.author = { name: authorLine };
+  const authorText = classicLine(authorLine, { plain: true });
+  if (authorText) {
+    embed.author = { name: authorText };
     if (showThumbnail && defaults.authorIconUrl) embed.author.icon_url = defaults.authorIconUrl;
   }
 
@@ -747,7 +752,8 @@ function buildMessage(kind, { config, vars: eventVars = {}, defaults = {}, field
 
   if (showThumbnail && defaults.thumbnailUrl) embed.thumbnail = { url: defaults.thumbnailUrl };
   if (image) embed.image = { url: image };
-  if (footer) embed.footer = { text: footer };
+  const footerText = classicLine(footer, { plain: true });
+  if (footerText) embed.footer = { text: footerText };
 
   return { embeds: [embed] };
 }
@@ -772,12 +778,23 @@ function plainVars(vars) {
   return plain;
 }
 
+// Todas las variables que algún mensaje puede usar: las que el panel ofrece
+// en cada mensaje y las que aparecen en los textos de fábrica y los paquetes.
+const KNOWN_VARIABLES = new Set([
+  'user', 'username', 'userTag', 'displayName', 'userId', 'server', 'memberCount', 'assets', 'handle', 'ownerName',
+  ...Object.values(CATALOG).flatMap(entry => (entry.variables || []).map(([name]) => String(name).replace(/[{}]/g, ''))),
+  ...JSON.stringify(FACTORY).match(/\{(\w+)\}/g)?.map(name => name.slice(1, -1)) || []
+]);
+
 // Sustituye {variables} por sus valores. Se hace aquí y no en
-// EmbedTemplateService porque estas variables dependen del evento.
+// EmbedTemplateService porque estas variables dependen del evento. Una
+// variable conocida que el evento no trae se queda en blanco: nunca debe
+// llegar a Discord un «{creator}» o un «{boostCount}» literal.
 function substitute(text, vars) {
   return String(text ?? '').replace(/\{(\w+)\}/g, (match, name) => {
     const value = vars[name];
-    return value === undefined || value === null ? match : String(value);
+    if (value !== undefined && value !== null) return String(value);
+    return KNOWN_VARIABLES.has(name) ? '' : match;
   });
 }
 
@@ -812,5 +829,7 @@ module.exports = {
   containerPayload,
   plainVars,
   substitute,
+  literalPlaceholders,
+  classicLine,
   memberVars
 };

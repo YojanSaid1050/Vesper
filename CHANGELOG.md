@@ -1,5 +1,37 @@
 # Changelog
 
+## 3.9.6 — Mensajes limpios en Discord, web de Aetheris y datos personales
+
+### Mensajes de Discord
+- «@usuario», «@nuevo-miembro» o «@miembro» escritos a mano en un mensaje
+  personalizado se convierten en la mención real de la persona. El panel los
+  guarda ya como `{user}`.
+- El título, el autor y el pie de un embed clásico ya no enseñan «#», «##» ni
+  «-#» sueltos (Discord no los entiende ahí), ni asteriscos en el pie.
+- Una variable que el aviso no trae se queda en blanco en vez de salir como
+  `{boostLevel}`.
+- La vista previa del panel usa tu propio nombre como persona del mensaje y
+  enseña exactamente lo que se publicará.
+- Prueba nueva: todos los mensajes, con los estilos Void, Limones y estándar y
+  los dos formatos, se revisan buscando textos de ejemplo, variables sin
+  rellenar, marcas sueltas y valores rotos.
+
+### Web
+- Logo de Aetheris en la portada, la carga y el acceso; favicon nuevo.
+- Portada neutral (sin servidores ni menciones de ejemplo) y «en español».
+- Páginas públicas `/privacidad`, `/terminos` y `/eliminacion-datos`, enlazadas
+  desde la portada y el acceso, con las mismas protecciones de seguridad que
+  el resto del sitio, indexables y con modo claro.
+- La portada refleja los planes reales: editar los mensajes, los paquetes y el
+  nombre y logo del bot es premium.
+
+### Datos personales
+- `/vesper-datos ver|borrar` (solo propietario, en el servidor principal):
+  muestra qué hay guardado de una persona y borra, tras confirmar, sus
+  sesiones, cuentas vinculadas, sugerencias, tickets cerrados y destacados, y
+  quita su identidad del historial del panel. Los casos de moderación, los
+  tickets abiertos y las salas activas se conservan y se explica por qué.
+
 ## 3.9.5 — Música más rápida y Embers Void en modo técnico
 
 ### Música

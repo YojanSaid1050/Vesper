@@ -13,6 +13,7 @@
 //     para el panel y para validar un despliegue.
 
 const path = require('node:path');
+const { securityHeaders } = require('./security');
 
 function buildRuntimeHealth({ getClient, getMongoStatus, getMonitorStats, isShuttingDown }) {
   return function runtimeHealth() {
@@ -52,6 +53,16 @@ function mountHealthRoutes(app, { runtimeHealth, getClient, isShuttingDown }) {
       uptime: getClient()?.uptime || 0
     });
   });
+
+  // Información legal pública sin autenticación, necesaria también antes del
+  // inicio de sesión. Lleva las mismas cabeceras de seguridad que el resto del
+  // sitio: estas rutas se registran antes que el panel y no pasaban por ellas.
+  app.get(['/privacidad', '/privacy'], securityHeaders, (req, res) =>
+    res.sendFile(path.join(__dirname, 'public', 'privacy.html')));
+  app.get(['/terminos', '/terms'], securityHeaders, (req, res) =>
+    res.sendFile(path.join(__dirname, 'public', 'terms.html')));
+  app.get(['/eliminacion-datos', '/data-deletion'], securityHeaders, (req, res) =>
+    res.sendFile(path.join(__dirname, 'public', 'data-removal.html')));
 
   app.get('/live', (req, res) => {
     const alive = !isShuttingDown();

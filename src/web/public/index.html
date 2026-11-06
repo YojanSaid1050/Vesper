@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#0e0b14">
   <meta name="description" content="Panel de control de Vesper: configura tu servidor de Discord sin tocar código.">
   <title>Vesper · Panel de control</title>
-  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTYiIGZpbGw9IiMxYjE0MjUiLz48dGV4dCB4PSIzMiIgeT0iNDUiIGZvbnQtZmFtaWx5PSJHZW9yZ2lhLHNlcmlmIiBmb250LXNpemU9IjM4IiBmb250LXdlaWdodD0iNzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOWQ2M2ZmIj5WPC90ZXh0Pjwvc3ZnPg==">
+  <link rel="icon" type="image/png" href="/panel/assets/img/aetheris-favicon.png">
   <link rel="stylesheet" href="/panel/assets/styles.css">
 </head>
 <body>
@@ -16,7 +16,7 @@
   <!-- Pantalla de carga inicial -->
   <div id="boot-view" class="boot-view">
     <div class="boot-card">
-      <span class="mark" aria-hidden="true">V</span>
+      <img class="mark logo" src="/panel/assets/img/aetheris-logo.webp" width="44" height="44" alt="" aria-hidden="true">
       <p>Conectando con Vesper…</p>
       <div class="boot-bar" role="progressbar" aria-label="Cargando"><span></span></div>
     </div>
@@ -25,12 +25,13 @@
   <!-- Inicio de sesión -->
   <main id="login-view" class="login-view" hidden>
     <section class="login-card">
-      <span class="mark large" aria-hidden="true">V</span>
+      <img class="mark large logo" src="/panel/assets/img/aetheris-logo.webp" width="56" height="56" alt="" aria-hidden="true">
       <h1>Entra con Discord</h1>
       <p class="lead">Configura los servidores que administras o descubre qué puedes hacer con Vesper en los que participas.</p>
       <div id="login-message" class="callout" hidden></div>
       <div id="login-actions" class="login-actions"></div>
       <p class="fine-print">Vesper nunca ve tu contraseña.</p>
+      <p class="fine-print">Antes de continuar, consulta la <a href="/privacidad">Política de privacidad</a>, las <a href="/terminos">Condiciones de servicio</a> y <a href="/eliminacion-datos">cómo solicitar la eliminación de datos</a>.</p>
     </section>
   </main>
 

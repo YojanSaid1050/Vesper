@@ -7,6 +7,8 @@
 // valor usar en cada hueco: primero lo que el administrador guardó desde el
 // panel, y si no hay nada, exactamente el valor que el bot usaba antes.
 
+const { literalPlaceholders } = require('../utils/messageText');
+
 const EMBED_KINDS = Object.freeze(['welcome', 'goodbye']);
 
 // Las dos formas en que Discord puede pintar un mensaje del bot:
@@ -59,7 +61,7 @@ function rendersMentions(field, layout) {
 // valor por defecto sin confundirlo con una cadena vacía.
 function applyVariables(template, member, options = {}) {
   if (template === null || template === undefined) return null;
-  const text = String(template);
+  const text = literalPlaceholders(String(template));
   if (!text.trim()) return null;
   const guild = member?.guild;
   const name = member?.displayName ?? member?.user?.username ?? '';

@@ -367,3 +367,14 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   * { animation: none !important; transition: none !important; }
   .button:hover, .card:hover { transform: none; }
 }
+
+/* VESPER_AETHERIS_QA_PATCH_2026_11_05 */
+.logo-mark,.logo-mark.small,.chat-avatar{
+  object-fit:cover;object-position:center;display:block;flex-shrink:0;
+  overflow:hidden;border-radius:50%;background:#121019;
+  border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);
+}
+.logo-mark{width:2.3rem;height:2.3rem}
+.logo-mark.small{width:1.9rem;height:1.9rem}
+.chat-avatar{width:2.2rem;height:2.2rem}
+/* Sin degradados de muestra temáticos: el ejemplo es la configuración predeterminada. */
