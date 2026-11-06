@@ -66,6 +66,7 @@ async function completeOAuth(req, res, provider, state, identity) {
     ? await WebIdentityLink.findOne({ 'discord.id': identity.id }).lean()
     : await WebIdentityLink.findOne({ 'google.id': identity.id }).lean();
   if (linked) {
+    WebIdentityLink.updateOne({ _id: linked._id }, { $set: { lastUsedAt: new Date() } }).catch(() => null);
     // Un vínculo guardado a medias (sin una de las dos identidades) hacía
     // que esta comprobación lanzara un TypeError y bloqueara el inicio de
     // sesión con un error 500 en vez de un mensaje claro.
@@ -89,7 +90,7 @@ async function completeOAuth(req, res, provider, state, identity) {
     }
     await WebIdentityLink.findOneAndUpdate(
       { 'discord.id': session.discord.id },
-      { $set: { discord: session.discord.toObject?.() || session.discord, google: session.google.toObject?.() || session.google } },
+      { $set: { discord: session.discord.toObject?.() || session.discord, google: session.google.toObject?.() || session.google, lastUsedAt: new Date() } },
       { upsert: true, returnDocument: 'after' }
     );
   }

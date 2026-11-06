@@ -143,10 +143,11 @@ chmod 640 "$ENV_FILE" "$DUCKDNS_FILE"
 
 paso "Comandos de ayuda"
 install -m 755 "$APP_DIR/deploy/oracle/vesper-update.sh" /usr/local/bin/vesper-update
+install -m 755 "$APP_DIR/deploy/oracle/vesper-config.sh" /usr/local/bin/vesper-config
 install -m 755 "$APP_DIR/deploy/oracle/duckdns.sh" /usr/local/bin/vesper-duckdns
 printf '#!/bin/sh\nexec journalctl -u vesper -f -n 100 --output cat\n' > /usr/local/bin/vesper-logs && chmod 755 /usr/local/bin/vesper-logs
 echo '*/5 * * * * root /usr/local/bin/vesper-duckdns >/dev/null 2>&1' > /etc/cron.d/vesper-duckdns
-ok "vesper-update, vesper-logs y vesper-duckdns"
+ok "vesper-config, vesper-update, vesper-logs y vesper-duckdns"
 
 if [ "$SKIP_CADDY" != "true" ] && [ -n "$DOMAIN" ]; then
   paso "HTTPS para $DOMAIN"
@@ -186,8 +187,8 @@ $(printf '\033[1;32m✅ Instalación terminada.\033[0m')
 
 Falta lo que solo puedes hacer tú:
 
-  1. Pega tus secretos (los mismos de Render → Environment):
-       sudo nano $ENV_FILE
+  1. Pon tus claves (las mismas de Render → Environment); te las pide una a una:
+       sudo vesper-config
   2. Pega el token de DuckDNS:
        sudo nano $DUCKDNS_FILE
   3. En Discord Developer Portal → OAuth2, añade la redirección:

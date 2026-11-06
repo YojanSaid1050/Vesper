@@ -13,7 +13,10 @@ const webIdentityLinkSchema = new mongoose.Schema({
     name: { type: String, default: null },
     picture: { type: String, default: null },
     verified: { type: Boolean, required: true }
-  }
+  },
+  // Último inicio de sesión con esta cuenta: la vinculación se borra tras un
+  // año sin uso (ver RetentionService).
+  lastUsedAt: { type: Date, default: null }
 }, { timestamps: true });
 
 webIdentityLinkSchema.index({ 'discord.id': 1 }, { unique: true });

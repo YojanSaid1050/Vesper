@@ -1,5 +1,23 @@
 # Changelog
 
+## 3.9.7 — Plazos de conservación y Oracle en pocos pasos
+
+### Datos
+- Cada dato se borra solo al cumplir su plazo (se revisa a diario):
+  casos de moderación cerrados, 1 año; cualquier caso, 2 años; tickets
+  cerrados, 180 días; sugerencias y destacados, 1 año; cuentas vinculadas
+  del panel, tras 1 año sin iniciar sesión. Los tickets abiertos y las salas
+  activas no caducan.
+- La política de privacidad dice esos plazos, ya no pide domicilio ni
+  teléfono y está vigente desde su publicación.
+
+### Oracle
+- `deploy/oracle/cloud-init.yaml`: se pega al crear la instancia y el
+  servidor instala Vesper solo al encenderse.
+- `sudo vesper-config`: pide las claves una a una (sin que se vean), genera la
+  clave de sesión del panel y reinicia el bot. Ya no hace falta editar
+  archivos.
+
 ## 3.9.6 — Mensajes limpios en Discord, web de Aetheris y datos personales
 
 ### Mensajes de Discord
