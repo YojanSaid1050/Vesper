@@ -1,0 +1,8 @@
+#cloud-config
+# Pégalo en Oracle al crear la instancia: «Show advanced options» →
+# «Management» → «Paste cloud-init script». Cambia solo TU-NOMBRE por el
+# nombre que elegiste en DuckDNS. El servidor instala Vesper solo al
+# encenderse (unos 10 minutos); el avance queda en /var/log/vesper-install.log.
+# Aquí no van claves: se ponen después con «sudo vesper-config».
+runcmd:
+  - [bash, -c, "curl -fsSL https://raw.githubusercontent.com/YojanSaid1050/Vesper/main/deploy/oracle/install.sh -o /root/vesper-install.sh && DOMAIN=TU-NOMBRE.duckdns.org bash /root/vesper-install.sh > /var/log/vesper-install.log 2>&1"]

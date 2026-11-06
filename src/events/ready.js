@@ -29,6 +29,8 @@ module.exports = {
       const { reconcileTemporaryVoiceChannels } = require('../core/TempVoiceService');
       const tempVoice = await reconcileTemporaryVoiceChannels(client);
       console.log(`🔊 Salas temporales revisadas: ${tempVoice.checked}; eliminadas: ${tempVoice.removed}`);
+      // Borra a diario lo que superó su plazo de conservación.
+      require('../core/RetentionService').startRetention();
     } catch (error) {
       console.error('❌ Error conectando a MongoDB:', error.message);
     }

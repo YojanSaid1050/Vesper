@@ -42,7 +42,12 @@ Lo que necesitas a mano:
 4. **Networking**: deja *Assign a public IPv4 address* marcado.
 5. **Add SSH keys**: **Generate a key pair for me** → **Save private key**.
    Guarda ese archivo `.key`: es la llave para entrar al servidor.
-6. **Create**. Cuando diga *Running*, copia la **Public IP address**.
+6. **Show advanced options** → **Management** → **Paste cloud-init script**.
+   Pega el contenido de
+   [`deploy/oracle/cloud-init.yaml`](deploy/oracle/cloud-init.yaml) y
+   cambia `TU-NOMBRE` por el nombre que vas a elegir en DuckDNS (paso 4).
+   Así el servidor instala Vesper solo al encenderse y te saltas el paso 5.
+7. **Create**. Cuando diga *Running*, copia la **Public IP address**.
 
 ## 3. Abrir los puertos de la web
 
@@ -84,13 +89,17 @@ sudo DOMAIN=vesper-yojan.duckdns.org bash install.sh
 Tarda unos 5–10 minutos. Instala Node 24, Caddy (HTTPS), Chromium (TikTok),
 la música para ARM y el servicio `vesper`.
 
-## 6. Pegar los secretos
+## 6. Poner tus claves
+
+Si usaste el script de arranque, espera unos 10 minutos desde que el servidor
+dice *Running* y entra con `ssh` como en el paso 5. Luego:
 
 ```bash
-sudo nano /etc/vesper/vesper.env
+sudo vesper-config
 ```
 
-Rellena con los mismos valores que tienes en Render. Como mínimo:
+Te pide cada clave una por una (lo que escribes no se ve) y reinicia el bot al
+terminar. Son los mismos valores que tienes en Render:
 
 | Variable | De dónde sale |
 | --- | --- |
@@ -103,7 +112,8 @@ Rellena con los mismos valores que tienes en Render. Como mínimo:
 | `MAIN_GUILD_ID`, `THEMED_MAIN_GUILD_IDS`, `BOT_OWNER_IDS`… | Igual que en Render |
 
 `WEB_BASE_URL`, `PORT`, `WEB_TRUST_PROXY` y `WEB_COOKIE_SECURE` ya vienen
-puestos. Guarda con `Ctrl+O`, `Enter` y sal con `Ctrl+X`.
+puestos, y la clave de sesión del panel se genera sola. Si prefieres editar el
+archivo a mano: `sudo nano /etc/vesper/vesper.env`.
 
 Luego el token de DuckDNS:
 
@@ -147,7 +157,7 @@ el servidor nuevo.
 | Actualizar a la última versión de GitHub | `sudo vesper-update` |
 | Reiniciar | `sudo systemctl restart vesper` |
 | Ver si está encendido | `systemctl status vesper` |
-| Cambiar un secreto | `sudo nano /etc/vesper/vesper.env` y reiniciar |
+| Cambiar una clave | `sudo vesper-config` |
 
 Render desplegaba solo con cada cambio en GitHub; aquí lo haces tú con
 `sudo vesper-update` cuando haya una versión nueva.
@@ -158,6 +168,8 @@ Render desplegaba solo con cada cambio en GitHub; aquí lo haces tú con
   apunte a la IP correcta (`sudo vesper-duckdns`). `sudo systemctl status caddy`
   dice si el certificado falló.
 - **El bot no se conecta**: `vesper-logs` dice qué variable falta.
+- **Usaste el script de arranque y no aparece `vesper-config`**: la instalación
+  sigue en marcha. Mira cómo va con `sudo tail -f /var/log/vesper-install.log`.
 - **«Out of capacity» al crear el servidor**: otra *Availability domain*,
   menos OCPU o vuelve a intentarlo en unas horas.
 - **YouTube**: también bloquea las IP de Oracle. La música sale de SoundCloud
