@@ -9,7 +9,8 @@ const COLLECTOR_ONLY_COMPONENT_IDS = new Set([
   'twitch_clear_confirm', 'twitch_clear_cancel',
   'youtube_clear_confirm', 'youtube_clear_cancel',
   'confirm_reset_config', 'cancel_reset_config',
-  'resetalldb_confirm', 'resetalldb_cancel'
+  'resetalldb_confirm', 'resetalldb_cancel',
+  'personal_data_confirm', 'personal_data_cancel'
 ]);
 
 function inferredCapability(commandName) {

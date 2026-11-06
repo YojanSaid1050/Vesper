@@ -159,7 +159,8 @@ test('en Embers Void se puede pasar la bienvenida al embed clásico sin perder e
 
   assert.ok(!payload.flags, 'ya no lleva la marca de Components V2');
   assert.equal(payload.embeds.length, 1);
-  assert.equal(payload.embeds[0].title, memberAdd.WELCOME_DEFAULT_TITLE);
+  // El título conserva todo menos el «# », que en un embed clásico no agranda la letra.
+  assert.equal(payload.embeds[0].title, memberAdd.WELCOME_DEFAULT_TITLE.replace(/^# /, ''));
   assert.equal(payload.embeds[0].description, memberAdd.welcomeDefaultMessage(member));
   assert.equal(payload.embeds[0].image.url, memberAdd.WELCOME_DEFAULT_IMAGE);
   assert.equal(payload.embeds[0].color, memberAdd.WELCOME_DEFAULT_COLOR);
@@ -169,7 +170,7 @@ test('en Embers Void se puede pasar la bienvenida al embed clásico sin perder e
 test('la despedida de Embers Void también admite el embed clásico', () => {
   const payload = memberRemove.buildGoodbyePayload(fakeMember(), { embeds: { goodbye: { layout: 'classic' } } });
   assert.ok(!payload.flags);
-  assert.equal(payload.embeds[0].title, memberRemove.GOODBYE_DEFAULT_TITLE);
+  assert.equal(payload.embeds[0].title, memberRemove.GOODBYE_DEFAULT_TITLE.replace(/^# /, ''));
 });
 
 test('en el Main temático la bienvenida sale como embed clásico por defecto', () => {

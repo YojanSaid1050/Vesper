@@ -2,7 +2,7 @@ const { ChannelType, PermissionFlagsBits } = require('discord.js');
 const { MODULE_DEFAULTS, isAnyMainGuild, isMainGuild } = require('../config/guildPolicy');
 const { normalizeAllowedDomain } = require('../core/ModerationService');
 const { EMBED_FIELD_LIMITS } = require('../core/EmbedTemplateService');
-const { isKnownKind, kindInfo } = require('../core/EmbedCatalog');
+const { isKnownKind, kindInfo, literalPlaceholders } = require('../core/EmbedCatalog');
 const { ROUTABLE } = require('../core/AlertRouter');
 const { featureAvailable } = require('../config/guildPolicy');
 const { isPrivateHostname } = require('../utils/imageUrlValidator');
@@ -195,7 +195,10 @@ function sanitizeGuildPatch(input, guild, config = null) {
       const result = {};
       for (const field of ['author', 'title', 'message', 'footer']) {
         if (block[field] === undefined) continue;
-        result[field] = optionalText(block[field], EMBED_FIELD_LIMITS[field], `embeds.${kind}.${field}`);
+        // «@usuario» escrito a mano se guarda ya como {user}: el editor enseña
+        // la variable y en Discord sale la mención de la persona.
+        const text = optionalText(block[field], EMBED_FIELD_LIMITS[field], `embeds.${kind}.${field}`);
+        result[field] = typeof text === 'string' ? literalPlaceholders(text) : text;
       }
       const supports = kindInfo(kind)?.supports || {};
       // El editor manda la imagen vacía también en los mensajes de solo

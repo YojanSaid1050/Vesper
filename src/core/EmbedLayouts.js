@@ -13,6 +13,8 @@
 // perder nada de lo que escribió. Lo único que no viaja es la miniatura: el
 // contenedor V2 no tiene ese hueco.
 
+const { classicLine } = require('../utils/messageText');
+
 const CONTAINER = 17;   // contenedor con borde de color
 const TEXT = 10;        // texto con Markdown
 const SEPARATOR = 14;   // línea separadora
@@ -56,13 +58,16 @@ function containerPayload({ title, message, fields = [], footer, image, color, a
  */
 function classicPayload({ title, message, fields = [], footer, image, color, thumbnailUrl } = {}) {
   const embed = { color, timestamp: new Date().toISOString() };
-  if (title) embed.title = title;
+  // «# Título» no se agranda en un embed clásico: se quita la marca.
+  const titleText = classicLine(title);
+  if (titleText) embed.title = titleText;
   if (message) embed.description = message;
   const usable = fields.filter(field => field && field.name && field.value);
   if (usable.length) embed.fields = usable;
   if (thumbnailUrl) embed.thumbnail = { url: thumbnailUrl };
   if (image) embed.image = { url: image };
-  if (footer) embed.footer = { text: footer };
+  const footerText = classicLine(footer, { plain: true });
+  if (footerText) embed.footer = { text: footerText };
   return { embeds: [embed] };
 }
 

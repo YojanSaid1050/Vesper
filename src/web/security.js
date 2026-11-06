@@ -101,9 +101,11 @@ function securityHeaders(req, res, next) {
   res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  // La portada es lo único público y existe para que la encuentren. Todo lo
-  // demás —el panel, la API, las vueltas de OAuth— no debe indexarse.
-  const esPortada = req.path === '/' || req.path.startsWith('/panel/assets/landing');
+  // La portada y las páginas legales son públicas y existen para que las
+  // encuentren. Todo lo demás —el panel, la API, las vueltas de OAuth— no
+  // debe indexarse.
+  const esPortada = req.path === '/' || req.path.startsWith('/panel/assets/landing')
+    || ['/privacidad', '/privacy', '/terminos', '/terms', '/eliminacion-datos', '/data-deletion'].includes(req.path);
   res.setHeader('X-Robots-Tag', esPortada ? 'index, follow' : 'noindex, nofollow');
   if (req.secure || req.get('X-Forwarded-Proto') === 'https') {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

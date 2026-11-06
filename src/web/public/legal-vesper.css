@@ -1,0 +1,19 @@
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 8% -8%,#49311944 0%,transparent 35%),radial-gradient(ellipse at 100% 0%,#6450ac28 0%,transparent 40%),#0d0c13;color:#f5f2fb;font:16px/1.8 system-ui,-apple-system,Segoe UI,Arial,sans-serif}a{color:#d4c6ff;text-underline-offset:3px}a:hover{color:#ffd593}.legal-header{padding:14px max(22px,calc((100vw - 1050px)/2));display:flex;align-items:center;gap:24px;justify-content:space-between;flex-wrap:wrap;background:#0d0c13eb;border-bottom:1px solid #383040}.legal-brand{display:flex;align-items:center;gap:12px;color:#f5f0fb;text-decoration:none;font-weight:800;letter-spacing:.12em}.legal-brand img{width:44px;height:44px;border-radius:50%;object-fit:contain}.legal-header nav,.legal-footer{display:flex;gap:20px;flex-wrap:wrap}.legal-header nav a,.legal-footer a{text-decoration:none}.legal-header nav{font-size:14px}.legal-main{max-width:940px;margin:auto;padding:42px 24px 90px}.legal-kicker{font-size:12px;color:#ffd58c;letter-spacing:.18em;text-transform:uppercase}.legal-main h1{font-size:clamp(32px,5vw,53px);line-height:1.18;margin:6px 0 15px}.legal-lead{font-size:17px;color:#e6dff3}.legal-meta{display:flex;gap:12px 22px;flex-wrap:wrap;margin:22px 0;color:#c1b9d2;font-size:14px}.legal-notice{padding:16px 22px;border-left:3px solid #e8b86c;background:#292116;color:#f1e8d9;margin:22px 0;border-radius:0 8px 8px 0}.legal-toc{border:1px solid #3e3651;background:#171521;border-radius:14px;padding:23px;margin:26px 0}.legal-toc ol{column-count:2;column-gap:24px;padding-left:20px;margin-bottom:0}.legal-toc li{margin:3px 0;break-inside:avoid;font-size:13px}.legal-section{padding:11px 0 18px;border-bottom:1px solid #343041;scroll-margin-top:22px}.legal-section h2{font-size:22px;line-height:1.4;margin:22px 0 14px}.legal-section p{color:#d7d1e1;line-height:1.9;margin:0 0 15px}.references{padding-left:24px}.references li{padding:7px 0;overflow-wrap:anywhere}.legal-footer{justify-content:center;background:#0b0a10;border-top:1px solid #393248;padding:25px;font-size:14px}@media(max-width:650px){.legal-header{justify-content:center}.legal-toc ol{column-count:1}.legal-main{padding:28px 18px 56px}}
+
+/* Modo claro: las páginas legales siguen el tema del dispositivo, como la portada. */
+@media (prefers-color-scheme: light) {
+  body { background: radial-gradient(ellipse at 8% -8%, #f3d9b044 0%, transparent 35%), radial-gradient(ellipse at 100% 0%, #b7a6f028 0%, transparent 40%), #faf8fd; color: #1d1828; }
+  a { color: #5b3fc4; }
+  a:hover { color: #9a5a00; }
+  .legal-header { background: #faf8fdeb; border-bottom-color: #e2dcec; }
+  .legal-brand { color: #1d1828; }
+  .legal-kicker { color: #9a5a00; }
+  .legal-lead { color: #3a3348; }
+  .legal-meta { color: #5d5670; }
+  .legal-notice { background: #fbf1df; color: #4a3a1c; border-left-color: #d49a3c; }
+  .legal-toc { background: #ffffff; border-color: #e2dcec; }
+  .legal-section { border-bottom-color: #e7e2ef; }
+  .legal-section p { color: #3a3348; }
+  .legal-footer { background: #f1edf7; border-top-color: #e2dcec; }
+}
+
