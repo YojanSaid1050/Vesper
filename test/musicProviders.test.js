@@ -121,9 +121,19 @@ test('SoundCloud abre los primeros resultados a la vez y salta los protegidos', 
 test('lo pedido hace poco no se vuelve a buscar', async t => {
   const calls = fakeYtdlp(t, { order: 'soundcloud' });
   const [first] = await providers.search('joji slow dancing in the dark');
-  const before = calls().length;
+  // La búsqueda responde en cuanto un resultado sirve, pero los demás
+  // procesos que abrió a la vez pueden seguir anotándose un momento después.
+  // Se espera a que terminen todos antes de contar.
+  const settled = async () => {
+    for (let count = -1; count !== calls().length;) {
+      count = calls().length;
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    return calls().length;
+  };
+  const before = await settled();
   const [again] = await providers.search('  Joji SLOW dancing in the dark ');
-  assert.equal(calls().length, before, 'sale de la memoria');
+  assert.equal(await settled(), before, 'sale de la memoria');
   assert.equal(again.title, first.title);
   again.streamUrl = 'cambiada';
   const [third] = await providers.search('joji slow dancing in the dark');
