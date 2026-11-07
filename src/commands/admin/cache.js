@@ -1,6 +1,6 @@
 // commands/admin/cache.js
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
-const CacheManager = require('../../core/CacheManager');
+const PersistentStateStore = require('../../core/PersistentStateStore');
 const { getMonitorStats: getTikTokMonitorStats } = require('../../platforms/tiktok/monitors');
 
 module.exports = {
@@ -12,17 +12,20 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 });
     
-    const tiktokCache = new CacheManager('./data/tiktok');
-    const youtubeCache = new CacheManager('./data/youtube');
-    const twitchCache = new CacheManager('./data/twitch');
-    
-    const tiktokVideos = tiktokCache.load('videos', {});
-    const tiktokLive = tiktokCache.load('liveStatus', {});
-    const tiktokStats = await getTikTokMonitorStats();
-    const youtubeVideos = youtubeCache.load('videos', {});
-    const youtubeShorts = youtubeCache.load('shorts', {});
-    const youtubeLive = youtubeCache.load('liveStatus', {});
-    const twitchStatus = twitchCache.load('status', {});
+    // Lo mismo que leen los avisos: el estado guardado en la base de datos,
+    // que sobrevive a los reinicios (la copia local se pierde en Render).
+    const tiktokState = new PersistentStateStore('tiktok');
+    const youtubeState = new PersistentStateStore('youtube');
+    const twitchState = new PersistentStateStore('twitch');
+    const [tiktokVideos, tiktokLive, tiktokStats, youtubeVideos, youtubeShorts, youtubeLive, twitchStatus] = await Promise.all([
+      tiktokState.load('videos', {}),
+      tiktokState.load('liveStatus', {}),
+      getTikTokMonitorStats(),
+      youtubeState.load('videos', {}),
+      youtubeState.load('shorts', {}),
+      youtubeState.load('liveStatus', {}),
+      twitchState.load('status', {})
+    ]);
     
     const servers = n => `${n} ${n === 1 ? 'servidor' : 'servidores'}`;
     const embed = new EmbedBuilder()

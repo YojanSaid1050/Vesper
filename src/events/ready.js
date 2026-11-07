@@ -29,6 +29,8 @@ module.exports = {
       const { reconcileTemporaryVoiceChannels } = require('../core/TempVoiceService');
       const tempVoice = await reconcileTemporaryVoiceChannels(client);
       console.log(`🔊 Salas temporales revisadas: ${tempVoice.checked}; eliminadas: ${tempVoice.removed}`);
+      // El uso de cuota de hoy sigue contando tras el reinicio.
+      await require('../core/ProviderMetrics').restoreProviderMetrics().catch(error => console.warn(`[Cuotas] ${error.message}`));
       // Borra a diario lo que superó su plazo de conservación.
       require('../core/RetentionService').startRetention();
     } catch (error) {
@@ -59,6 +61,8 @@ module.exports = {
     // en segundo plano y se dice en una línea en qué estado quedó.
     try {
       await client.music.start();
+      // La música que sonaba antes del reinicio vuelve donde iba.
+      client.music.restoreSessions().catch(error => console.warn(`[Música] ${error.message}`));
       const music = client.music.status();
       if (!music.configured) {
         console.log(`🎵 Música desactivada — ${music.reason}`);

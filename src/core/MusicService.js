@@ -32,6 +32,7 @@ const { getGuildConfig } = require('../database/mongoManager');
 const { isModuleEnabledConfig, featureAvailable } = require('../config/guildPolicy');
 const sources = require('./music/sources');
 const providers = require('./music/providers');
+const sessions = require('./music/sessionStore');
 const { friendlyError } = require('../utils/userMessage');
 
 const DEFAULTS = Object.freeze({
@@ -116,6 +117,61 @@ class MusicService {
 
   changed(guildId) {
     try { this.onChange?.(guildId); } catch { /* el controlador no debe tumbar la música */ }
+    this.persist(guildId);
+  }
+
+  // Cada cambio se guarda en la base de datos para retomar la música tras un
+  // reinicio. Mientras el bot se apaga no se toca: lo guarda shutdown().
+  persist(guildId) {
+    if (this.shuttingDown) return;
+    sessions.scheduleSave(guildId, () => {
+      const player = this.players.get(guildId);
+      return player?.current ? sessions.snapshot(player, this.elapsed(player)) : null;
+    });
+  }
+
+  loadConfig(guildId) {
+    return getGuildConfig(guildId);
+  }
+
+  // Vuelve a poner la música que sonaba antes del reinicio, por donde iba,
+  // si en ese canal sigue habiendo alguien escuchando.
+  async restoreSessions() {
+    if (!this.tools?.ok) return 0;
+    const saved = await sessions.loadAll().catch(error => {
+      console.warn(`[Música] No pude leer las sesiones guardadas: ${error.message}`);
+      return [];
+    });
+    let restored = 0;
+    for (const { guildId, state } of saved) {
+      try {
+        const guild = this.client.guilds?.cache?.get(guildId);
+        const voiceChannel = guild?.channels?.cache?.get(state.voiceChannelId);
+        const listeners = voiceChannel?.members?.filter?.(member => !member.user?.bot)?.size || 0;
+        const config = guild ? await this.loadConfig(guildId) : null;
+        if (!sessions.fresh(state) || !voiceChannel || !listeners || this.players.has(guildId)
+          || !isModuleEnabledConfig(config, 'music', guildId)) {
+          await sessions.remove(guildId);
+          continue;
+        }
+        const player = await this.join(guild, voiceChannel, state.textChannelId, config.music || {});
+        player.volume = Number(state.volume) || player.volume;
+        player.loop = Boolean(state.loop);
+        player.queue = [state.current, ...(state.queue || [])].filter(Boolean).map(track => ({ ...track, quietStart: false }));
+        player.queue[0].quietStart = true;
+        player.resumeAt = state.current.live ? 0 : Number(state.elapsed) || 0;
+        await this.advance(guildId);
+        if (player.current) {
+          restored++;
+          this.announce(player, `▶️ Volví: sigo con **${player.current.title || 'la canción'}** donde iba.`);
+        }
+      } catch (error) {
+        console.warn(`[Música] No pude retomar la música de ${guildId}: ${error.message}`);
+        await sessions.remove(guildId).catch(() => null);
+      }
+    }
+    if (restored) console.log(`🎶 Música retomada en ${restored} servidor(es) tras el reinicio`);
+    return restored;
   }
 
   async start() {
@@ -127,6 +183,12 @@ class MusicService {
         if (!result.mpegts) console.warn(`[Música] ffmpeg no puede leer MPEG-TS en este alojamiento (${result.signal || 'sin audio'}); se priorizan formatos directos.`);
       }).catch(() => null);
     }
+    // Si el bot se cae sin avisar, lo guardado tiene como mucho 30 s de
+    // retraso en la posición de la canción.
+    this.heartbeat = setInterval(() => {
+      for (const [guildId, player] of this.players) if (player.current && !player.pausedAt) this.persist(guildId);
+    }, 30_000);
+    this.heartbeat.unref?.();
     this.client.on?.('voiceStateUpdate', (oldState, newState) => {
       const guildId = newState.guild?.id || oldState.guild?.id;
       if (guildId) setTimeout(() => this.checkAudience(guildId), 1000);
@@ -334,7 +396,10 @@ class MusicService {
 
     const repeating = player.loop && player.queue.length === 0;
     try {
-      await this.playCurrent(guildId);
+      // Tras un reinicio, la primera canción sigue por donde iba.
+      const resumeAt = player.resumeAt || 0;
+      player.resumeAt = 0;
+      await this.playCurrent(guildId, resumeAt);
       const now = player.current;
       this.changed(guildId);
       // Con el controlador en ese mismo canal, la canción ya se ve en él.
@@ -576,8 +641,15 @@ class MusicService {
     if (player) this.changed(guildId);
   }
 
+  // Al apagarse (un despliegue, Render reiniciando) se guarda por dónde iba
+  // cada servidor antes de cortar, para retomarlo al volver.
   async shutdown() {
     this.started = false;
+    this.shuttingDown = true;
+    clearInterval(this.heartbeat);
+    await Promise.all([...this.players.entries()].map(([guildId, player]) => (player.current
+      ? sessions.save(guildId, sessions.snapshot(player, this.elapsed(player)))
+      : Promise.resolve()).catch(() => null)));
     await Promise.all([...this.players.keys()].map(guildId => this.stop(guildId).catch(() => null)));
   }
 }
