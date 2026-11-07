@@ -1,6 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { updateGuildConfig, getGuildConfig } = require('../../database/mongoManager');
-const CacheManager = require('../../core/CacheManager');
 const { updateDashboard, getActivePanel } = require('../../dashboard/updater');
 const { clearGuildCache: clearTikTokGuildCache } = require('../../platforms/tiktok/monitors');
 const { clearGuildCache: clearTwitchGuildCache } = require('../../platforms/twitch/monitors');
@@ -9,45 +8,6 @@ const { CAPABILITIES, requireCapability } = require('../../core/PermissionServic
 const { createDefaultGuildConfig } = require('../../config/defaultGuild');
 const { moduleDefaults } = require('../../config/guildPolicy');
 const { friendlyError } = require('../../utils/userMessage');
-
-// Inicializar limpiadores de caché
-const twitchCache = new CacheManager('./data/twitch');
-const tiktokLiveCache = new CacheManager('./data/tiktok');
-const tiktokVideosCache = new CacheManager('./data/tiktok');
-const youtubeCache = new CacheManager('./data/youtube');
-
-function cleanAllGuildCache(guildId) {
-  // Limpiar caché de Twitch
-  const twitchStatus = twitchCache.load('status', {});
-  for (const key of Object.keys(twitchStatus)) {
-    if (key.startsWith(`${guildId}_`)) {
-      delete twitchStatus[key];
-    }
-  }
-  twitchCache.save('status', twitchStatus);
-
-  // Limpiar caché de TikTok
-  const tiktokLive = tiktokLiveCache.load('liveStatus', {});
-  delete tiktokLive[guildId];
-  tiktokLiveCache.save('liveStatus', tiktokLive);
-  
-  const tiktokVideos = tiktokVideosCache.load('videos', {});
-  delete tiktokVideos[guildId];
-  tiktokVideosCache.save('videos', tiktokVideos);
-
-  // Limpiar caché de YouTube
-  const youtubeLive = youtubeCache.load('liveStatus', {});
-  delete youtubeLive[guildId];
-  youtubeCache.save('liveStatus', youtubeLive);
-  
-  const youtubeVideos = youtubeCache.load('videos', {});
-  delete youtubeVideos[guildId];
-  youtubeCache.save('videos', youtubeVideos);
-  
-  const youtubeShorts = youtubeCache.load('shorts', {});
-  delete youtubeShorts[guildId];
-  youtubeCache.save('shorts', youtubeShorts);
-}
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -120,7 +80,6 @@ module.exports = {
           await updateGuildConfig(interaction.guildId, resetConfig);
           
           // Limpiar toda la caché del guild
-          cleanAllGuildCache(interaction.guildId);
           await Promise.all([
             clearTikTokGuildCache(interaction.guildId),
             clearTwitchGuildCache(interaction.guildId),

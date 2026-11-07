@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.9.8 — El bot ya no se duerme ni pierde lo que estaba haciendo
+
+- **Render no lo apaga:** el plan gratis apaga el servicio tras 15 minutos sin
+  visitas a la web, y la conexión con Discord no cuenta. Ahora el bot visita su
+  propia página de estado cada 10 minutos. Solo se activa en Render (o con
+  `KEEP_ALIVE_URL`).
+- **La música vuelve tras un reinicio:** la canción, por dónde iba, la cola, el
+  volumen y el bucle se guardan en la base de datos. Al arrancar, si en el
+  canal sigue habiendo gente, el bot vuelve a entrar y sigue donde iba
+  («Volví: sigo con…»). Se descarta pasadas dos horas o con el canal vacío.
+- **El uso de cuota de YouTube y Twitch del día** se guarda y se recupera, en
+  vez de volver a cero en cada reinicio.
+- `/cache` y `/resetconfig` leen y borran el estado de los avisos en la base de
+  datos, no en la copia local que se pierde en Render.
+
 ## 3.9.7 — Plazos de conservación y Oracle en pocos pasos
 
 ### Datos

@@ -25,7 +25,11 @@ mountHealthRoutes(app, { runtimeHealth, getClient: () => client, isShuttingDown:
 
 mountWebDashboard(app, { getClient: () => client, runtimeHealth });
 
-const server = app.listen(PORT, () => console.log(`🌐 Web activa en puerto ${PORT}`));
+const server = app.listen(PORT, () => {
+  console.log(`🌐 Web activa en puerto ${PORT}`);
+  // En el plan gratis de Render, sin esto el bot se apaga a los 15 minutos.
+  require('./core/KeepAlive').startKeepAlive();
+});
 
 // Función para apagado graceful
 async function gracefulShutdown(signal) {
@@ -41,6 +45,7 @@ async function gracefulShutdown(signal) {
 
   console.log('📡 Deteniendo monitores...');
   stopAllMonitors();
+  require('./core/KeepAlive').stopKeepAlive();
 
   if (client && client.timers) {
     for (const timer of Object.values(client.timers)) {
